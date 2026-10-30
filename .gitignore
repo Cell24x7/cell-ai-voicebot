@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+*/node_modules/
+*/*/node_modules/
+.pnp
+.pnp.js
+
+# Production & Build outputs
+dist/
+*/dist/
+build/
+coverage/
+*.tsbuildinfo
+dist-ssr/
+
+# Environment files and credentials
+.env
+.env.*
+*.env
+*.env.*
+*.env.production
+backend.env.production
+frontend.env.production
+!.env.example
+!*.env.example
+!*.env.template
+*.pem
+*.key
+*.p12
+id_rsa*
+
+# Live Server Deployment Scripts & Credentials (DO NOT SHARE WITH COLLABORATORS)
+deploy_live/
+deploy_live/*
+
+# Archives & Large packages
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+
+# Logs & Runtime data
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+uploads/
+recordings/
+tmp/
+staging_tmp/
+deploy-bundle.zip
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.suo
+*.sw?
+
+# Testing
+playwright-report/
+test-results/
+.eslintcache

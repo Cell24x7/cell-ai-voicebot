@@ -1,0 +1,73 @@
+# Secrets & Environment Variables Policy
+
+## Naming
+
+- Env vars use `UPPER_SNAKE_CASE`.
+- Frontend vars must start with `VITE_` — **these are bundled into the browser and are public**. Never put a secret in a `VITE_*` variable.
+- Every variable is documented in the repo's `.env.example` (with the phase that starts using it) and in the README env table.
+
+## Where secrets live
+
+| ✅ Allowed                                                | ❌ Never                            |
+| --------------------------------------------------------- | ----------------------------------- |
+| Local `.env` / `.env.local` (gitignored)                  | Git (any branch, any commit)        |
+| Server env vars, or a server `.env` file with `chmod 600` | Docs, README, ADRs, plans, prompts  |
+| Team password manager (source of truth)                   | Chat / WhatsApp / email             |
+| CI secrets store (GitHub Actions secrets)                 | Screenshots, screen shares          |
+|                                                           | Logs, error messages, API responses |
+
+## Environments
+
+- Each environment (local / staging / production) has **its own** secrets.
+- Production secrets are never copied to a laptop or used locally.
+- `.env.example` only holds placeholders (`change-me`, empty) or local-safe defaults (localhost URLs).
+
+## Rotation
+
+- Rotate immediately on any leak or doubt (committed by mistake, shared in chat, ex-team member, compromised machine).
+- Secrets already shared over chat/WhatsApp are treated as **exposed** and must be rotated **before production**:
+  - [ ] Client DB password (shared over WhatsApp)
+  - [ ] NotifyNow API key (shared in a chat message)
+  - [ ] Client SSH key (shared as a file over WhatsApp) — ask the client to issue a new key pair for production access
+- After rotation, update the password manager and the server env; never the repo.
+
+## Payment secrets (Phase 4)
+
+- `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` are secrets (test-mode keys locally, live keys only on the production server). `RAZORPAY_KEY_ID` is public (the checkout sends it to the browser).
+- `FAKE_PAYMENT_SECRET` is a dev / test-only signing secret of the fake provider; production refuses to start when it is set.
+- Never log signatures, webhook bodies, the Basic-auth header or card / UPI data (we never receive card data — Razorpay Checkout collects it).
+
+## AI secrets (Phase 5)
+
+- `OPENAI_API_KEY` is a secret (required in production; dev / tests use the fake provider without it). Never logged; `/admin/ai/config` only says whether it is set.
+- `ENCRYPTION_KEY` now also **seals agent function secret headers** (AES-256-GCM, key derived per purpose). Rotating it needs a re-seal step (planned script) — until then rotation makes stored function secrets unreadable; re-enter them after a rotation.
+- Function header values marked secret are write-only in the API (`valueHint` `••••1234` only) and never appear in logs, audit meta, tool-call logs or playground traces. Outgoing-request rules (SSRF guard, templating): [security.md](security.md).
+
+## Meta / WhatsApp secrets (Phase 9)
+
+- `META_APP_SECRET` (signs webhooks and `signed_request` callbacks; used for the code exchange and `debug_token`), `META_WEBHOOK_VERIFY_TOKEN`, `META_SYSTEM_USER_TOKEN` (our business's System User — credit line calls) are secrets; `META_APP_ID`, `META_ES_CONFIG_ID` and `META_CREDIT_LINE_ID` are public ids (the app id and config id go to the browser). Real values only on the server at Meta setup ([setup guide](../setup/meta-whatsapp.md)) — never AutoChatix values.
+- Business tokens of connected numbers and registration PINs are **sealed** with `ENCRYPTION_KEY` (`tokenSealed`, `registration.pinSealed`, `select: false`), never returned, logged or put in audit / WS / notifications / emails.
+- The two Graph calls that carry credentials in the query (`oauth/access_token`, `debug_token`) are never logged; Graph error messages are scrubbed (`access_token=`, `client_secret=`, `input_token=`, `code=`, `Bearer …` → `***`) before they reach logs or errors.
+- `FAKE_META_APP_SECRET` is a dev / test-only secret of the fake Meta provider; production refuses to start when it is set.
+
+## Client SSH key
+
+- Store in the password manager and locally in `~/.ssh/` with `chmod 400`.
+- Never copy it into a repo folder (`*.pem`, `*.key`, `id_rsa*` are gitignored as a safety net, not as permission).
+
+## Validation
+
+- The backend validates env vars with a zod schema at startup — implemented in `src/config/env.ts` (Phase 1). A missing or invalid required variable stops the app with an error listing variable **names** (never values). Production additionally requires JWT secrets ≥ 32 chars (no `change-me` placeholders), a 32-byte base64 `ENCRYPTION_KEY`, explicit URLs and CORS origins.
+
+## Leak prevention
+
+- `.gitignore` covers `.env`, `.env.*` (except `.env.example`), `*.pem`, `*.key`, `*.p12`, `id_rsa*`.
+- CI adds secret scanning (gitleaks / GitHub secret scanning) in T0.14.
+- Before committing, check `git status` — a `.env` file must never appear as staged.
+
+## Checklist: adding a new env var
+
+1. Add it to `.env.example` with a comment (purpose + phase) and `# SECRET — kabhi commit nahi` if it is a secret.
+2. Add it to the README "Environment variables" table (name, required?, phase, description — never the value).
+3. Add it to the env zod schema (Phase 1+), with a sensible default only if it is not a secret.
+4. Add the real value to the password manager and each environment's server env.

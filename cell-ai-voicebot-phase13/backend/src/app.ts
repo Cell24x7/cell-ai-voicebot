@@ -1,0 +1,164 @@
+import cookieParser from 'cookie-parser';
+import express, { json, raw, urlencoded, type Express } from 'express';
+import type { Store } from 'express-rate-limit';
+
+import type { Env } from './config/env';
+import {
+  BILLING_LIMITS,
+  WHATSAPP_LIMITS,
+  JSON_BODY_LIMIT,
+  UNLIMITED_PATHS,
+  URLENCODED_BODY_LIMIT,
+} from './config/limits';
+import { createAiProvider, type AiProvider } from './core/ai';
+import type { AiJobs } from './core/ai/jobs';
+import { registerWalletAlerts } from './core/billing/alerts';
+import type { BillingJobs } from './core/billing/jobs';
+import { createPaymentProvider, type PaymentProvider } from './core/payments';
+import { LocalStorage, type StorageProvider } from './core/storage';
+import type { CampaignsRouterDeps } from './modules/campaigns/campaigns.routes';
+import type { ContactJobs } from './modules/contacts/jobs';
+import { createDocsRouter } from './modules/docs/docs.routes';
+import { createFilesRouter } from './modules/files/files.routes';
+import type { ReadinessDeps } from './modules/health/health.controller';
+import { createHealthRouter } from './modules/health/health.routes';
+import { createApiRouter, type AiDeps, type CallsApiDeps, type WhatsAppDeps } from './routes';
+import { getAppInfo } from './shared/app-info';
+import type { Logger } from './shared/logger';
+import { corsMiddleware } from './shared/middlewares/cors';
+import { errorHandler } from './shared/middlewares/error-handler';
+import { httpLogger } from './shared/middlewares/http-logger';
+import { notFound } from './shared/middlewares/not-found';
+import { globalRateLimiter, type RateLimiterOptions } from './shared/middlewares/rate-limit';
+import { requestId } from './shared/middlewares/request-id';
+import { securityHeaders } from './shared/middlewares/security';
+
+export interface AppDeps {
+  env: Env;
+  logger: Logger;
+  /** Test hook: override the global rate limit (e.g. a tiny limit). */
+  rateLimit?: Partial<RateLimiterOptions>;
+  /** Shared rate-limit counters (Redis) — MemoryStore when omitted. */
+  rateLimitStore?: Store;
+  /** Readiness checks for GET /ready (server passes Mongo + Redis pings). */
+  readiness?: ReadinessDeps;
+  /** File storage; the local driver also mounts the signed `/files/*` download route. */
+  storage?: StorageProvider;
+  /** Auth routes limiter: separate Redis store (`rl:auth:`) + test overrides. */
+  authRateLimitStore?: Store;
+  authRateLimit?: Partial<RateLimiterOptions>;
+  /** Enqueues background contact jobs (imports, exports, bulk) — Phase 3. */
+  contactJobs?: ContactJobs;
+  /** Payment gateway — built from env (`PAYMENT_PROVIDER`) when omitted. */
+  payments?: PaymentProvider;
+  /** Enqueues billing jobs (invoice render) — Phase 4. */
+  billingJobs?: BillingJobs;
+  /** Top-up orders limiter store (`rl:topup:`); MemoryStore when omitted. */
+  topupRateLimitStore?: Store;
+  /** AI provider (OpenAI or fake) — built from env (`AI_PROVIDER`) when omitted. Phase 5. */
+  aiProvider?: AiProvider;
+  /** Enqueues AI jobs (knowledge ingest) — Phase 5. */
+  aiJobs?: AiJobs;
+  /** Phase 5 limiter stores: playground (`rl:playground:`), knowledge sources (`rl:kbsrc:`), function tests (`rl:fntest:`). */
+  aiRateLimitStores?: { playground?: Store; knowledge?: Store; functionTest?: Store };
+  /** Tests only: fake resolver / dial / extra ports for the custom-function executor. */
+  aiHttp?: AiDeps['http'];
+  /** Phase 6 limiter stores: simulator inputs (`rl:flowsim:`), audio uploads (`rl:flowaudio:`). */
+  flowRateLimitStores?: { simulator?: Store; audio?: Store };
+  /** Phase 7 live call runtime (`/calls` routes); omitted where no voice runs. */
+  calls?: CallsApiDeps;
+  /** Phase 8: campaign export queue + `rl:campaign:` limiter store. */
+  campaigns?: CampaignsRouterDeps;
+  /** Phase 9: WhatsApp context (Meta client, Redis, secret key) + the `whatsapp` queue. */
+  whatsapp?: WhatsAppDeps;
+}
+
+/**
+ * Builds the Express app. Pure: no listening, no I/O — tests use it directly.
+ * Pipeline order matters (see src/README.md).
+ */
+export const createApp = ({
+  env,
+  logger,
+  rateLimit,
+  rateLimitStore,
+  readiness,
+  storage,
+  authRateLimitStore,
+  authRateLimit,
+  contactJobs,
+  payments = createPaymentProvider(env),
+  billingJobs,
+  topupRateLimitStore,
+  aiProvider = createAiProvider(env),
+  aiJobs,
+  aiRateLimitStores = {},
+  aiHttp,
+  flowRateLimitStores = {},
+  calls,
+  campaigns = {},
+  whatsapp,
+}: AppDeps): Express => {
+  // Wallet low-balance / exhausted alerts run after every committed wallet change.
+  registerWalletAlerts();
+  const app = express();
+  app.disable('x-powered-by');
+  app.set('trust proxy', env.TRUST_PROXY);
+
+  app.use(requestId());
+  app.use(httpLogger(logger, { ignorePaths: [...UNLIMITED_PATHS] }));
+
+  app.use(securityHeaders(env));
+  app.use(corsMiddleware(env));
+  app.use(
+    globalRateLimiter({ ...(rateLimitStore ? { store: rateLimitStore } : {}), ...rateLimit }),
+  );
+
+  // Payment webhooks need the exact bytes for the signature: raw body, this path only.
+  app.use(
+    '/api/v1/webhooks/razorpay',
+    raw({ type: 'application/json', limit: BILLING_LIMITS.webhookMaxBytes }),
+  );
+  // Meta (WhatsApp) webhooks: X-Hub-Signature-256 over the raw bytes, this path only.
+  app.use(
+    '/api/v1/webhooks/meta',
+    raw({ type: 'application/json', limit: WHATSAPP_LIMITS.webhookMaxBytes }),
+  );
+  app.use(json({ limit: JSON_BODY_LIMIT }));
+  app.use(urlencoded({ extended: false, limit: URLENCODED_BODY_LIMIT }));
+  app.use(cookieParser());
+
+  const health = createHealthRouter(readiness ?? { checks: {}, isShuttingDown: () => false }, {
+    version: getAppInfo().version,
+    commit: env.GIT_SHA ?? 'unknown',
+    builtAt: env.BUILT_AT ?? 'unknown',
+  });
+  app.use(health);
+  app.use('/api/v1', health);
+  if (storage instanceof LocalStorage) app.use(createFilesRouter(storage));
+  if (env.API_DOCS_ENABLED) app.use(createDocsRouter());
+  app.use(
+    '/api/v1',
+    createApiRouter({
+      env,
+      auth: { rateLimitStore: authRateLimitStore, rateLimit: authRateLimit },
+      contacts: { storage, jobs: contactJobs },
+      billing: { storage, payments, jobs: billingJobs, topupRateLimitStore },
+      ai: {
+        provider: aiProvider,
+        jobs: aiJobs,
+        storage,
+        rateLimitStores: aiRateLimitStores,
+        ...(aiHttp ? { http: aiHttp } : {}),
+      },
+      flows: { rateLimitStores: flowRateLimitStores },
+      ...(calls ? { calls } : {}),
+      campaigns,
+      ...(whatsapp ? { whatsapp: { ...whatsapp, storage: whatsapp.storage ?? storage } } : {}),
+    }),
+  );
+
+  app.use(notFound());
+  app.use(errorHandler());
+  return app;
+};

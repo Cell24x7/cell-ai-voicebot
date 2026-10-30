@@ -1,0 +1,13 @@
+# gitleaks config — default rules + project allowlist.
+title = "cell-ai-voicebot gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented placeholders and test-only passphrases, never real secrets"
+regexes = [
+  '''change-me(-32-bytes-base64)?''',
+  # Fake passwords used by unit / e2e tests (throw-away users in test databases).
+  '''\b(?:blue-tiger-river-42|teal-canyon-river-81|green-falcon-lake-77|another-pass-word-55|e2e-orchid-river-93)\b''',
+]

@@ -1,0 +1,107 @@
+{
+  "source": "developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/implementation (re-checked 26 Oct 2026); shapes only, ids made up",
+  "cases": [
+    {
+      "name": "Cloud API finish",
+      "message": {
+        "type": "WA_EMBEDDED_SIGNUP",
+        "event": "FINISH",
+        "data": {
+          "phone_number_id": "106540352242922",
+          "waba_id": "524126980791429",
+          "business_id": "2729063490586005"
+        }
+      },
+      "expected": {
+        "kind": "finish",
+        "wabaId": "524126980791429",
+        "phoneNumberId": "106540352242922"
+      }
+    },
+    {
+      "name": "finish without a phone number",
+      "message": {
+        "type": "WA_EMBEDDED_SIGNUP",
+        "event": "FINISH_ONLY_WABA",
+        "data": { "waba_id": "524126980791429", "business_id": "2729063490586005" }
+      },
+      "expected": { "kind": "finish", "wabaId": "524126980791429" }
+    },
+    {
+      "name": "Business app number finish",
+      "message": {
+        "type": "WA_EMBEDDED_SIGNUP",
+        "event": "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING",
+        "data": {
+          "phone_number_id": "106540352242922",
+          "waba_id": "524126980791429",
+          "business_id": "2729063490586005"
+        }
+      },
+      "expected": {
+        "kind": "finish",
+        "wabaId": "524126980791429",
+        "phoneNumberId": "106540352242922"
+      }
+    },
+    {
+      "name": "on-behalf-of migration finish",
+      "message": {
+        "type": "WA_EMBEDDED_SIGNUP",
+        "event": "FINISH_OBO_MIGRATION",
+        "data": { "waba_id": "524126980791429" }
+      },
+      "expected": { "kind": "finish", "wabaId": "524126980791429" }
+    },
+    {
+      "name": "grant-only API access finish",
+      "message": {
+        "type": "WA_EMBEDDED_SIGNUP",
+        "event": "FINISH_GRANT_ONLY_API_ACCESS",
+        "data": { "waba_id": "524126980791429" }
+      },
+      "expected": { "kind": "finish", "wabaId": "524126980791429" }
+    },
+    {
+      "name": "finish with a separate WhatsApp account id (Meta account model phase 2)",
+      "message": {
+        "type": "WA_EMBEDDED_SIGNUP",
+        "event": "FINISH",
+        "data": {
+          "phone_number_id": "106540352242922",
+          "waba_id": "524126980791429",
+          "waac_id": "771100000000001"
+        }
+      },
+      "expected": {
+        "kind": "finish",
+        "wabaId": "524126980791429",
+        "phoneNumberId": "106540352242922",
+        "waacId": "771100000000001"
+      }
+    },
+    {
+      "name": "abandoned flow",
+      "message": {
+        "type": "WA_EMBEDDED_SIGNUP",
+        "event": "CANCEL",
+        "data": { "current_step": "PHONE_NUMBER_SETUP" }
+      },
+      "expected": { "kind": "cancel", "step": "PHONE_NUMBER_SETUP" }
+    },
+    {
+      "name": "user-reported error",
+      "message": {
+        "type": "WA_EMBEDDED_SIGNUP",
+        "event": "CANCEL",
+        "data": {
+          "error_message": "Your verification code is incorrect.",
+          "error_code": "524126",
+          "session_id": "f34b51dab5e0498",
+          "timestamp": "1689211294"
+        }
+      },
+      "expected": { "kind": "error", "message": "Your verification code is incorrect." }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.mp3 binary
+*.wav binary
+
+# Sample sheets stay byte-exact (BOM + CRLF, like Excel exports)
+docs/samples/*.csv binary
+*.xlsx binary
+*.docx binary
+
+# Fonts (invoice PDF)
+*.ttf binary
+# test fixtures are byte-exact (CRLF, Windows-1252, binary)
+tests/fixtures/** -text

@@ -1,0 +1,1021 @@
+# Core Data Model (draft)
+
+Design draft of every MongoDB collection planned for Phases 1–14. Mongoose models are written phase by phase from this document; when a model deviates, update this file in the same PR.
+
+Rules that apply to every entity are in [data.md](data.md): camelCase fields, `accountId` on every tenant document (first field in compound indexes), `createdAt` / `updatedAt` timestamps, money as `*Micros`, phones as E.164, enums lower_snake_case.
+
+Legend for field tables: **R** = required. All tenant collections also have `_id`, `accountId` (R, indexed), `createdAt`, `updatedAt` — not repeated in every table.
+
+---
+
+## 1. Diagrams
+
+### 1a. Tenancy & auth
+
+```mermaid
+erDiagram
+    ACCOUNT ||--o{ USER : has
+    ACCOUNT ||--o{ ROLE : defines
+    ROLE ||--o{ USER : "assigned to"
+    USER ||--o{ REFRESH_TOKEN : "signs in with"
+    USER ||--o{ AUTH_CODE : "verifies / resets with"
+    ACCOUNT ||--o{ API_KEY : issues
+    ACCOUNT ||--o{ AUDIT_LOG : records
+    ACCOUNT ||--o{ IDEMPOTENCY_KEY : stores
+    ACCOUNT ||--o{ NOTIFICATION : receives
+    USER ||--o{ NOTIFICATION : "may target"
+```
+
+### 1b. Contacts, campaigns & calls
+
+```mermaid
+erDiagram
+    ACCOUNT ||--o{ CONTACT : owns
+    ACCOUNT ||--o{ CONTACT_LIST : owns
+    CONTACT_LIST }o--o{ CONTACT : groups
+    ACCOUNT ||--o{ CUSTOM_FIELD_DEFINITION : defines
+    ACCOUNT ||--o{ DND_ENTRY : blocks
+    ACCOUNT ||--o{ IMPORT_JOB : runs
+    IMPORT_JOB }o--|| CONTACT_LIST : "fills"
+    ACCOUNT ||--o{ SEGMENT : "saved filters"
+    ACCOUNT ||--o{ EXPORT_JOB : exports
+    ACCOUNT ||--o{ CAMPAIGN : runs
+    CAMPAIGN }o--|| FLOW_VERSION : "pinned to"
+    CAMPAIGN }o--o| PHONE_NUMBER : "calls from"
+    CAMPAIGN ||--o{ CAMPAIGN_CONTACT : targets
+    CONTACT ||--o{ CAMPAIGN_CONTACT : "appears in"
+    CAMPAIGN_CONTACT ||--o{ CALL : "attempts"
+    CONTACT ||--o{ CALL : receives
+    CALL ||--o{ CALL_EVENT : "timeline"
+    CALL ||--o{ TRANSCRIPT_TURN : "transcript"
+    CALL }o--o| AI_AGENT : "talks via"
+    CALL }o--o| LEDGER_ENTRY : "charged by"
+    ACCOUNT ||--o{ PHONE_NUMBER : owns
+    PHONE_NUMBER }o--o| FLOW : "inbound flow"
+```
+
+### 1c. Wallet, AI, flows & integrations
+
+```mermaid
+erDiagram
+    ACCOUNT ||--|| WALLET : has
+    ACCOUNT ||--o{ LEDGER_ENTRY : "money movements"
+    ACCOUNT ||--o{ RATE_CARD : "custom rates"
+    ACCOUNT ||--o{ TOPUP_ORDER : pays
+    TOPUP_ORDER ||--o| LEDGER_ENTRY : credits
+    LEDGER_ENTRY ||--o| INVOICE : "billed in"
+    ACCOUNT ||--o{ AI_AGENT : configures
+    AI_AGENT ||--o{ KNOWLEDGE_SOURCE : uses
+    ACCOUNT ||--o{ FLOW : builds
+    FLOW ||--o{ FLOW_VERSION : versions
+    FLOW_VERSION }o--o{ AI_AGENT : "ai_agent nodes use"
+    FLOW ||--o{ FLOW_RUN : "simulator / call runs"
+    FLOW ||--o{ FLOW_NODE_STATS : "node counters"
+    ACCOUNT ||--o{ FLOW_AUDIO : "audio prompts"
+    FLOW_VERSION }o--o{ FLOW_AUDIO : "play_audio nodes use"
+    ACCOUNT ||--o| TELEPHONY_CONFIG : "SIP settings"
+    ACCOUNT ||--o{ OUTBOUND_WEBHOOK : subscribes
+    OUTBOUND_WEBHOOK ||--o{ WEBHOOK_DELIVERY : delivers
+```
+
+---
+
+## 2. Entities
+
+### 2.1 Tenancy & auth
+
+#### Account (`accounts`) — Phase 2
+
+Not tenant-scoped (it **is** the tenant): no `accountId`.
+
+| Field                        | Type                                               | R   | Notes                                                                                                                     |
+| ---------------------------- | -------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------------------------- |
+| name                         | string                                             | ✓   | Business name                                                                                                             |
+| slug                         | string                                             | ✓   | Unique, URL-safe                                                                                                          |
+| status                       | `active \| suspended`                              | ✓   | Suspended → no calls, read-only                                                                                           |
+| timezone                     | string                                             | ✓   | IANA, default `Asia/Kolkata`                                                                                              |
+| country                      | string                                             | ✓   | ISO-3166 alpha-2, default `IN`                                                                                            |
+| defaultLanguage              | `hi \| en \| hinglish`                             | ✓   | Default for flows/agents                                                                                                  |
+| settings.callingWindow       | `{ start: "09:00", end: "19:00", days: number[] }` | ✓   | Account default; campaigns may narrow it                                                                                  |
+| settings.recordingEnabled    | boolean                                            | ✓   | Default true                                                                                                              |
+| settings.recordingNotice     | string (≤ 200)                                     | ✓   | Said at the start of recorded calls (Phase 7); default "Yeh call quality ke liye record ki ja rahi hai."                  |
+| settings.aiDisclosureEnabled | boolean                                            | ✓   | Default true (compliance)                                                                                                 |
+| settings.callCaps            | `{ perDay, perWeek, minGapMinutes }`               | ✓   | Per-contact call caps across campaigns + single calls (Phase 8); default 3 / 10 / 30                                      |
+| limits                       | `{ maxConcurrentCalls, dialsPerMinute }`           | ✓   | Dialing limits set by a superadmin (Phase 8); default 10 / 60                                                             |
+| whatsapp.metaPayer           | `platform \| customer`                             | ✓   | Who pays Meta for WhatsApp (Phase 9, set by a superadmin): our credit line (default) or the customer's own payment method |
+| ownerId                      | ObjectId → users                                   |     | The single owner (set at signup)                                                                                          |
+| suspendedAt, suspendReason   | Date, string                                       |     | Set by a superadmin                                                                                                       |
+| isPlatform                   | boolean                                            | ✓   | `true` only for the internal `platform` account (holds superadmins; migration 0002)                                       |
+
+Indexes: `{ slug: 1 }` unique, `{ status: 1 }`. Slugs `platform`, `admin`, `api`, `www`, `app`, `support` are reserved. Defaults: timezone `Asia/Kolkata`, country `IN`, language `hinglish`, calling window 09:00–19:00 Mon–Sat. PII: none. Retention: life of contract.
+
+#### User (`users`) — Phase 2
+
+| Field             | Type                                                      | R   | Notes                                                                                      |
+| ----------------- | --------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------ |
+| name              | string                                                    | ✓   |                                                                                            |
+| email             | string                                                    | ✓   | Lowercase, **unique globally**                                                             |
+| phone             | string                                                    |     | E.164                                                                                      |
+| passwordHash      | string                                                    |     | Null for invited-not-yet-accepted                                                          |
+| roleId            | ObjectId → roles                                          | ✓   |                                                                                            |
+| status            | `invited \| active \| disabled`                           | ✓   |                                                                                            |
+| lastLoginAt       | Date                                                      |     |                                                                                            |
+| emailVerifiedAt   | Date                                                      |     | Set by the signup OTP / invite acceptance                                                  |
+| tokenVersion      | number                                                    | ✓   | Bumped to invalidate all access tokens (password change, disable, role change, logout-all) |
+| platformRole      | `superadmin \| null`                                      |     | Platform admins only (in the `platform` account, created by `npm run superadmin:create`)   |
+| invite            | `{ tokenHash, expiresAt, invitedBy, lastSentAt } \| null` |     | Pending invitation (status `invited`)                                                      |
+| passwordChangedAt | Date                                                      |     |                                                                                            |
+| deletedAt         | Date \| null                                              |     | Soft delete                                                                                |
+
+Indexes: `{ email: 1 }` unique **partial** (`deletedAt: null` — a removed user's email can be invited again), `{ accountId: 1, status: 1 }`, `{ 'invite.tokenHash': 1 }` sparse. JSON never contains `passwordHash`, `tokenVersion`, `invite`. PII: email, phone, name.
+
+#### Role (`roles`) — Phase 2
+
+| Field       | Type     | R   | Notes                                                                                  |
+| ----------- | -------- | --- | -------------------------------------------------------------------------------------- |
+| key         | string   | ✓   | `owner \| admin \| manager \| agent \| viewer` (custom keys later); unique per account |
+| name        | string   | ✓   | Display name                                                                           |
+| permissions | string[] | ✓   | e.g. `campaigns.write`, `wallet.topup`                                                 |
+| isSystem    | boolean  | ✓   | Built-in owner/admin/manager/agent/viewer (not deletable)                              |
+
+Indexes: `{ accountId: 1, key: 1 }` unique. Permissions come from the catalogue `src/modules/rbac/permissions.ts`; system roles are synced from `SYSTEM_ROLES` (signup + migrations).
+
+#### RefreshToken (`refreshTokens`) — Phase 2
+
+| Field         | Type             | R   | Notes                                                                                                             |
+| ------------- | ---------------- | --- | ----------------------------------------------------------------------------------------------------------------- |
+| userId        | ObjectId → users | ✓   |                                                                                                                   |
+| familyId      | string           | ✓   | Rotation family — reuse of a rotated token revokes the family                                                     |
+| tokenHash     | string           | ✓   | Never the raw token                                                                                               |
+| expiresAt     | Date             | ✓   | **TTL index**                                                                                                     |
+| revokedAt     | Date             |     |                                                                                                                   |
+| replacedBy    | ObjectId         |     | Next token in the family                                                                                          |
+| userAgent, ip | string           |     | Session list in UI                                                                                                |
+| accountId     | ObjectId         | ✓   | Account of the session                                                                                            |
+| revokedReason | string           |     | `logout \| logout_all \| rotated \| reuse_detected \| password_changed \| disabled \| removed \| session_revoked` |
+| lastUsedAt    | Date             | ✓   |                                                                                                                   |
+
+Indexes: `{ tokenHash: 1 }` unique, `{ userId: 1, familyId: 1 }`, `{ expiresAt: 1 }` TTL (0 s). `tokenHash` = HMAC-SHA256(`JWT_REFRESH_SECRET`, raw token).
+
+#### AuthCode (`authCodes`) — Phase 2
+
+One live code per user and purpose (email OTP or password-reset token), hashed.
+
+| Field                                  | Type                             | R   | Notes                                   |
+| -------------------------------------- | -------------------------------- | --- | --------------------------------------- |
+| userId                                 | ObjectId → users                 | ✓   |                                         |
+| purpose                                | `verify_email \| reset_password` | ✓   |                                         |
+| codeHash                               | string                           | ✓   | HMAC of the code / token                |
+| attempts                               | number                           | ✓   | Wrong tries (max 5 for OTPs)            |
+| sentCount, sendWindowStart, lastSentAt | number, Date, Date               | ✓   | Resend cooldown (60 s) + hourly cap (5) |
+| expiresAt                              | Date                             | ✓   | **TTL** — OTP 10 min, reset 30 min      |
+| usedAt                                 | Date                             |     | Single use                              |
+
+Indexes: `{ userId: 1, purpose: 1 }` unique, `{ codeHash: 1 }`, `{ expiresAt: 1 }` TTL. Not tenant-scoped (looked up before login).
+
+#### ApiKey (`apiKeys`) — Phase 2/10
+
+| Field      | Type             | R   | Notes                                       |
+| ---------- | ---------------- | --- | ------------------------------------------- |
+| name       | string           | ✓   |                                             |
+| prefix     | string           | ✓   | First chars, shown in UI (`cav_live_ab12…`) |
+| keyHash    | string           | ✓   | SHA-256 of the full key; raw key shown once |
+| scopes     | string[]         | ✓   | `calls:write`, `contacts:write`, …          |
+| lastUsedAt | Date             |     |                                             |
+| revokedAt  | Date             |     |                                             |
+| createdBy  | ObjectId → users | ✓   |                                             |
+
+Indexes: `{ keyHash: 1 }` unique, `{ accountId: 1, revokedAt: 1 }`.
+
+#### AuditLog (`auditLogs`) — Phase 2
+
+| Field  | Type                                                                  | R   | Notes                                                                            |
+| ------ | --------------------------------------------------------------------- | --- | -------------------------------------------------------------------------------- |
+| actor  | `{ type: user \| api_key \| system, id, impersonatorId?, platform? }` | ✓   | `impersonatorId` = superadmin acting as the user; `platform` = superadmin action |
+| action | string                                                                | ✓   | `campaign.started`, `wallet.adjusted`, …                                         |
+| target | `{ type, id }`                                                        |     |                                                                                  |
+| meta   | object                                                                |     | No PII values                                                                    |
+| ip     | string                                                                |     |                                                                                  |
+| at     | Date                                                                  | ✓   |                                                                                  |
+
+Indexes: `{ accountId: 1, at: -1 }`, `{ accountId: 1, action: 1, at: -1 }`. **Immutable** (model hooks reject updates / deletes; only the purge job deletes with `allowPurge`). Action catalogue: [audit.md](audit.md) (Phase 2 · T2.10). Retention: 1 year (purge job).
+
+#### IdempotencyKey (`idempotencyKeys`) — Phase 1
+
+| Field          | Type                       | R   | Notes                           |
+| -------------- | -------------------------- | --- | ------------------------------- |
+| key            | string                     | ✓   | Client `Idempotency-Key` header |
+| method, path   | string                     | ✓   |                                 |
+| requestHash    | string                     | ✓   | SHA-256 of the body             |
+| status         | `in_progress \| completed` | ✓   |                                 |
+| responseStatus | number                     |     |                                 |
+| responseBody   | object                     |     | Replayed on retry               |
+| expiresAt      | Date                       | ✓   | **TTL**, 24 h                   |
+
+Indexes: `{ accountId: 1, key: 1 }` unique, `{ expiresAt: 1 }` TTL.
+
+#### Notification (`notifications`) — Phase 4
+
+| Field       | Type             | R   | Notes                                                                                                                                                                    |
+| ----------- | ---------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| userId      | ObjectId → users | ✓   | **One row per recipient** (fan-out at creation, so each user has their own read state)                                                                                   |
+| type        | string           | ✓   | `wallet.low_balance`, `wallet.exhausted`, `wallet.topup_paid`, `wallet.adjusted`, `billing.*`, `campaign.completed`, `campaign.paused`, `campaign.run_skipped` (Phase 8) |
+| title, body | string           | ✓   | ≤ 120 / ≤ 500                                                                                                                                                            |
+| link        | string           |     | In-app route                                                                                                                                                             |
+| readAt      | Date             |     |                                                                                                                                                                          |
+| expiresAt   | Date             | ✓   | **TTL** (90 days), hidden                                                                                                                                                |
+
+Indexes: `{ accountId: 1, userId: 1, readAt: 1, createdAt: -1 }`, `{ expiresAt: 1 }` TTL. Recipients of account-wide notices are resolved server-side by permission (e.g. users with `wallet.read`).
+
+### 2.2 Contacts
+
+Phase 3 ([PHASE_3_PLAN.md](../phases/PHASE_3_PLAN.md) §1). All collections are tenant-scoped (`accountId`, indexed).
+
+#### Contact (`contacts`) — Phase 3
+
+| Field           | Type                                                          | R   | Notes                                                                                                                                            |
+| --------------- | ------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| phoneE164       | string                                                        | ✓   | Unique per account among live contacts (ADR 0018)                                                                                                |
+| name            | string \| null                                                |     | ≤ 120, Unicode                                                                                                                                   |
+| email           | string \| null                                                |     | lower-case                                                                                                                                       |
+| externalId      | string \| null                                                |     | Client's loan / CRM id — unique per account when set                                                                                             |
+| variables       | `Map<key, string \| number>`                                  | ✓   | Typed by `customFieldDefinitions`: text / phone / date (`YYYY-MM-DD`) as string, number as number, **currency as integer micros**. Sensitive PII |
+| tags            | string[]                                                      | ✓   | lower-case, ≤ 20; no Tag collection                                                                                                              |
+| listIds         | ObjectId[] → contactLists                                     | ✓   | ≤ 50                                                                                                                                             |
+| dnd             | boolean                                                       | ✓   | Mirrors `dndEntries` for fast filtering                                                                                                          |
+| optedOutAt      | Date \| null                                                  |     | Opt-out also creates a DND entry                                                                                                                 |
+| consent         | `{ source, at }` \| null                                      |     | Compliance (T0.18)                                                                                                                               |
+| source          | `{ type: manual \| import \| api \| whatsapp, importJobId? }` | ✓   | First creation                                                                                                                                   |
+| searchText      | string                                                        | ✓   | lower-case name + email + phone digits + externalId; **never serialised**                                                                        |
+| lastCalledAt    | Date \| null                                                  |     | Last campaign / single call (Phase 8)                                                                                                            |
+| callCount       | number                                                        | ✓   | Calls made to the contact (Phase 8)                                                                                                              |
+| lastDisposition | string \| null                                                |     | Disposition of the last answered call (Phase 8; segment filter)                                                                                  |
+| deletedAt       | Date \| null                                                  |     | Soft delete; re-creating the phone revives the document; hard-deleted after 30 days                                                              |
+
+Indexes: `{ accountId, phoneE164 }` unique partial (`deletedAt: null`), `{ accountId, externalId }` unique partial (string, live), `{ accountId, deletedAt, createdAt: -1 }`, `{ accountId, listIds }`, `{ accountId, tags }`, `{ accountId, dnd }`, `{ accountId, name }` (collation `en`, strength 2). PII: phone, name, email, variables, searchText. Retention: until deleted by the client (+ 30-day purge of soft-deleted contacts).
+
+#### ContactList (`contactLists`) — Phase 3
+
+| Field       | Type                                           | R   | Notes                                       |
+| ----------- | ---------------------------------------------- | --- | ------------------------------------------- |
+| name        | string                                         | ✓   | Unique per account (case-insensitive, live) |
+| description | string \| null                                 |     |                                             |
+| source      | `{ type: upload \| api \| manual, fileName? }` | ✓   |                                             |
+| deletedAt   | Date \| null                                   |     | Soft delete; members keep their contacts    |
+
+Indexes: `{ accountId, name }` unique partial (collation `en` / 2). **No stored counter** — counts are computed on read (no drift).
+
+#### CustomFieldDefinition (`customFieldDefinitions`) — Phase 3
+
+| Field        | Type                                          | R   | Notes                                                                       |
+| ------------ | --------------------------------------------- | --- | --------------------------------------------------------------------------- |
+| key          | string                                        | ✓   | `^[a-z][a-z0-9_]{0,39}$`, unique per account, immutable; `{{key}}` in flows |
+| label        | string                                        | ✓   |                                                                             |
+| type         | `text \| number \| date \| currency \| phone` | ✓   | Changeable only while no contact has a value                                |
+| required     | boolean                                       | ✓   |                                                                             |
+| defaultValue | string \| number \| null                      |     | Stored form (currency micros, date `YYYY-MM-DD`)                            |
+| order        | number                                        | ✓   | Display order                                                               |
+
+Indexes: `{ accountId, key }` unique, `{ accountId, order }`. Max 50 per account.
+
+#### Segment (`segments`) — Phase 3
+
+| Field     | Type             | R   | Notes                                 |
+| --------- | ---------------- | --- | ------------------------------------- |
+| name      | string           | ✓   | Unique per account (case-insensitive) |
+| filter    | `ContactFilter`  | ✓   | Evaluated at query time               |
+| createdBy | ObjectId → users | ✓   |                                       |
+
+Indexes: `{ accountId, name }` unique (collation `en` / 2). Max 100 per account.
+
+#### DndEntry (`dndEntries`) — Phase 3
+
+| Field     | Type                                              | R   | Notes                   |
+| --------- | ------------------------------------------------- | --- | ----------------------- |
+| phoneE164 | string                                            | ✓   | Unique per account      |
+| reason    | string \| null                                    |     |                         |
+| source    | `manual \| upload \| keyword \| dtmf \| whatsapp` | ✓   | e.g. customer pressed 9 |
+| addedBy   | ObjectId → users \| null                          |     |                         |
+
+Indexes: `{ accountId, phoneE164 }` unique, `{ accountId, createdAt: -1 }`. PII: phone.
+
+#### ImportJob (`importJobs`) — Phase 3
+
+| Field                                                       | Type                                                                                            | R   | Notes                                     |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --- | ----------------------------------------- |
+| kind                                                        | `contacts \| dnd`                                                                               | ✓   |                                           |
+| fileName, fileType, fileSize                                | string, `csv \| xlsx`, number                                                                   | ✓   |                                           |
+| fileKey                                                     | string \| null                                                                                  |     | Storage key (hidden); cleared when purged |
+| sheet, sheets                                               | string, string[]                                                                                |     | xlsx only                                 |
+| columns                                                     | `[{ index, header, samples[] }]`                                                                | ✓   | Samples are PII — purged with the file    |
+| rowCount                                                    | number                                                                                          | ✓   |                                           |
+| mapping, options                                            | object                                                                                          |     | Validated by the contact-imports module   |
+| status                                                      | `uploaded \| mapped \| validating \| validated \| importing \| completed \| failed \| canceled` | ✓   |                                           |
+| progress                                                    | `{ processed, total }`                                                                          | ✓   | Checkpoint for resume                     |
+| totals                                                      | `{ rows, created, updated, unchanged, invalid, duplicates, dnd }`                               | ✓   |                                           |
+| problemRows                                                 | `[{ row, reasons[] }]`                                                                          | ✓   | ≤ 100, **no cell values**                 |
+| errorReportKey                                              | string \| null                                                                                  |     | Error CSV in storage (hidden)             |
+| listId                                                      | ObjectId \| null                                                                                |     | Target list                               |
+| warnings, errorMessage                                      | string[], string                                                                                |     | No PII                                    |
+| cancelRequested                                             | boolean                                                                                         | ✓   | Hidden                                    |
+| createdBy                                                   | ObjectId → users                                                                                | ✓   |                                           |
+| startedAt, completedAt, failedAt, canceledAt, filesPurgedAt | Date                                                                                            |     |                                           |
+
+Indexes: `{ accountId, createdAt: -1 }`, `{ status, completedAt }`. Retention: file + error report + samples deleted 30 days after the job ends; the document (totals) stays.
+
+#### ExportJob (`exportJobs`) — Phase 3 (+ campaign results, Phase 8)
+
+| Field                  | Type                                                  | R   | Notes                                                           |
+| ---------------------- | ----------------------------------------------------- | --- | --------------------------------------------------------------- |
+| kind                   | `contacts \| campaign_results`                        | ✓   | Phase 8; default `contacts`                                     |
+| campaignId             | ObjectId \| null                                      |     | Campaign of a `campaign_results` export                         |
+| format                 | `csv \| xlsx`                                         | ✓   | Default `csv`                                                   |
+| includePhone           | boolean                                               | ✓   | Full phones (creator had `contacts.export`), else last 4 digits |
+| scope                  | `ids \| filter \| list \| segment \| campaign`        | ✓   | `campaign` for campaign results                                 |
+| filter                 | `ContactFilter`                                       | ✓   | Resolved at creation                                            |
+| columns                | string[]                                              | ✓   |                                                                 |
+| status                 | `pending \| processing \| ready \| failed \| expired` | ✓   |                                                                 |
+| progress               | `{ processed, total }`                                | ✓   |                                                                 |
+| rowCount               | number                                                | ✓   |                                                                 |
+| fileKey                | string \| null                                        |     | Hidden; CSV with PII                                            |
+| createdBy              | ObjectId → users                                      | ✓   |                                                                 |
+| completedAt, expiresAt | Date                                                  |     | File deleted at `expiresAt` (24 h)                              |
+
+Indexes: `{ accountId, createdAt: -1 }`, `{ status, expiresAt }`.
+
+### 2.3 Wallet & billing
+
+Money is integer **micros** (₹1 = 1,000,000 — ADR 0016), percentages are **basis points** (1 % = 100 bps). All writes go through `src/core/billing/engine.ts` in one transaction with their ledger rows (ADR 0032).
+
+#### Wallet (`wallets`) — Phase 4
+
+| Field                     | Type                                                    | R   | Notes                                                                    |
+| ------------------------- | ------------------------------------------------------- | --- | ------------------------------------------------------------------------ |
+| accountId                 | ObjectId → accounts                                     | ✓   | **Unique** — one wallet per account (created at signup / migration 0005) |
+| currency                  | `INR`                                                   | ✓   |                                                                          |
+| balanceMicros             | number                                                  | ✓   | Real money; below 0 only after a call overran its hold                   |
+| holdMicros                | number                                                  | ✓   | Reserved for running calls (≥ 0)                                         |
+| creditLimitMicros         | number                                                  | ✓   | Default 0; holds may use it, AI / TTS charges never                      |
+| lowBalanceThresholdMicros | number                                                  | ✓   | Default ₹500; 0 = alerts off                                             |
+| budgets                   | `{ monthlyCallMicros, monthlyAiMicros }`                | ✓   | 0 = unlimited                                                            |
+| spend                     | `{ month: 'YYYY-MM', callMicros, aiMicros, ttsMicros }` | ✓   | Month in the account timezone; reset when a new month starts             |
+| alerts                    | `{ lowBalanceNotifiedAt, exhaustedNotifiedAt }`         | ✓   | Hidden — once-per-24 h alert claims                                      |
+| version                   | number                                                  | ✓   | Hidden — bumped on every change                                          |
+
+Derived in the API: `availableMicros = balance + creditLimit − hold`, `status` `ok | low | exhausted`.
+
+#### LedgerEntry (`ledgerEntries`) — Phase 4 — **insert-only**
+
+| Field                     | Type                                                                                                                                    | R   | Notes                                                      |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --- | ---------------------------------------------------------- |
+| type                      | `topup \| call_charge \| ai_charge \| tts_charge \| adjustment \| refund \| subscription \| recording_charge`                           | ✓   |                                                            |
+| direction                 | `credit \| debit`                                                                                                                       | ✓   |                                                            |
+| status                    | `held \| captured \| released`                                                                                                          | ✓   | **Only allowed mutation: `held → released`** (model guard) |
+| amountMicros              | number                                                                                                                                  | ✓   | > 0, never changes                                         |
+| currency                  | `INR`                                                                                                                                   | ✓   |                                                            |
+| balanceAfterMicros        | number                                                                                                                                  |     | Wallet balance right after a captured row                  |
+| breakdown                 | `{ telephonyMicros, aiMicros, ttsMicros, commissionMicros, answered, durationSec, billableSeconds, pulseSeconds, aiSeconds, ttsChars }` |     | Call / usage charges                                       |
+| ref                       | `{ type: call \| campaign \| topup \| manual \| simulator \| usage \| seed, id }`                                                       | ✓   |                                                            |
+| holdId                    | ObjectId → ledgerEntries                                                                                                                |     | Charge → its hold; extension hold → the first hold row     |
+| rateCardId                | ObjectId → rateCards                                                                                                                    |     | Prices used (snapshot reference)                           |
+| idempotencyKey            | string                                                                                                                                  | ✓   | Unique per account, hidden — repeats return the stored row |
+| note                      | string                                                                                                                                  |     | Adjustment reason                                          |
+| createdBy                 | ObjectId → users                                                                                                                        |     | Null for system                                            |
+| releasedAt, releaseReason | Date, string                                                                                                                            |     | Set by the release                                         |
+
+A call settle = release the hold rows + insert a `captured` charge row (amounts are never edited). Indexes: `{ accountId: 1, idempotencyKey: 1 }` unique, `{ accountId: 1, createdAt: -1, _id: -1 }`, `{ accountId: 1, ref.type: 1, ref.id: 1 }`, `{ status: 1, createdAt: 1 }` (reaper), `{ holdId: 1 }`. Retention: forever (financial record).
+
+#### RateCard (`rateCards`) — Phase 4
+
+| Field                  | Type             | R   | Notes                                                      |
+| ---------------------- | ---------------- | --- | ---------------------------------------------------------- |
+| accountId              | ObjectId \| null |     | **Null = platform default** (exception to the tenant rule) |
+| callPerMinuteMicros    | number           | ✓   | Selling price per call minute                              |
+| pulseSeconds           | `15 \| 30 \| 60` | ✓   | Billing rounding of answered calls                         |
+| aiPerMinuteMicros      | number           | ✓   | Billed per second of AI use                                |
+| ttsPer1kCharsMicros    | number           | ✓   |                                                            |
+| commissionBps          | number           | ✓   | 0–10,000                                                   |
+| billUnansweredAttempts | boolean          | ✓   | Default false                                              |
+| inheritsDefault        | boolean          | ✓   | Account row meaning "use the platform default again"       |
+| effectiveFrom          | Date             | ✓   | Insert-only history; latest `effectiveFrom ≤ now` wins     |
+| createdBy, note        | ObjectId, string |     |                                                            |
+
+Indexes: `{ accountId: 1, effectiveFrom: -1 }`. Migration 0005 inserts the platform default.
+
+#### TopupOrder (`topupOrders`) — Phase 4
+
+| Field                                                                  | Type                                                           | R   | Notes                                          |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------- | --- | ---------------------------------------------- |
+| provider                                                               | `razorpay \| fake`                                             | ✓   | `fake` only outside production                 |
+| providerOrderId, providerPaymentId                                     | string                                                         |     | Unique per provider when set (partial indexes) |
+| baseMicros, cgstMicros, sgstMicros, igstMicros, taxMicros, totalMicros | number                                                         | ✓   | Base credited to the wallet; GST on top        |
+| status                                                                 | `creating \| created \| paid \| failed \| expired \| refunded` | ✓   |                                                |
+| failureReason                                                          | string                                                         |     |                                                |
+| buyer                                                                  | billing profile snapshot                                       | ✓   | Invoice buyer                                  |
+| createdBy                                                              | ObjectId → users                                               | ✓   |                                                |
+| paidAt, ledgerEntryId, invoiceId                                       |                                                                |     | Set when credited                              |
+| rawProviderStatus                                                      | string                                                         |     | Hidden                                         |
+
+Indexes: `{ provider, providerOrderId }` / `{ provider, providerPaymentId }` unique partial, `{ accountId: 1, createdAt: -1 }`, `{ status: 1, createdAt: 1 }`. Retention: forever.
+
+#### Invoice (`invoices`) — Phase 4
+
+| Field         | Type                                                                         | R   | Notes                                        |
+| ------------- | ---------------------------------------------------------------------------- | --- | -------------------------------------------- |
+| number        | string                                                                       | ✓   | `CAV/26-27/000001`, unique, ≤ 16 chars (GST) |
+| fy            | string                                                                       | ✓   | Indian financial year (IST), `26-27`         |
+| topupOrderId  | ObjectId                                                                     | ✓   | Unique                                       |
+| ledgerEntryId | ObjectId                                                                     | ✓   |                                              |
+| seller        | `{ name, address, gstin, stateCode }`                                        | ✓   | Snapshot from env                            |
+| buyer         | billing profile snapshot                                                     | ✓   |                                              |
+| placeOfSupply | `{ stateCode, stateName }`                                                   | ✓   |                                              |
+| sacCode       | string                                                                       | ✓   |                                              |
+| amounts       | `{ baseMicros, cgstMicros, sgstMicros, igstMicros, taxMicros, totalMicros }` | ✓   | CGST + SGST (same state) or IGST             |
+| paymentId     | string                                                                       | ✓   |                                              |
+| issuedAt      | Date                                                                         | ✓   |                                              |
+| status        | `rendering \| ready \| failed`                                               | ✓   | PDF rendered by a job                        |
+| pdfFileKey    | string                                                                       |     | Hidden; download via signed URL              |
+
+Indexes: `{ number: 1 }` unique, `{ topupOrderId: 1 }` unique, `{ accountId: 1, createdAt: -1 }`. Retention: 8 years (tax records — confirm with CA).
+
+#### InvoiceCounter (`invoiceCounters`) — Phase 4
+
+`{ _id: '<fy>', seq }` — `$inc` inside the credit transaction (consecutive numbers, an aborted transaction consumes none). Platform-wide (one GST series per seller).
+
+#### PaymentEvent (`paymentEvents`) — Phase 4
+
+Provider webhook deliveries: `provider`, `eventId` (unique per provider), `type`, `accountId?`, `topupOrderId?`, `providerOrderId?`, `providerPaymentId?`, `outcome` (`received \| credited \| duplicate_credit \| failed \| unmatched \| mismatch \| refund \| ignored`), `receivedAt`, `processedAt`, `expiresAt` (TTL 90 days).
+
+#### Account billing profile (`accounts.billing`) — Phase 4
+
+`{ legalName, email, addressLine1, addressLine2?, city, stateCode, pin, gstin?, updatedAt }` — Latin text only (the invoice PDF can't shape Devanagari); GSTIN checksum + state validated by the API.
+
+### 2.4 AI & flows
+
+#### AiAgent (`aiAgents`) — Phase 5
+
+| Field                             | Type                                                                                                                             | R   | Notes                                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --- | --------------------------------------------------------------------------------------------------- |
+| name, description                 | string (≤ 80 / ≤ 300)                                                                                                            | ✓   | Name unique per account, case-insensitive (collation index, deleted agents excluded)                |
+| persona, openingLine, closingLine | string (≤ 8,000 / ≤ 500 / ≤ 500)                                                                                                 |     | Support `{{variables}}` from `allowedVariables` + `{{company}}`                                     |
+| isActive, templateKey             | boolean, string \| null                                                                                                          | ✓   |                                                                                                     |
+| allowedVariables                  | string[]                                                                                                                         | ✓   | Contact data the model may see (`name`, `phone_last4`, custom field keys); default `['name']`       |
+| voice                             | OpenAI Realtime voice                                                                                                            | ✓   | Used in Phase 7                                                                                     |
+| languageMode, language            | `auto \| fixed`, `hi \| en \| hinglish`                                                                                          | ✓   |                                                                                                     |
+| toneRules                         | `{ when, customWhen?, respond }[]` (≤ 10)                                                                                        |     |                                                                                                     |
+| callBehaviour                     | `{ maxCallDurationSec, silenceTimeoutSec, bargeIn, endCallAfterSilenceRetries }`                                                 | ✓   | Phase 7                                                                                             |
+| model                             | `{ textModel, temperatureTenths (0–12), maxOutputTokens }`                                                                       | ✓   | `textModel` from `AI_TEXT_MODELS`                                                                   |
+| limits                            | `{ dailySpendCapMicros, monthlySpendCapMicros, onCap: stop \| fallback }`                                                        | ✓   | 0 = no cap                                                                                          |
+| guardrails                        | `{ neverSay[], disclosureLine, complianceMode: recovery \| general }`                                                            | ✓   |                                                                                                     |
+| fallback                          | `{ aiFailed, walletEmpty, agentOff, capReached }`                                                                                | ✓   |                                                                                                     |
+| knowledge                         | `{ knowledgeBaseIds (≤ 3), topK, minScoreHundredths }`                                                                           | ✓   |                                                                                                     |
+| functions                         | embedded `{ name, description, parameters[], method, url, headers[], bodyTemplate, resultPath, responseHint, timeoutMs }` (≤ 10) |     | Secret headers: `sealed` (AES-256-GCM, `ENCRYPTION_KEY`) + `valueHint` (`••••1234`); never returned |
+| builtInTools                      | `{ endCall, transferToHuman, setDisposition, scheduleCallback, savePromiseToPay, sendSmsAfterCall }`                             | ✓   | Simulated in the playground (Phase 5)                                                               |
+| createdBy, updatedBy, deletedAt   | ObjectId, ObjectId, Date \| null                                                                                                 |     | Soft delete; hard-deleted after 30 days (`agents.purge_deleted`)                                    |
+
+Indexes: `{ accountId, name }` unique (partial `deletedAt: null`, collation strength 2), `{ accountId, isActive }`, `{ accountId, updatedAt: -1 }`.
+
+#### KnowledgeBase (`knowledgeBases`) — Phase 5
+
+`{ name (unique per account, case-insensitive), description, version, sourcesCount, chunksCount, embeddingModel, status: ok | stale, createdBy }` — `version` bumps on every source change (vector caches key on it). ≤ 10 per account.
+
+#### KnowledgeSource (`knowledgeSources`) — Phase 5
+
+| Field                   | Type                                                              | R   | Notes                                           |
+| ----------------------- | ----------------------------------------------------------------- | --- | ----------------------------------------------- |
+| kbId                    | ObjectId → knowledgeBases                                         | ✓   |                                                 |
+| kind, fileType          | `file \| url`, `pdf \| docx \| txt \| md \| null`                 | ✓   |                                                 |
+| title, url              | string                                                            | ✓   |                                                 |
+| fileKey                 | string \| null                                                    |     | Private storage key (hidden)                    |
+| bytes, chars, chunks    | number                                                            | ✓   |                                                 |
+| status, progress, error | `queued \| processing \| ready \| failed \| stale`, 0–100, string | ✓   | Live via WS `kb.source.updated`                 |
+| version, embeddingModel | number, string                                                    | ✓   | Chunks of the current version are the live ones |
+
+Indexes: `{ accountId, kbId, createdAt: -1 }`. ≤ 25 per knowledge base.
+
+#### KnowledgeChunk (`knowledgeChunks`) — Phase 5
+
+`{ kbId, sourceId, sourceVersion, order, title, text (≤ 4,000), embedding number[] (unit length, hidden), dims, model }` — indexes `{ kbId, sourceId, sourceVersion, order }`, `{ accountId, kbId }`. ≤ 2,000 per knowledge base. Searched in process (cosine = dot product), ADR 0033.
+
+#### AgentPlaygroundSession (`agentPlaygroundSessions`) — Phase 5 — TTL 30 days
+
+`{ agentId, userId, contactId?, variables (allowed values only), testPhone (select: false — functions only, never to the model, never returned), turns[] (role, text, toolCalls (redacted), knowledge refs, tokens, costMicros, billing, guardrail, fallback, clientTurnId), outcome { disposition, promiseToPay, callback, transferRequested, endRequested, smsTemplate }, status: active | ended, expiresAt }` — indexes `{ accountId, agentId, createdAt: -1 }`, TTL `expiresAt`.
+
+#### AgentToolCall (`agentToolCalls`) — Phase 5 — TTL 90 days
+
+`{ agentId, sessionId?, source: playground | test | call, tool, kind: custom | built_in, argsRedacted, status: ok | error, httpStatus?, durationMs, resultBytes, resultPreview (≤ 500, redacted), errorCode?, expiresAt }` — never headers or full responses.
+
+#### AgentUsage (`agentUsage`) — Phase 5
+
+`{ agentId, day (YYYY-MM-DD, account timezone), month, spentMicros, turns, inputTokens, outputTokens }` — unique `{ agentId, day }`; atomic `$inc`; drives per-agent caps.
+
+#### MockPaymentRecord (`mockPaymentRecords`) — Phase 5 — dev only
+
+`{ phoneE164, loanId?, status: paid | unpaid | partial, amountMicros, paidOn? }` — answers of the mock client payment API (`/api/v1/mock/payment-status`), not tenant data; the route is never mounted in production.
+
+#### Flow (`flows`) — Phase 6
+
+| Field                                 | Type                                        | R   | Notes                                                                                         |
+| ------------------------------------- | ------------------------------------------- | --- | --------------------------------------------------------------------------------------------- |
+| name, description                     | string                                      | ✓ / | name 1–80, unique per account (case-insensitive collation, live flows only)                   |
+| status                                | `draft \| published \| archived`            | ✓   |                                                                                               |
+| draft                                 | FlowGraph (`schemaVersion: 1`)              | ✓   | **Embedded editable draft** (nodes, edges, variables, settings, viewport) — `minimize: false` |
+| revision                              | number                                      | ✓   | +1 per draft save / restore; a save with an old revision → 409 `FLOW_REVISION_CONFLICT`       |
+| draftChecksum                         | string                                      |     | sha256 of the canonical draft (viewport excluded)                                             |
+| publishedVersionId / publishedVersion | ObjectId → flowVersions / number            |     | Latest published version                                                                      |
+| hasUnpublishedChanges                 | boolean                                     | ✓   | Draft checksum ≠ latest version checksum                                                      |
+| templateKey                           | string                                      |     | Created from a template                                                                       |
+| stats                                 | `{ nodes, agents[], audios[], triggers[] }` | ✓   | Recomputed on every save — drives "agent / audio in use" checks and list columns              |
+| createdBy, updatedBy                  | ObjectId → users                            |     |                                                                                               |
+| deletedAt                             | Date \| null                                |     | Soft delete; purged after 30 days unless in use                                               |
+
+**Deviation (Phase 6):** the draft is embedded on the flow instead of a `draftVersionId` row — one document, one write, optimistic `revision`. Indexes: unique `{ accountId, name }` (partial live, collation), `{ accountId, deletedAt, updatedAt: -1 }`, `{ accountId, status }`, `{ accountId, stats.agents }`, `{ accountId, stats.audios }`.
+
+#### FlowVersion (`flowVersions`) — Phase 6 — **published = immutable**
+
+| Field       | Type             | R   | Notes                                           |
+| ----------- | ---------------- | --- | ----------------------------------------------- |
+| flowId      | ObjectId → flows | ✓   |                                                 |
+| version     | number           | ✓   | 1, 2, … unique per flow                         |
+| graph       | FlowGraph        | ✓   | Snapshot of the draft at publish                |
+| checksum    | string           | ✓   | sha256 of the canonical graph                   |
+| notes       | string           |     | ≤ 200                                           |
+| agentIds    | ObjectId[]       | ✓   | Agents used by `ai_agent` nodes (in-use checks) |
+| audioIds    | ObjectId[]       | ✓   | Audio used by the graph (in-use checks)         |
+| publishedBy | ObjectId → users |     |                                                 |
+| publishedAt | Date             | ✓   |                                                 |
+
+Model hooks refuse every update / replace; there is no update route. Indexes: `{ flowId, version }` unique, `{ accountId, agentIds }`, `{ accountId, audioIds }`. Size: bounded graph (≤ 150 nodes, ≤ 512 KB).
+
+#### FlowRun (`flowRuns`) — Phase 6
+
+`{ flowId, mode: simulator | call, versionRef: 'draft' | number, graph (draft snapshot, hidden), graphChecksum, contactId?, manualVariables?, testPhone? (select: false, never returned), status: running | waiting | ended, state (engine JSON), transcript[], trace[], inputs[{ inputId, kind, at, seqFrom, seqTo }], costMicros, endReason, createdBy, endedAt, expiresAt }` — indexes `{ accountId, flowId, createdAt: -1 }`, `{ accountId, createdBy, createdAt: -1 }`, TTL `{ expiresAt }` (simulator runs: 30 days). PII: transcript texts, variables, test phone.
+
+#### FlowNodeStats (`flowNodeStats`) — Phase 6
+
+`{ flowId, version (0 = draft), nodeId, day (account timezone), mode, entered, errorCount, totalMs, exits: { handle → n } }` — unique `{ flowId, version, nodeId, day, mode }`; atomic `$inc`; deleted with the flow.
+
+#### FlowAudio (`flowAudio`) — Phase 6
+
+`{ name (unique per account, case-insensitive), fileKey (accounts/<id>/flow-audio/<id>.<ext>, hidden), format: wav | mp3, bytes (≤ 5 MB), durationMs (≤ 120 s), sampleRate, channels, uploadedBy, deletedAt }` — ≤ 200 per account; delete refused while a draft or published version uses it.
+
+### 2.5 Campaigns & calls
+
+#### Campaign (`campaigns`) — Phase 8
+
+| Field                                        | Type                                                                                                                                                                             | R   | Notes                                                                                                            |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---------------------------------------------------------------------------------------------------------------- |
+| name                                         | string (≤ 120)                                                                                                                                                                   | ✓   | Unique per account among live campaigns (case-insensitive)                                                       |
+| mode                                         | `dry_run \| live`                                                                                                                                                                | ✓   | `live` refused until a phone line exists (Phase 13)                                                              |
+| flowId                                       | ObjectId → flows                                                                                                                                                                 | ✓   | Only flows whose version's start step has the `campaign` trigger                                                 |
+| flowVersionId, flowVersion                   | ObjectId → flowVersions, number                                                                                                                                                  |     | **Pinned at start** — later flow edits don't affect a running campaign                                           |
+| chosenVersion                                | number \| null                                                                                                                                                                   |     | A chosen version number; `null` = latest published at start                                                      |
+| versionPolicy                                | `pinned \| latest`                                                                                                                                                               | ✓   | Recurring runs: keep the parent's version or take the latest                                                     |
+| audience                                     | `{ listIds, segmentId, filter, contactIds, excludeActiveCampaigns, skipIfMissing }`                                                                                              | ✓   | Sources are a union; then exclusions                                                                             |
+| schedule                                     | `{ startAt \| null, endAt \| null, timezone, recurrence: { freq: daily \| weekly, days, time, until } \| null }`                                                                 | ✓   | `startAt null` = start now                                                                                       |
+| window                                       | `{ start, end, days }`                                                                                                                                                           | ✓   | `[start, end)` in `schedule.timezone`; must intersect the account window                                         |
+| retry                                        | `{ maxAttempts 1–5, intervalMinutes 15–1440, retryOn: (no_answer \| busy \| failed \| no_outcome)[] }`                                                                           | ✓   |                                                                                                                  |
+| followUps                                    | `{ callbacks, callbackMaxDays, promiseCheck: { enabled, daysAfter } }`                                                                                                           | ✓   | Customer-requested callbacks; optional promise follow-up                                                         |
+| pacing                                       | `{ concurrency, dialsPerMinute, priority: high \| normal \| low }`                                                                                                               | ✓   | ≤ the account `limits`                                                                                           |
+| autoResume                                   | boolean                                                                                                                                                                          | ✓   | Resume a wallet pause after a top-up (default true)                                                              |
+| dryRun                                       | `{ mix (bps per pre-answer outcome), scenarios (weights), speed }` \| null                                                                                                       |     | Only for `dry_run`                                                                                               |
+| status                                       | `draft \| scheduled \| running \| paused \| completed \| canceled \| failed`                                                                                                     | ✓   |                                                                                                                  |
+| pauseReason                                  | `manual \| wallet_empty \| budget_reached \| account_suspended \| too_many_failures \| admin \| flow_not_runnable` \| null                                                       |     |                                                                                                                  |
+| waitingUntil                                 | Date \| null                                                                                                                                                                     |     | Running but outside the window → next window start                                                               |
+| stats                                        | `{ total, pending, queued, calling, waiting, completed, failed, skipped, canceled, answered, attempts, dispositions, skippedBy, spentMicros, virtualCostMicros, failureStreak }` | ✓   | Denormalised `$inc` counters; the sweep recounts on drift                                                        |
+| estimate                                     | `{ contacts, calls, perCallMicros, totalMicros, minMicros, maxMicros, at }` \| null                                                                                              |     | Review step (Phase 4 `estimateCampaign`)                                                                         |
+| snapshot                                     | `{ cursor, done, counts }`                                                                                                                                                       | ✓   | Resumable audience snapshot                                                                                      |
+| parentId, runNumber                          | ObjectId \| null, number \| null                                                                                                                                                 |     | Runs of a recurring parent                                                                                       |
+| nextRunAt                                    | Date \| null                                                                                                                                                                     |     | Recurring parent: the next occurrence; the `campaign.run` job and the minute sweep claim it with compare-and-set |
+| startedAt, completedAt, canceledAt, pausedAt | Date \| null                                                                                                                                                                     |     |                                                                                                                  |
+| startedBy, createdBy, updatedBy              | ObjectId → users                                                                                                                                                                 |     |                                                                                                                  |
+| revision                                     | number                                                                                                                                                                           | ✓   | `+1` per save; edits must send it (`CAMPAIGN_REVISION_CONFLICT`)                                                 |
+| error                                        | `{ code }` \| null                                                                                                                                                               |     | Why a campaign `failed`                                                                                          |
+| history                                      | `{ at, status, pauseReason, by }[]`                                                                                                                                              | ✓   | Last 100 status changes (Activity tab)                                                                           |
+| deletedAt                                    | Date \| null                                                                                                                                                                     |     | Soft delete; purged after 30 days                                                                                |
+
+No campaign wallet hold: every call holds / settles on its own (Phase 4 decision, ADR 0032) — the draft's `holdLedgerEntryId` was dropped. Indexes: `{ accountId, name }` unique partial (live, collation `en` / 2), `{ accountId, status, createdAt: -1 }`, `{ status, schedule.startAt }` (scheduler), `{ accountId, flowId, status }` (`isFlowInUse`), `{ parentId, runNumber: -1 }`. PII: none (names of campaigns only). Retention: until deleted (+ 30-day purge).
+
+#### CampaignContact (`campaignContacts`) — Phase 8
+
+| Field                                         | Type                                                                                                                                               | R                                                                                                                              | Notes                                                                                                                                                                                        |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| campaignId, contactId                         | ObjectId                                                                                                                                           | ✓                                                                                                                              |                                                                                                                                                                                              |
+| seq                                           | number                                                                                                                                             | ✓                                                                                                                              | Snapshot order                                                                                                                                                                               |
+| phoneE164, name, variables                    | snapshot                                                                                                                                           | ✓                                                                                                                              | Copied at campaign start — later contact edits don't change the call; variables = display values of the fields the flow uses                                                                 |
+| status                                        | `pending \| queued \| calling \| retry_wait \| callback_wait \| completed \| failed \| skipped \| canceled`                                        | ✓                                                                                                                              |                                                                                                                                                                                              |
+| dueRank                                       | `0 \| 1 \| 2`                                                                                                                                      | ✓                                                                                                                              | Claim order: callback, retry, fresh                                                                                                                                                          |
+| attempts, dials, nextAttemptAt, lastAttemptAt | number, number, Date \| null                                                                                                                       |                                                                                                                                | Counted attempts (retry limit; a not-counted end — shutdown, wallet, limit — gives one back), every dial (the next call's `attempt` number, unique per contact), retry / callback scheduling |
+| lastCallId, lastResult                        | ObjectId → calls, `answered \| no_answer \| busy \| failed \| invalid_number`                                                                      |                                                                                                                                |                                                                                                                                                                                              |
+| disposition, promiseToPay, callback           | string, `{ date, amountMicros }`, `{ date, time }`                                                                                                 |                                                                                                                                | From the call outcome                                                                                                                                                                        |
+| skipReason                                    | `contact_deleted \| dnd \| opted_out \| invalid_phone \| duplicate_phone \| in_active_campaign \| missing_values \| cap_reached \| campaign_ended` |                                                                                                                                |                                                                                                                                                                                              |
+| waitReason                                    | `window \| daily_cap \| weekly_cap \| min_gap` (why it waits for `nextAttemptAt`; cleared on the next dial)                                        | dnd \| opted_out \| invalid_phone \| duplicate_phone \| in_active_campaign \| missing_values \| cap_reached \| campaign_ended` |                                                                                                                                                                                              |     |
+| claimToken, claimedAt                         | string, Date                                                                                                                                       |                                                                                                                                | Dispatcher claim (token never serialised)                                                                                                                                                    |
+| costMicros                                    | number                                                                                                                                             | ✓                                                                                                                              | Sum of call costs (virtual for dry runs)                                                                                                                                                     |
+
+Indexes: `{ campaignId, contactId }` unique, `{ campaignId, status, dueRank, nextAttemptAt, seq }` (claims), `{ campaignId, seq }`, `{ campaignId, phoneE164 }` (dedupe), `{ accountId, contactId, status }` (active-campaign exclusion), `{ status, claimedAt }` (sweep). PII: phone, name, variables snapshot. Retention: with the campaign (not soft-deleted itself).
+
+#### Call (`calls`) — Phase 7
+
+| Field                      | Type                                                                                                                                                                                                                                                               | R   | Notes                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --- | -------------------------------------------------------------------------------------------- |
+| direction                  | `outbound \| inbound`                                                                                                                                                                                                                                              | ✓   |                                                                                              |
+| provider                   | `webcall \| sip \| notifynow \| dryrun`                                                                                                                                                                                                                            | ✓   | ADR 0020 (Phase 7: `webcall`; Phase 8: `dryrun` simulated phone calls)                       |
+| providerCallId             | string \| null                                                                                                                                                                                                                                                     |     | Unique per provider when set                                                                 |
+| from, to                   | string                                                                                                                                                                                                                                                             | ✓   | E.164 for phone calls; web test calls `webcall` → `webcall:<userId>`                         |
+| isTest                     | boolean                                                                                                                                                                                                                                                            | ✓   | Every web call                                                                               |
+| source                     | `{ kind: flow \| agent, flowId?, flowVersionRef?: 'draft' \| n, flowVersionId?, agentId? }`                                                                                                                                                                        | ✓   | What runs on the call                                                                        |
+| contactId, campaignId      | ObjectId \| null                                                                                                                                                                                                                                                   |     | Campaign from Phase 8                                                                        |
+| campaignContactId, attempt | ObjectId \| null, number \| null                                                                                                                                                                                                                                   |     | Campaign attempt (1-based); unique together — an attempt is never dialed twice (Phase 8)     |
+| startedBy                  | ObjectId \| null                                                                                                                                                                                                                                                   |     | User who started a test call                                                                 |
+| status                     | `queued \| ringing \| in_progress \| completed \| failed \| busy \| no_answer \| canceled`                                                                                                                                                                         | ✓   | `busy` / `no_answer` from SIP (Phase 13)                                                     |
+| endReason                  | `hangup_node \| agent_end_call \| customer_hangup \| transferred \| max_duration \| wallet_empty \| ai_failed \| engine_error \| media_timeout \| media_error \| server_shutdown \| canceled \| limit \| busy \| no_answer \| invalid_number \| campaign_canceled` |     | Phase 8 adds the pre-answer reasons and `campaign_canceled`                                  |
+| hangupCause                | string \| null                                                                                                                                                                                                                                                     |     | Provider cause mapped                                                                        |
+| timestamps                 | `{ queuedAt, ringingAt, answeredAt, endedAt }`                                                                                                                                                                                                                     | ✓   |                                                                                              |
+| durationSec                | number                                                                                                                                                                                                                                                             | ✓   | Answered → ended                                                                             |
+| variables                  | object (display strings)                                                                                                                                                                                                                                           |     | Allowed contact values + flow values — **never** phone / external id                         |
+| outcome, disposition       | object, string \| null                                                                                                                                                                                                                                             |     | Same shape as `FlowRun.outcome` / agent outcome                                              |
+| languageDetected           | string \| null                                                                                                                                                                                                                                                     |     |                                                                                              |
+| metrics                    | `{ latency { p50Ms, p95Ms, maxMs, samples }, bargeIns, silencePrompts, framesIn, framesOut, gapsIn, ttsChars, ttsCachedChars, aiSeconds, realtime { input/output audio + text tokens, cachedTokens } }`                                                            | ✓   | Numbers only                                                                                 |
+| holdId, ledgerEntryId      | ObjectId \| null                                                                                                                                                                                                                                                   |     | Wallet hold (start) and settle row (end)                                                     |
+| cost                       | `{ telephonyMicros, aiMicros, ttsMicros, commissionMicros, totalMicros }`                                                                                                                                                                                          | ✓   | Web test calls: telephony 0                                                                  |
+| charged                    | boolean                                                                                                                                                                                                                                                            | ✓   | `false` for dry-run calls: `cost` is what the call would have cost, no ledger rows (Phase 8) |
+| recording                  | `{ fileKey, durationSec, sizeBytes, format: 'wav' } \| null`                                                                                                                                                                                                       |     | Stereo PCM16 8 kHz (customer left, bot right); file key never returned                       |
+| flowRunId                  | ObjectId \| null                                                                                                                                                                                                                                                   |     | `FlowRun` (`mode: call`) of a flow call                                                      |
+| seq                        | `{ events, transcript }`                                                                                                                                                                                                                                           | ✓   | Next sequence numbers (atomic `$inc`)                                                        |
+| error                      | `{ code } \| null`                                                                                                                                                                                                                                                 |     | Error code only                                                                              |
+
+Indexes: `{ accountId: 1, createdAt: -1, _id: -1 }`, `{ accountId: 1, status: 1 }`, `{ accountId: 1, campaignId: 1, status: 1 }`, `{ accountId: 1, contactId: 1, createdAt: -1 }`, `{ accountId: 1, source.flowId: 1, createdAt: -1 }`, `{ accountId: 1, source.agentId: 1, createdAt: -1 }`, `{ provider: 1, providerCallId: 1 }` unique (when set), `{ campaignContactId: 1, attempt: 1 }` unique (when set, Phase 8), `{ accountId: 1, contactId: 1, provider: 1, createdAt: -1 }` (call caps), `{ status: 1, updatedAt: 1 }` (reaper), `{ createdAt: 1 }` (purge). PII: variables, outcome, recording. Retention: `CALL_RETENTION_DAYS` (default 180) — `calls-purge` deletes the recording file, events, transcript, the call-mode `FlowRun` and the call.
+
+#### CallEvent (`callEvents`) — Phase 7 — **immutable**
+
+| Field  | Type                                                                                                                                                                                                                                                                                             | R   | Notes                                                                  |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --- | ---------------------------------------------------------------------- |
+| callId | ObjectId → calls                                                                                                                                                                                                                                                                                 | ✓   |                                                                        |
+| seq    | number                                                                                                                                                                                                                                                                                           | ✓   | Monotonic per call                                                     |
+| type   | `status \| node_entered \| node_exited \| dtmf \| speech_started \| barge_in \| silence_prompt \| ai_session_started \| ai_session_ended \| ai_function_call \| ai_function_result \| ai_outcome \| tts \| latency \| wallet_extend \| transfer \| recording_saved \| recording_failed \| error` | ✓   |                                                                        |
+| data   | object                                                                                                                                                                                                                                                                                           | ✓   | Ids, names, counts, ms, codes — never texts, digits, phones or secrets |
+| at     | Date                                                                                                                                                                                                                                                                                             | ✓   |                                                                        |
+
+Indexes: `{ callId: 1, seq: 1 }` unique, `{ accountId: 1, at: -1 }`. Update / replace / re-save hooks throw (append-only). Retention: same as calls.
+
+#### TranscriptTurn (`transcriptTurns`) — Phase 7
+
+| Field          | Type                                          | R   | Notes                                 |
+| -------------- | --------------------------------------------- | --- | ------------------------------------- |
+| callId         | ObjectId → calls                              | ✓   |                                       |
+| seq            | number                                        | ✓   |                                       |
+| speaker        | `customer \| bot \| agent`                    | ✓   |                                       |
+| text           | string                                        | ✓   | **PII** — finals only (DTMF as `[1]`) |
+| language       | string \| null                                |     |                                       |
+| startMs, endMs | number                                        | ✓   | Offset from answer                    |
+| interrupted    | boolean                                       | ✓   | Bot turn cut by barge-in              |
+| source         | `tts \| ai \| stt \| dtmf \| audio \| system` | ✓   |                                       |
+
+Indexes: `{ callId: 1, seq: 1 }` unique. Retention: same as calls.
+
+#### TtsCacheEntry (`ttsCache`) — Phase 7 — platform-wide
+
+`{ key (sha256 of model + voice + language + tone + text — the text is never stored), model, voice, language, chars, fileKey (PCM16 24 kHz in storage), durationMs, hits, lastUsedAt }` — index `{ key: 1 }` unique, `{ lastUsedAt: 1 }`; entries unused for 30 days are purged with their files. Not tenant data.
+
+#### PhoneNumber (`phoneNumbers`) — Phase 13/14
+
+| Field                          | Type                    | R   | Notes               |
+| ------------------------------ | ----------------------- | --- | ------------------- |
+| e164                           | string                  | ✓   | **Unique globally** |
+| provider                       | `sip \| notifynow`      | ✓   |                     |
+| capabilities                   | `{ inbound, outbound }` | ✓   |                     |
+| inboundFlowId / inboundAgentId | ObjectId                |     | Inbound routing     |
+| status                         | `active \| inactive`    | ✓   |                     |
+| deletedAt                      | Date \| null            |     |                     |
+
+Indexes: `{ e164: 1 }` unique, `{ accountId: 1 }`.
+
+### 2.6 Integrations
+
+#### TelephonyConfig (`telephonyConfigs`) — Phase 13
+
+| Field            | Type                                                         | R   | Notes                     |
+| ---------------- | ------------------------------------------------------------ | --- | ------------------------- |
+| provider         | `sip \| notifynow`                                           | ✓   |                           |
+| sip              | `{ host, port, transport, username, passwordEnc, callerId }` |     | **passwordEnc encrypted** |
+| concurrencyLimit | number                                                       | ✓   | Trunk limit               |
+| status           | `active \| inactive`                                         | ✓   |                           |
+
+Indexes: `{ accountId: 1, provider: 1 }` unique.
+
+#### OutboundWebhook (`outboundWebhooks`) — Phase 10
+
+| Field        | Type     | R   | Notes                                 |
+| ------------ | -------- | --- | ------------------------------------- |
+| url          | string   | ✓   | HTTPS only in production              |
+| events       | string[] | ✓   | `call.completed`, …                   |
+| secretEnc    | string   | ✓   | Encrypted signing secret              |
+| active       | boolean  | ✓   |                                       |
+| failureCount | number   | ✓   |                                       |
+| disabledAt   | Date     |     | Auto-disabled after repeated failures |
+
+Indexes: `{ accountId: 1, active: 1 }`.
+
+#### WebhookDelivery (`webhookDeliveries`) — Phase 10
+
+| Field                      | Type                             | R   | Notes           |
+| -------------------------- | -------------------------------- | --- | --------------- |
+| webhookId                  | ObjectId → outboundWebhooks      | ✓   |                 |
+| eventId, type              | string                           | ✓   |                 |
+| payload                    | object                           | ✓   |                 |
+| status                     | `pending \| succeeded \| failed` | ✓   |                 |
+| attempts                   | number                           | ✓   |                 |
+| nextAttemptAt              | Date                             |     |                 |
+| responseStatus, durationMs | number                           |     |                 |
+| expiresAt                  | Date                             | ✓   | **TTL** 30 days |
+
+Indexes: `{ webhookId: 1, createdAt: -1 }`, `{ status: 1, nextAttemptAt: 1 }`, `{ expiresAt: 1 }` TTL.
+
+### 2.7 WhatsApp
+
+#### WhatsAppChannel (`whatsappChannels`) — Phase 9
+
+One connected WhatsApp Business number (Embedded Signup). Tenant-scoped.
+
+| Field                                                                           | Type                                                                                                                      | R   | Notes                                                                                                                                       |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| label                                                                           | string (≤ 60)                                                                                                             | ✓   | Name shown in the app                                                                                                                       |
+| provider                                                                        | `meta \| fake`                                                                                                            | ✓   | `fake` only outside production                                                                                                              |
+| mode                                                                            | `cloud_api \| coexistence`                                                                                                | ✓   | `coexistence` = WhatsApp Business app number (messages also sent from the phone)                                                            |
+| wabaId, wabaName, businessId, businessName                                      | string                                                                                                                    | ✓   | WhatsApp Business Account + Meta business                                                                                                   |
+| wabaKind, waacId                                                                | `'whatsapp' \| 'messaging'` \| null, string \| null                                                                       |     | Phase 13 (migration 0014): Meta's 2026 account model — `messaging` when Meta sent a separate WhatsApp account id (`waacId`); null = unknown |
+| wabaCurrency, wabaTimezoneId, templateNamespace, wabaReviewStatus               | string \| null                                                                                                            |     | From Graph                                                                                                                                  |
+| businessVerificationStatus                                                      | string \| null                                                                                                            |     |                                                                                                                                             |
+| phoneNumberId                                                                   | string \| null                                                                                                            |     | Null while the WABA has no number yet; one **active** channel per number                                                                    |
+| phoneE164, displayPhoneNumber, verifiedName, nameStatus, newNameStatus          | string \| null                                                                                                            |     | The business number (not customer PII)                                                                                                      |
+| qualityRating                                                                   | `GREEN \| YELLOW \| RED \| UNKNOWN`                                                                                       | ✓   | Default `UNKNOWN`                                                                                                                           |
+| messagingLimitTier                                                              | `TIER_50 … TIER_UNLIMITED` \| null                                                                                        |     |                                                                                                                                             |
+| throughputLevel, accountMode, platformType, codeVerificationStatus, phoneStatus | string \| null                                                                                                            |     | From Graph                                                                                                                                  |
+| isOfficialBusinessAccount, isOnBizApp                                           | boolean                                                                                                                   | ✓   | `isOnBizApp` → coexistence (no calling)                                                                                                     |
+| capabilities                                                                    | object \| null                                                                                                            |     | Raw capability flags                                                                                                                        |
+| tokenSealed                                                                     | string                                                                                                                    |     | **Business token, sealed** (AES-256-GCM, `ENCRYPTION_KEY`); `select: false`, never in JSON                                                  |
+| tokenType, tokenScopes, tokenExpiresAt, tokenCheckedAt                          | string, string[], Date                                                                                                    |     | From `debug_token`                                                                                                                          |
+| metaUserId                                                                      | string \| null                                                                                                            |     | Meta user that granted access (deauthorize / data deletion)                                                                                 |
+| registration                                                                    | `{ status: not_needed \| pending \| registered \| failed, pinSealed, error, at }`                                         | ✓   | Cloud API registration; `pinSealed` `select: false`                                                                                         |
+| subscription                                                                    | `{ status: subscribed \| failed \| null, error, at }`                                                                     | ✓   | App subscribed to the WABA webhooks                                                                                                         |
+| metaPayer                                                                       | `platform \| customer`                                                                                                    | ✓   | Copied from the account at connect                                                                                                          |
+| creditLine                                                                      | `{ status: not_needed \| attached \| failed, allocationConfigId, error, at }`                                             | ✓   | Platform credit line (Solution Partner)                                                                                                     |
+| paymentMethodOk                                                                 | boolean \| null                                                                                                           |     | Customer pays Meta: payment method present                                                                                                  |
+| coexistence                                                                     | `{ contactsSync, historySync (not_requested \| requested \| received \| declined \| failed), historyProgress, echoesAt }` | ✓   |                                                                                                                                             |
+| status                                                                          | `connecting \| connected \| action_needed \| needs_reconnect \| restricted \| disconnected`                               | ✓   |                                                                                                                                             |
+| statusReason                                                                    | `{ code, message, step }` \| null                                                                                         |     | `step` ∈ phone, details, subscribe, billing, register (retry resumes there)                                                                 |
+| restriction                                                                     | `{ type, until }` \| null                                                                                                 |     | From `account_update`                                                                                                                       |
+| webhook                                                                         | `{ lastEventAt, lastField }`                                                                                              | ✓   | Throttled to one write per minute                                                                                                           |
+| history                                                                         | `{ status, reason, at, by }[]`                                                                                            | ✓   | Last 50 status changes                                                                                                                      |
+| connectedBy/At, syncedAt, disconnectedBy/At                                     | ObjectId, Date                                                                                                            |     |                                                                                                                                             |
+
+Indexes: `{ phoneNumberId: 1 }` unique **partial** (status not `disconnected`, `phoneNumberId` a string), `{ accountId: 1, status: 1 }`, `{ wabaId: 1 }`, `{ metaUserId: 1 }`, `account_waac` `{ accountId: 1, waacId: 1 }` partial (string, Phase 13). Disconnect clears the token and PIN and keeps the row (history). PII: none of customers. Retention: life of contract.
+
+#### MetaWebhookEvent (`metaWebhookEvents`) — Phase 9
+
+Not tenant-scoped (stored before routing). One row per `entry × change` of a signed Meta webhook.
+
+| Field                               | Type                                                     | R   | Notes                                                                |
+| ----------------------------------- | -------------------------------------------------------- | --- | -------------------------------------------------------------------- |
+| key                                 | string                                                   | ✓   | sha256 idempotency key (object, entry id, field, value) — **unique** |
+| object, field                       | string                                                   | ✓   | `whatsapp_business_account`, `messages`, …                           |
+| wabaId, phoneNumberId               | string \| null                                           |     | Routing                                                              |
+| accountId, channelId                | ObjectId \| null                                         |     | Set once routed                                                      |
+| payloadSealed                       | string                                                   | ✓   | **Sealed** change value; `select: false`                             |
+| status                              | `received \| processed \| ignored \| deferred \| failed` | ✓   | `deferred` = kept for a later phase (messages, templates, calls)     |
+| attempts, error                     | number, string \| null                                   |     |                                                                      |
+| receivedAt, processedAt, consumedAt | Date                                                     |     |                                                                      |
+| expiresAt                           | Date                                                     | ✓   | **TTL** 7 days (deferred 30)                                         |
+
+Indexes: `{ key: 1 }` unique, `{ status: 1, receivedAt: 1 }`, `{ channelId: 1, field: 1, receivedAt: -1 }`, `{ field: 1, status: 1, receivedAt: 1 }`, `{ expiresAt: 1 }` TTL.
+
+#### MetaDeletionRequest (`metaDeletionRequests`) — Phase 9
+
+Not tenant-scoped. Meta data-deletion callback (`signed_request`); the status page reads it by code.
+
+| Field                   | Type                    | R   | Notes              |
+| ----------------------- | ----------------------- | --- | ------------------ |
+| confirmationCode        | string                  | ✓   | Random, **unique** |
+| metaUserId              | string                  | ✓   |                    |
+| status                  | `received \| completed` | ✓   |                    |
+| channelsAffected        | number                  | ✓   |                    |
+| receivedAt, completedAt | Date                    |     |                    |
+| expiresAt               | Date                    | ✓   | **TTL** 365 days   |
+
+Indexes: `{ confirmationCode: 1 }` unique, `{ expiresAt: 1 }` TTL.
+
+### 2.8 Inbox
+
+#### Conversation (`conversations`) — Phase 10
+
+One WhatsApp chat between one connected number and one customer. Tenant-scoped.
+
+| Field                          | Type                                                           | R   | Notes                                                             |
+| ------------------------------ | -------------------------------------------------------------- | --- | ----------------------------------------------------------------- |
+| channelId                      | ObjectId → whatsappChannels                                    | ✓   |                                                                   |
+| contactId                      | ObjectId → contacts                                            | ✓   | Matched by phone, else auto-created (`source.type = whatsapp`)    |
+| waId                           | string (digits)                                                | ✓   | Customer's WhatsApp id; **unique** per account × channel          |
+| phoneE164                      | string                                                         | ✓   | `+<waId>`                                                         |
+| profileName                    | string \| null                                                 |     | Latest Meta profile name                                          |
+| status                         | `open \| closed`                                               | ✓   | Inbound reopens a closed one                                      |
+| assignedTo                     | ObjectId → users \| null                                       |     |                                                                   |
+| unreadCount                    | number                                                         | ✓   | Inbound since the team's last read (not reactions / system lines) |
+| lastMessage                    | `{ id, direction, type, preview (≤ 120), at, status }` \| null |     | List row; only replaced by a newer message (`at`)                 |
+| lastInboundAt, windowExpiresAt | Date \| null                                                   |     | 24-hour service window (`windowExpiresAt = lastInboundAt + 24 h`) |
+| lastReadAt, lastReadBy         | Date, ObjectId                                                 |     | Team read marker                                                  |
+| blocked                        | boolean                                                        | ✓   | Blocked on WhatsApp (Block Users API)                             |
+| source                         | `inbound \| outbound \| business_app \| history`               | ✓   | How it started                                                    |
+| closedAt, closedBy             | Date, ObjectId                                                 |     |                                                                   |
+
+Indexes: `{ accountId: 1, channelId: 1, waId: 1 }` unique, `{ accountId: 1, status: 1, 'lastMessage.at': -1, _id: -1 }` (list + cursor), `{ accountId: 1, assignedTo: 1, status: 1, 'lastMessage.at': -1 }` (Mine), `{ accountId: 1, unreadCount: 1 }` partial `unreadCount > 0` (Unread, badge), `{ accountId: 1, contactId: 1 }` (contact page). PII: phone, profile name, preview. Retention: the row stays when the retention job removes its messages (`lastMessage` then recomputed or null).
+
+#### Message (`messages`) — Phase 10
+
+One WhatsApp message (both directions) or internal note. Tenant-scoped. **Every sub-field is declared** — Mongoose strict mode silently drops undeclared ones (the AutoChatix reaction bug).
+
+| Field                                | Type                                                                                                                                                                                                                                                                                                                                                                  | R   | Notes                                                                                               |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | --------------------------------------------------------------------------------------------------- |
+| conversationId, channelId, contactId | ObjectId                                                                                                                                                                                                                                                                                                                                                              | ✓   |                                                                                                     |
+| direction                            | `in \| out`                                                                                                                                                                                                                                                                                                                                                           | ✓   |                                                                                                     |
+| origin                               | `customer \| agent \| business_app \| history \| system`                                                                                                                                                                                                                                                                                                              | ✓   | `business_app` = coexistence echo; `system` = Meta system message / our confirmation text           |
+| type                                 | `text \| image \| video \| audio \| document \| sticker \| location \| contacts \| interactive \| button \| reaction \| order \| system \| unsupported \| note`                                                                                                                                                                                                       | ✓   | `note` = internal, never sent                                                                       |
+| text                                 | string (≤ 4096) \| null                                                                                                                                                                                                                                                                                                                                               |     | Body / caption                                                                                      |
+| media                                | `{ metaMediaId, metaMediaUploadedAt, storageKey, mimeType, size, sha256, fileName, voice, durationSec, animated, status: pending \| ready \| failed \| expired, error }` \| null                                                                                                                                                                                      |     | Stored file (`accounts/<id>/inbox-media/<messageId>.<ext>` or the upload's key); never the Meta URL |
+| location                             | `{ latitude, longitude, name, address, url }` \| null                                                                                                                                                                                                                                                                                                                 |     |                                                                                                     |
+| contacts                             | `{ name, phones[{ phone, type, waId }], emails[{ email, type }], org }[]` \| null                                                                                                                                                                                                                                                                                     |     | ≤ 10 cards                                                                                          |
+| interactive                          | `{ kind: button \| list \| cta_url \| button_reply \| list_reply \| nfm_reply, header { type, text, storageKey, metaMediaId, mimeType, fileName }, body, footer, buttons[{ id, title }], listButton, sections[{ title, rows[{ id, title, description }] }], cta { displayText, url }, reply { id, title, description }, nfmResponse (≤ 8 KB), nfmTruncated }` \| null |     | Outgoing builder + incoming replies / forms                                                         |
+| reaction                             | `{ targetWaMessageId, targetMessageId, emoji }` \| null                                                                                                                                                                                                                                                                                                               |     | Inbound reaction message (`''` = removed)                                                           |
+| context                              | `{ replyToWaMessageId, replyToMessageId, forwarded, frequentlyForwarded, referral { sourceUrl, sourceType, sourceId, headline, body, ctwaClid } }` \| null                                                                                                                                                                                                            |     | Reply quote, forwarded, click-to-WhatsApp ad                                                        |
+| reactions                            | `{ emoji, by: customer \| agent, userId, at }[]`                                                                                                                                                                                                                                                                                                                      | ✓   | Reactions **on** this message (one per actor)                                                       |
+| order, button, system                | `{ catalogId, itemsCount, total, currency }`, `{ payload, text }`, `{ kind, newWaIdLast4 }` \| null                                                                                                                                                                                                                                                                   |     | Read-only inbound types                                                                             |
+| status                               | `received \| queued \| accepted \| sent \| delivered \| read \| failed \| deleted`                                                                                                                                                                                                                                                                                    | ✓   | Monotonic (a lower status never replaces a higher one)                                              |
+| statusHistory                        | `{ status, at }[]`                                                                                                                                                                                                                                                                                                                                                    | ✓   | ≤ 10, deduped                                                                                       |
+| error                                | `{ code, title, reason }` \| null                                                                                                                                                                                                                                                                                                                                     |     | Meta error code + our reason text (no customer data)                                                |
+| waMessageId                          | string \| null                                                                                                                                                                                                                                                                                                                                                        |     | Meta `wamid…`                                                                                       |
+| clientId                             | string \| null                                                                                                                                                                                                                                                                                                                                                        |     | Outgoing idempotency key (uuid from the browser)                                                    |
+| sentBy, retryOf                      | ObjectId \| null                                                                                                                                                                                                                                                                                                                                                      |     | Agent; failed message this one retries                                                              |
+| pricing                              | `{ billable, model, category, type, conversationId, conversationOrigin }` \| null                                                                                                                                                                                                                                                                                     |     | From status webhooks — billed in Phase 11                                                           |
+| metaTimestamp                        | Date \| null                                                                                                                                                                                                                                                                                                                                                          |     |                                                                                                     |
+| at                                   | Date                                                                                                                                                                                                                                                                                                                                                                  | ✓   | Chat order, paging and retention: Meta's time for inbound / echoes / history, send time otherwise   |
+
+Indexes: `{ accountId: 1, channelId: 1, waMessageId: 1 }` unique partial (string) — Meta redelivers, `{ accountId: 1, conversationId: 1, at: -1, _id: -1 }` (paging), `{ at: 1 }` (retention), `{ accountId: 1, clientId: 1 }` unique partial (string), `{ 'media.status': 1, createdAt: 1 }` (download retries), text `{ accountId: 1, text: 'text' }` with `default_language: 'none'` (search without stemming — Hinglish). PII: text, media, location, contact cards, referral. Retention: `INBOX_RETENTION_DAYS` (default **90**) — the daily `inbox-retention` job deletes older messages and their files.
+
+#### InboxUpload (`inboxUploads`) — Phase 10
+
+A file uploaded from the composer, waiting to be sent. Tenant-scoped. Its id is the `mediaToken`; sending copies it into `message.media` and deletes the row (the file then belongs to the message).
+
+| Field                  | Type                                                      | R   | Notes                                                                        |
+| ---------------------- | --------------------------------------------------------- | --- | ---------------------------------------------------------------------------- |
+| userId                 | ObjectId → users                                          | ✓   | Only this user may send it                                                   |
+| kind                   | `image \| video \| audio \| voice \| document \| sticker` | ✓   |                                                                              |
+| storageKey             | string                                                    | ✓   | `accounts/<id>/inbox-uploads/<uploadId>.<ext>`                               |
+| mimeType, size, sha256 | string, number, string                                    | ✓   | Sniffed type (magic bytes), not the browser's claim                          |
+| fileName               | string (≤ 200) \| null                                    |     | Sanitised                                                                    |
+| durationSec, voice     | number \| null, boolean                                   |     | Voice notes: OGG / Opus mono (WebM remuxed)                                  |
+| expiresAt              | Date                                                      | ✓   | 24 h; **not** a TTL index — the retention job deletes the file, then the row |
+
+Indexes: `{ expiresAt: 1 }`.
+
+**Additions (Phase 10):** Contact `whatsapp: { waId, profileName, lastInboundAt, blocked, syncRemovedAt, nameEditedAt, keywordAt } | null` (`nameEditedAt` — a person renamed the contact, WhatsApp syncs keep that name; `keywordAt` — time of the message whose opt-out / opt-in keyword set the current state, so keywords apply in message order) and `source.type` + `whatsapp`; DndEntry `source` + `whatsapp` (a WhatsApp opt-out keyword — an opt-in keyword removes only these); Account `settings.inbox: { sendReadReceipts, optOutKeywords, optInKeywords, optOutReply, optOutReplyText, optInReply, optInReplyText, notifyOnNewMessage: assigned_or_all \| assigned_only \| off }` (defaults: owner decisions of 23 Oct 2026 — English + Hinglish + Hindi keywords, confirmations on, read receipts on).
+
+### 2.9 Templates & WhatsApp billing
+
+#### WhatsAppTemplate (`whatsappTemplates`) — Phase 11
+
+A WhatsApp message template on one WABA (Meta's copy is the truth; ours adds drafts, variable sources, usage). Tenant-scoped. Rows are **never hard-deleted** — Meta deletion → `status: DELETED` + `deletedAt` (history and reports keep working).
+
+| Field                | Type                                                                                                                                                                      | R   | Notes                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------- |
+| wabaId               | string                                                                                                                                                                    | ✓   | Meta WABA id                                                                                |
+| channelIds           | ObjectId[] → whatsappChannels                                                                                                                                             | ✓   | Our numbers on this WABA                                                                    |
+| metaTemplateId       | string \| null                                                                                                                                                            |     | `null` while a local draft                                                                  |
+| name                 | string `^[a-z0-9_]+$` (≤ 512)                                                                                                                                             | ✓   |                                                                                             |
+| language             | string                                                                                                                                                                    | ✓   | Meta code (`en`, `en_US`, `hi`, …)                                                          |
+| category             | `MARKETING \| UTILITY \| AUTHENTICATION`                                                                                                                                  | ✓   | `previousCategory` keeps the old one after Meta recategorises                               |
+| subCategory          | string \| null                                                                                                                                                            |     | Meta's, read-only                                                                           |
+| parameterFormat      | `positional \| named`                                                                                                                                                     | ✓   |                                                                                             |
+| components           | Meta JSON object[]                                                                                                                                                        | ✓   | The only `Mixed` field — validated by zod before every write. Bodies / samples never logged |
+| variables            | `{ key, component: header \| body \| button, index, example, defaultSource { kind: contact.name \| contact.phone \| contact.email \| field \| static \| ask, value } }[]` | ✓   | ≤ 20; derived from components                                                               |
+| status               | `DRAFT \| PENDING \| APPROVED \| REJECTED \| PAUSED \| DISABLED \| IN_APPEAL \| FLAGGED \| PENDING_DELETION \| DELETED \| ARCHIVED \| LIMIT_EXCEEDED`                     | ✓   | `DRAFT` = ours only                                                                         |
+| statusReason         | `{ reason, title, description }` \| null                                                                                                                                  |     | Rejection / pause reason                                                                    |
+| statusHistory        | `{ status, reason, at, source: user \| webhook \| sync }[]`                                                                                                               | ✓   | ≤ 30                                                                                        |
+| quality              | `{ score: GREEN \| YELLOW \| RED \| UNKNOWN, at }` \| null                                                                                                                |     |                                                                                             |
+| pausedUntil          | Date \| null                                                                                                                                                              |     | Meta pause (3 h / 6 h)                                                                      |
+| ttlSeconds           | number \| null                                                                                                                                                            |     | Meta `message_send_ttl_seconds`                                                             |
+| editsLog             | `{ at }[]`                                                                                                                                                                | ✓   | Approved-template edits (1 / 24 h, 10 / 30 days)                                            |
+| headerMedia          | `{ storageKey, mimeType, size, fileName, handle, handleAt }` \| null                                                                                                      |     | Example asset (our storage) + Meta upload handle                                            |
+| purpose              | `general \| call_permission`                                                                                                                                              | ✓   | `call_permission` = the ready-made Phase 12 template                                        |
+| editable             | boolean                                                                                                                                                                   | ✓   | False for authentication / carousel / unknown components                                    |
+| usage                | `{ sent, delivered, read, failed, lastSentAt }`                                                                                                                           | ✓   | Counters from our messages                                                                  |
+| createdBy, updatedBy | ObjectId \| null                                                                                                                                                          |     |                                                                                             |
+| syncedAt, deletedAt  | Date \| null                                                                                                                                                              |     |                                                                                             |
+| lastEventAt          | Date \| null                                                                                                                                                              |     | Event time of the newest applied webhook / sync (older ones ignored)                        |
+
+Indexes: `{ accountId: 1, wabaId: 1, name: 1, language: 1 }` unique partial (every status except `DELETED`), `{ wabaId: 1, metaTemplateId: 1 }` unique partial (string), `{ accountId: 1, status: 1, updatedAt: -1 }`, `{ accountId: 1, purpose: 1 }`.
+
+#### WhatsAppRateCard (`whatsappRateCards`) — Phase 11
+
+Meta's per-message rates (INR micros, before our markup). **Platform-wide, no `accountId`**, insert-only history; the card effective at send time prices a message.
+
+| Field         | Type                                                                                                                                                                                                                   | R   | Notes                                                                                  |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | -------------------------------------------------------------------------------------- |
+| effectiveFrom | Date                                                                                                                                                                                                                   | ✓   |                                                                                        |
+| currency      | `INR`                                                                                                                                                                                                                  | ✓   |                                                                                        |
+| source        | `meta_csv \| manual`                                                                                                                                                                                                   | ✓   |                                                                                        |
+| note          | string (≤ 300) \| null                                                                                                                                                                                                 |     |                                                                                        |
+| createdBy     | ObjectId \| null                                                                                                                                                                                                       |     | Superadmin                                                                             |
+| markets       | `{ market [A-Z_]{2,40}, label, callingCodes (digits 1–4)[], marketingMicros, utilityMicros, authenticationMicros, authenticationInternationalMicros \| null, serviceMicros, utilityTiers[], authenticationTiers[] }[]` | ✓   | Exactly one `OTHER` market; unique markets; no calling code in two markets; micros ≥ 0 |
+
+Indexes: `{ effectiveFrom: -1 }`. Market lookup: E.164 → the longest matching calling code → market, else `OTHER`. Seed (migration 0012): placeholder card IN + OTHER (marketing ₹0.8631, utility / authentication / service ₹0.115).
+
+#### PlatformSettings (`platformSettings`) — Phase 11
+
+One row per `key`, **no `accountId`**; reads fall back to code defaults. Key `whatsappBilling`: `value { markupBps (default 1500), platformFeeMicros (0), holdMaxAgeHours (72) }`, `updatedBy`. Indexes: `{ key: 1 }` unique.
+
+#### WhatsAppBillingDaily (`whatsappBillingDaily`) — Phase 11
+
+Superadmin reconciliation: Meta's `pricing_analytics` vs our captured charges per WABA day + category. Platform reporting rows (carry `accountId`, not tenant-scoped).
+
+| Field                             | Type                                                                                                  | R   | Notes                         |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------- | --- | ----------------------------- |
+| accountId, wabaId                 | ObjectId, string                                                                                      | ✓   |                               |
+| day                               | `YYYY-MM-DD`                                                                                          | ✓   | UTC                           |
+| category                          | `marketing \| utility \| authentication \| authentication_international \| service \| marketing_lite` | ✓   |                               |
+| metaVolume, metaCostMicros        | number                                                                                                | ✓   | From Meta                     |
+| ourCaptured, ourBilledMicros      | number                                                                                                | ✓   | Our captured messages / money |
+| diffVolume, diffMicros, fetchedAt | number, number, Date                                                                                  | ✓   |                               |
+
+Indexes: `{ wabaId: 1, day: 1, category: 1 }` unique, `{ day: -1 }`, `{ accountId: 1, day: -1 }`.
+
+**Additions (Phase 11):**
+
+- **Message:** `type` + `template`; `origin` + `api` (internal API sends); `template { templateId, name, language, category, parameters { key, value }[] }` (values are customer data) — `text` keeps the rendered body for bubbles / search / preview; `billing { payer: platform \| customer, market, category, estimateMicros, priceMicros, metaCostMicros, holdId, status: none \| held \| captured \| released \| late_charged \| waived, billable, pricingType, metaCategory, categoryMismatch, at }` (the price is fixed at send; a category mismatch is flagged, never re-priced); `pricing.subtype`. Indexes `billing_held_at` `{ 'billing.at': 1 }` partial `billing.status = held` (hold reaper) and `template_contact_at` `{ accountId: 1, contactId: 1, 'template.category': 1, at: -1 }` partial `type = template` (1 marketing template / contact / 24 h).
+- **LedgerEntry:** type + `whatsapp_charge`, refType + `whatsapp_message`, usage kind + `whatsapp`; `breakdown` + `{ waCategory, waMarket, metaCostMicros, markupMicros, platformFeeMicros, waPricingType }`.
+- **Wallet:** `budgets.monthlyWhatsappMicros` (0 = none), `spend.whatsappMicros` (monthly; backfilled with 0 by migration 0012).
+- **Contact:** `whatsapp.marketing { stopped, at, source: user_preferences \| error_131050 \| manual }` \| null.
+- **Account:** `settings.templates { defaultLanguage: 'en' }`; `whatsappBilling { markupBps, fixedPrices { marketing?, utility?, authentication?, service? }, platformFeeMicros }` \| null (superadmin override; null fields use platform settings).
+- **WhatsAppChannel:** `pricingTier { category, market, tier, at }[]` (last 10 `VOLUME_BASED_PRICING_TIER_UPDATE`).
+
+### 2.10 WhatsApp calling
+
+#### WhatsAppCallPermission (`whatsappCallPermissions`) — Phase 12
+
+Our view of a customer's call permission per number. Tenant-scoped. **Meta's `GET call_permissions` is the source of truth** before every business-initiated call and every request (60 s Redis cache); this row is the UI state and the history.
+
+| Field                 | Type                                                                                          | R   | Notes                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------- | --- | ------------------------------------------------------------- |
+| channelId, contactId  | ObjectId                                                                                      | ✓   |                                                               |
+| status                | `none \| requested \| temporary \| permanent \| declined \| expired \| revoked`               | ✓   | Meta `no_permission / temporary / permanent` mapped           |
+| expiresAt             | Date \| null                                                                                  |     | Temporary: approval + 7 days (Meta's timestamp wins)          |
+| source                | `request_reply \| callback \| profile \| unknown` \| null                                     |     | Meta `response_source` / `context.id`                         |
+| lastRequest           | `{ messageId, kind: interactive \| template, at, by }` \| null                                |     |                                                               |
+| requests              | `{ day: Date[], week: Date[] }`                                                               | ✓   | Our counters (1 / 24 h, 2 / 7 days); Meta is authoritative    |
+| unansweredStreak      | number                                                                                        | ✓   | Business-initiated calls not picked up in a row (4 → revoked) |
+| connectedCallsLast24h | number                                                                                        | ✓   | Meta cap 100 / 24 h per pair                                  |
+| metaCheckedAt         | Date \| null                                                                                  |     | Last `GET call_permissions`                                   |
+| metaActions           | `{ action, canPerform, limits { timePeriod, maxAllowed, currentUsage, limitExpiresAt }[] }[]` | ✓   | Meta's answer                                                 |
+| history               | `{ status, at, source }[]`                                                                    | ✓   | ≤ 30 — contact panel timeline                                 |
+
+Indexes: `{ accountId: 1, channelId: 1, contactId: 1 }` unique, `{ accountId: 1, expiresAt: 1 }` partial (date), `temporary_expiry` `{ status: 1, expiresAt: 1 }` partial `status = temporary` (hourly sweep).
+
+**Additions (Phase 12):**
+
+- **WhatsAppChannel:** `calling { status: disabled \| enabled \| unavailable, unavailableReason: coexistence \| country \| messaging_limit \| not_cloud_api \| null, callIconVisibility: DEFAULT \| DISABLE_ALL, iconCountries (ISO-2)[], callHours { enabled, timezone, weekly { day MONDAY…SUNDAY, open HHMM, close HHMM }[], holidays { date YYYY-MM-DD, start, end }[] }, callbackPermission, inbound { route: team \| ai \| ai_then_team, aiProgram { kind: flow \| agent, id } \| null, ringTimeoutSec (10–60, default 30), ringUserIds ObjectId[] \| null (≤ 50; null = every eligible online user) }, permissionRequestBody (≤ 1,024), restrictions { type, reason, expiresAt }[], syncedAt, lastError }` — at most 2 time ranges per day, no overlaps, ≤ 20 holidays (Meta's rules); coexistence numbers start `unavailable`.
+- **Call:** provider + `whatsapp`; `mode: ai \| human` (default `ai`; human calls have `source.kind = null`); `agentUserId`; `whatsapp { channelId, waCallId, direction: BUSINESS_INITIATED \| USER_INITIATED, conversationId, permissionId, timeline { event, at }[], metaStatus, metaDuration, metaStartTime, metaEndTime, metaErrors { code }[], ctaPayload, deeplinkPayload, ringUserIds, answeredBy, transferredTo }` \| null — never SDP, ICE data or phones; `billing.whatsapp { payer, market, pulses, perMinuteMicros, metaCostMicros, markupMicros, platformFeeMicros, status: free \| held \| settled \| released, durationSource, metaLatePulses }` \| null; end reasons + `rejected_by_customer`, `not_answered`, `meta_failed`, `permission_missing`, `calling_restricted`, `no_agent_available`, `outside_call_hours`. Indexes `wa_call_id` `{ 'whatsapp.waCallId': 1 }` unique partial (string), `wa_channel_calls` `{ accountId: 1, 'whatsapp.channelId': 1, createdAt: -1 }` partial `provider = whatsapp`.
+- **Message:** type + `call` (`call { callId, direction, outcome: missed \| completed \| rejected \| failed \| no_answer, durationSec, mode }`, index `call_bubble` `{ accountId: 1, 'call.callId': 1 }` unique partial `type = call`); interactive kinds + `call_permission_request`, `call_permission_reply` (`callPermission { response: accept \| reject, isPermanent, expiresAt, source, requestWaMessageId }`), `voice_call` (`voiceCall { displayText ≤ 20, ttlMinutes ≤ 43,200, payload }`).
+- **Contact:** `whatsapp.bsuid` (Meta business-scoped user id; matched after the phone), index `whatsapp_bsuid` `{ accountId: 1, 'whatsapp.bsuid': 1 }` partial (string).
+- **User:** `callAvailability: available \| busy \| offline` (default `available`; `busy` while on a call).
+- **Account:** `settings.whatsappCalling { recordCalls (true), recordingNotice (the account's Phase 7 notice), transcribeHumanCalls (false), maxCallMinutes (30, ≤ 60) }`; `whatsappCallingBilling { markupBps, fixedPerMinuteMicros, platformFeePerMinuteMicros }` \| null (superadmin override).
+- **WhatsAppRateCard:** `kind: messaging \| calling` (rows before 0013 = `messaging`); calling cards carry `callingMarkets { market, label, callingCodes, perMinuteMicros, tiers { fromMinutes, perMinuteMicros }[] }[]` and no `markets`; index `kind_effective_from`. Seed (migration 0013): placeholder calling card IN ₹0.3885 / min + OTHER ₹1 / min.
+- **PlatformSettings:** key + `whatsappCalling { markupBps (1500), platformFeePerMinuteMicros (0), holdMinutes (5), holdExtendMinutes (5) }`; the value is validated per key.
+- **LedgerEntry:** type + `whatsapp_call_charge` (ref type `call`), usage kind + `whatsapp_call`; `breakdown` + `{ waPulses, waPerMinuteMicros }`.
+- **Call media metrics (T12.12):** optional `metrics.whatsapp { setupMs: number | null, packetsIn, packetsOut, lossPct, jitterMs, rttMs: number | null }`, captured from the leg at call end. No SDP, IP addresses, ICE or DTLS credentials. Existing rows may omit it; RTT is currently unmeasured.
+- **Call (T12.8):** `billing.whatsapp.durationSource: meta \| ours \| null` (which talk time was charged) and `metaLatePulses` (reconcile: Meta's pulses when its duration arrived after we charged ours — margin report only, no money moves).
+
+---
+
+## 3. Embedded vs separate collection
+
+| Data                    | Decision                                       | Why                                            |
+| ----------------------- | ---------------------------------------------- | ---------------------------------------------- |
+| Agent functions         | Embedded in `aiAgents`                         | Small, always edited together                  |
+| Recording metadata      | Embedded in `calls`                            | One per call                                   |
+| Transcript turns        | Separate `transcriptTurns`                     | Unbounded; streamed live                       |
+| Call events             | Separate `callEvents`                          | Unbounded; append-only                         |
+| Campaign audience       | Separate `campaignContacts`                    | Thousands per campaign; per-row status updates |
+| Tags                    | Strings on `contacts`                          | No metadata needed                             |
+| Flow versions           | Separate `flowVersions`                        | Immutable history; campaigns pin a version     |
+| Flow nodes/edges        | Embedded in a version                          | Bounded graph, loaded together                 |
+| Wallet budgets          | Embedded in `wallets`                          | One wallet per account                         |
+| WhatsApp status history | Embedded in `whatsappChannels`                 | Last 50, shown with the channel                |
+| Template status history | Embedded in `whatsappTemplates`                | Last 30, shown with the template               |
+| WhatsApp message charge | Embedded `billing` in `messages` + ledger rows | One per message; money rows stay in the ledger |
+
+## 4. Open questions
+
+1. **Vector store** for knowledge bases — OpenAI vector store vs MongoDB 8.2 vector search vs another store (Phase 5).
+2. **Recording format** — μ-law WAV (simple, 0.48 MB/min) vs Opus (≈ 5× smaller) (Phase 7).
+3. **Production database** — client DB type unknown ([answers.md](../client/answers.md) #5); MongoDB ≥ 8.2 required.
+4. **Retention periods** for calls, transcripts and recordings — client legal (T0.18).
+5. **Encryption key management** — single `ENCRYPTION_KEY` vs per-account keys / KMS (Phase 11).

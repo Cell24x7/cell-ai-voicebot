@@ -1,0 +1,182 @@
+import { useAuthStore } from '@/features/auth/store';
+import type { AuthSession } from '@/services/api/types';
+
+const ALL = [
+  'account.read',
+  'account.update',
+  'team.read',
+  'team.invite',
+  'team.update',
+  'team.remove',
+  'apikeys.read',
+  'apikeys.manage',
+  'audit.read',
+  'contacts.read',
+  'contacts.write',
+  'contacts.import',
+  'contacts.export',
+  'dnd.manage',
+  'wallet.read',
+  'wallet.topup',
+  'agents.read',
+  'agents.write',
+  'flows.read',
+  'flows.write',
+  'flows.publish',
+  'calls.read',
+  'calls.trigger',
+  'calls.listen',
+  'calls.export',
+  'campaigns.read',
+  'campaigns.write',
+  'campaigns.run',
+  'campaigns.export',
+  'reports.read',
+  'reports.export',
+  'integrations.manage',
+  'telephony.manage',
+  'whatsapp.read',
+  'whatsapp.manage',
+  'inbox.read',
+  'inbox.reply',
+  'inbox.assign',
+  'templates.read',
+  'templates.manage',
+  'calls.answer',
+  'whatsapp.calling.manage',
+];
+
+/** Mirrors the backend role matrix (PHASE_2_PLAN §1b) for UI tests. */
+export const ROLE_PERMISSIONS: Record<string, string[]> = {
+  owner: ALL,
+  admin: ALL,
+  manager: [
+    'account.read',
+    'team.read',
+    'contacts.read',
+    'contacts.write',
+    'contacts.import',
+    'contacts.export',
+    'wallet.read',
+    'agents.read',
+    'agents.write',
+    'flows.read',
+    'flows.write',
+    'flows.publish',
+    'calls.read',
+    'calls.trigger',
+    'calls.listen',
+    'calls.answer',
+    'calls.export',
+    'campaigns.read',
+    'campaigns.write',
+    'campaigns.run',
+    'campaigns.export',
+    'reports.read',
+    'reports.export',
+    'whatsapp.read',
+    'inbox.read',
+    'inbox.reply',
+    'inbox.assign',
+    'templates.read',
+    'templates.manage',
+  ],
+  agent: [
+    'account.read',
+    'contacts.read',
+    'agents.read',
+    'flows.read',
+    'calls.read',
+    'calls.trigger',
+    'calls.listen',
+    'calls.answer',
+    'campaigns.read',
+    'whatsapp.read',
+    'inbox.read',
+    'inbox.reply',
+    'templates.read',
+  ],
+  viewer: [
+    'account.read',
+    'contacts.read',
+    'wallet.read',
+    'agents.read',
+    'flows.read',
+    'calls.read',
+    'campaigns.read',
+    'reports.read',
+    'whatsapp.read',
+    'inbox.read',
+    'templates.read',
+  ],
+  superadmin: [
+    ...ALL,
+    'platform.accounts.read',
+    'platform.accounts.manage',
+    'platform.impersonate',
+    'platform.billing.manage',
+  ],
+};
+
+export const fakeSession = (
+  role: keyof typeof ROLE_PERMISSIONS = 'owner',
+  overrides: Partial<AuthSession> = {},
+): AuthSession => ({
+  accessToken: 'test-access-token',
+  expiresIn: 900,
+  user: {
+    id: 'u1',
+    name: 'Asha Verma',
+    email: 'asha@example.com',
+    phone: null,
+    status: 'active',
+    emailVerifiedAt: '2026-10-08T00:00:00.000Z',
+    lastLoginAt: null,
+    platformRole: role === 'superadmin' ? 'superadmin' : null,
+    callAvailability: 'available',
+    createdAt: '2026-10-08T00:00:00.000Z',
+  },
+  account: {
+    id: 'a1',
+    name: 'Demo Finance',
+    slug: 'demo-finance',
+    status: 'active',
+    suspendReason: null,
+    ownerId: 'u1',
+    isPlatform: role === 'superadmin',
+    timezone: 'Asia/Kolkata',
+    country: 'IN',
+    defaultLanguage: 'hinglish',
+    settings: {
+      callingWindow: { start: '09:00', end: '19:00', days: [1, 2, 3, 4, 5, 6] },
+      callCaps: { perDay: 3, perWeek: 10, minGapMinutes: 30 },
+      recordingEnabled: true,
+      recordingNotice: 'Yeh call quality ke liye record ki ja rahi hai.',
+      aiDisclosureEnabled: true,
+    },
+    createdAt: '2026-10-08T00:00:00.000Z',
+  },
+  role: {
+    key: role === 'superadmin' ? 'owner' : role,
+    name: role[0]?.toUpperCase() + role.slice(1),
+  },
+  permissions: ROLE_PERMISSIONS[role] ?? [],
+  impersonation: null,
+  ...overrides,
+});
+
+/** Puts the store in a signed-in state (skips the bootstrap refresh). */
+export const signInAs = (
+  role: keyof typeof ROLE_PERMISSIONS = 'owner',
+  overrides: Partial<AuthSession> = {},
+) => {
+  const session = fakeSession(role, overrides);
+  useAuthStore.setState({ status: 'authenticated', savedSession: null });
+  useAuthStore.getState().setSession(session);
+  return session;
+};
+
+export const signOutStore = () =>
+  useAuthStore.setState({ status: 'anonymous', session: null, savedSession: null });
+export const resetAuthStore = () =>
+  useAuthStore.setState({ status: 'loading', session: null, savedSession: null });

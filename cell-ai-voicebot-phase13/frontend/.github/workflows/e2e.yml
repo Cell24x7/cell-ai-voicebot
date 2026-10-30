@@ -1,0 +1,67 @@
+name: E2E
+
+# Manual until both repos run together in CI (PHASE_2_PLAN T2.18). Checks out
+# the backend next to this repo, starts MongoDB / Redis / Mailpit with the
+# backend's docker compose, then runs Playwright (Chromium).
+on:
+  workflow_dispatch:
+    inputs:
+      backend_ref:
+        description: Backend branch / tag / SHA
+        required: true
+        default: dev
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: playwright
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: cell-ai-voicebot-frontend
+
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/cell-ai-voicebot-backend
+          ref: ${{ inputs.backend_ref }}
+          path: cell-ai-voicebot-backend
+          # Needed only while the backend repo is private (fine-grained, contents: read).
+          token: ${{ secrets.BACKEND_REPO_TOKEN || github.token }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: cell-ai-voicebot-frontend/.nvmrc
+
+      - name: Start infra (MongoDB, Redis, Mailpit)
+        working-directory: cell-ai-voicebot-backend
+        run: npm run infra:up
+
+      - name: Install backend
+        working-directory: cell-ai-voicebot-backend
+        run: npm ci
+
+      - name: Install frontend
+        working-directory: cell-ai-voicebot-frontend
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: cell-ai-voicebot-frontend
+        run: npx playwright install --with-deps chromium
+
+      # No backend .env: development defaults (dev-only JWT secrets, local ports).
+      - name: Run Playwright
+        working-directory: cell-ai-voicebot-frontend
+        run: npm run e2e
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            cell-ai-voicebot-frontend/playwright-report
+            cell-ai-voicebot-frontend/test-results
+          retention-days: 7

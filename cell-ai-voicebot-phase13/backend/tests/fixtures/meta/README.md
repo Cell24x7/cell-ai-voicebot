@@ -1,0 +1,65 @@
+# Meta fixtures (Phases 9–12)
+
+Shapes copied from Meta's documented sample payloads; every id, number, name and text is a **test value** (`+91 90000 …`, `Test Business`, `Test Customer`). No real data, no AutoChatix data. Re-check against the docs when bumping `META_GRAPH_VERSION`.
+
+| File                                      | Source (developers.facebook.com/docs/…)                                      |
+| ----------------------------------------- | ---------------------------------------------------------------------------- |
+| `graph-oauth-token.json`                  | whatsapp/embedded-signup/implementation (exchange the code)                  |
+| `graph-debug-token.json`                  | graph-api/reference/debug_token                                              |
+| `graph-me-wabas.json`                     | whatsapp/embedded-signup/manage-accounts (`/me/whatsapp_business_accounts`)  |
+| `graph-me-businesses.json`                | graph-api/reference/user/businesses + `owned_whatsapp_business_accounts`     |
+| `graph-waba.json`                         | graph-api/reference/whatsapp-business-account                                |
+| `graph-phone-numbers.json`                | graph-api/reference/whatsapp-business-account/phone_numbers                  |
+| `graph-phone-number.json`                 | graph-api/reference/whatsapp-business-phone-number                           |
+| `graph-success.json`                      | `subscribed_apps` POST / DELETE, `assigned_users`, `register`                |
+| `graph-me.json`                           | graph-api/reference/user (`/me?fields=id`)                                   |
+| `graph-credit-line-attach.json`           | whatsapp/solution-providers/share-and-revoke-credit-lines                    |
+| `graph-allocation.json`                   | same page (verify the allocation `receiving_credential`)                     |
+| `graph-smb-app-data.json`                 | whatsapp/embedded-signup/custom-flows/onboarding-business-app-users          |
+| `graph-error-token-expired.json`          | graph-api/guides/error-handling (190 / 463)                                  |
+| `graph-error-rate-limit.json`             | whatsapp/cloud-api/support/error-codes (80007)                               |
+| `graph-error-pin-mismatch.json`           | whatsapp/cloud-api/support/error-codes (133005)                              |
+| `webhook-account-update-*.json`           | whatsapp/business-management-api/webhooks/components (`account_update`)     |
+| `webhook-quality-update.json`, `-flagged` | same page (`phone_number_quality_update`)                                    |
+| `webhook-name-update.json`, `-rejected`   | same page (`phone_number_name_update`)                                       |
+| `webhook-capability-update.json`          | same page (`business_capability_update`)                                     |
+| `webhook-smb-message-echoes.json`         | whatsapp/embedded-signup/custom-flows/onboarding-business-app-users (echoes) |
+| `webhook-history-*.json`                  | same page (`history`: chunks, final chunk, declined `2593109`)               |
+| `webhook-smb-app-state-sync.json`         | same page (`smb_app_state_sync` contacts)                                    |
+| `webhook-messages-text.json`, `-status`   | whatsapp/cloud-api/webhooks/payload-examples                                 |
+| `webhook-calls-connect.json`              | whatsapp/cloud-api/calling/user-initiated-calls (`calls` connect)            |
+| `calls-sdp-answer.txt`                    | whatsapp/cloud-api/calling/reference (answer: ICE-lite, `setup:active`)      |
+| `calls-sdp-offer.txt` (Phase 12) | same (Meta's offer in user-initiated calls: ICE-lite, `setup:actpass`) |
+| `calls-connect-bic.json`, `calls-connect-uic.json` | whatsapp/calling/reference + business- / user-initiated-calls (`connect` with the SDP answer / offer, `to_user_id` / `from_user_id`, `cta_payload`) |
+| `calls-status-ringing.json`, `calls-status-accepted.json`, `calls-status-rejected.json` | whatsapp/calling/reference (`statuses[]` with `type: call`, `biz_opaque_callback_data`) |
+| `calls-terminate-completed.json`, `calls-terminate-failed.json` | same (`terminate`: `status`, `start_time`, `end_time`, `duration`; value-level `errors[]`) |
+| `call-permission-reply-temporary.json`, `call-permission-reply-permanent.json`, `call-permission-reply-reject.json`, `call-permission-reply-automatic.json` | whatsapp/calling/user-call-permissions (`interactive.call_permission_reply`, `context.id` = request / missed call) |
+| `account-settings-update.json` | whatsapp/calling/call-settings (`account_settings_update`, `phone_number_settings.calling`) |
+| `account-update-calling-restriction.json`, `account-update-calling-violation.json` | same page (`ACCOUNT_RESTRICTION` / `ACCOUNT_VIOLATION` calling types) |
+| `graph-call-permissions.json` | whatsapp/calling/user-call-permissions (`GET call_permissions`: `permission`, `actions[].limits`) |
+| `graph-phone-settings.json` | whatsapp/calling/call-settings (`GET settings`: `calling` + `restrictions.restrictions_list`) |
+| `graph-call-connect.json`, `graph-error-call-permission.json` | whatsapp/calling/reference (`connect` answer) + troubleshooting (138006) |
+| `graph-call-analytics.json` | whatsapp/analytics (`call_analytics`: daily points with `count`, `cost`, `average_duration`; cost left out on one point) |
+| `webhook-template-status.json`            | whatsapp/business-management-api/webhooks/components (template status)      |
+| `messages-*.json` (Phase 10) | whatsapp/cloud-api/webhooks/payload-examples — text (link), image, video, audio, voice (`audio.voice: true`), document, sticker (+ animated), location, contacts, interactive `button_reply` / `list_reply` / `nfm_reply`, template `button`, reaction (+ removed), reply `context`, forwarded, ad `referral`, order, system (number changed), unsupported (`errors`) |
+| `statuses-*.json` (sent, delivered, read, played, failed, deleted) | same page (status webhooks with `conversation` / `pricing`, `errors` on failed) |
+| `graph-message-sent.json`, `graph-error-window-closed.json`, `graph-error-throughput.json` | whatsapp/cloud-api/reference/messages + support/error-codes (131047, 130429) |
+| `graph-media-upload.json`, `graph-media-url.json` | whatsapp/cloud-api/reference/media (upload, retrieve URL — `lookaside.fbsbx.com`) |
+| `graph-business-profile.json` | whatsapp/cloud-api/reference/business-profiles |
+| `graph-block-users.json`, `graph-unblock-users.json` | whatsapp/cloud-api/block-users |
+| `graph-upload-session.json`, `graph-upload-handle.json` | graph-api/guides/upload (resumable upload → handle for the profile photo) |
+| `templates-status-*.json` (approved, rejected, paused, disabled) (Phase 11) | whatsapp/webhooks/reference/message_template_status_update (`reason`, `other_info`, `rejection_info`, `disable_info`, `message_template_category`) |
+| `templates-quality.json` | whatsapp/webhooks/reference/message_template_quality_update |
+| `templates-category-*.json` (pending, changed) | whatsapp/webhooks/reference/template_category_update (pending: `correct_category` + `category_update_timestamp`; done: `previous_category`) |
+| `templates-components.json` | whatsapp/webhooks/reference/message_template_components_update |
+| `user-preferences-*.json` (stop, resume) | whatsapp/webhooks/reference/user_preferences (`marketing_messages` stop / resume) |
+| `webhook-account-update-volume-tier.json` | whatsapp/webhooks/reference/account_update (`VOLUME_BASED_PRICING_TIER_UPDATE`, `volume_tier_info`) |
+| `pricing-*.json` (template billable, service free, `paid_exempt` subtype, free entry point) | docs/whatsapp/pricing (status webhook `pricing`) |
+| `graph-templates-page1.json`, `graph-templates-page2.json`, `graph-template-created.json` | whatsapp/business-management-api/message-templates (list with paging, create answer) |
+| `graph-error-template-exists.json` | same page (code 100, subcode 2388023) |
+| `graph-pricing-analytics.json` | whatsapp/business-management-api/analytics (`pricing_analytics` data points) |
+
+`media/sample.{jpg,png,webp,mp4,ogg,pdf}` — tiny generated files (no real content) for sniffing / download tests; `sample.ogg` is a valid mono OGG / Opus (OpusHead, OpusTags, 50 × 20 ms silent packets, CRCs computed).
+
+**Graph API v26.0 re-check (Phase 13, 26 Oct 2026):** the default is now `v26.0`. Meta's v26.0 changelog lists no change for the WhatsApp Cloud API, the Business Management API, Facebook Login, `oauth/access_token` or `debug_token`; its Graph-wide protocol changes (no `pretty` / `debug` formatting, `date_format` rejected, root `GET /?ids=` rejected, `If-None-Match` ignored) are not used by `graph.client.ts`. With no WhatsApp change in the changelog the fixtures stay as they are; the field-level check of each endpoint against the real app happens in the Phase 13 real-number checks (setup guide §12) (only the version in the paging URL of `graph-templates-page1.json` moved to `v26.0`).
+

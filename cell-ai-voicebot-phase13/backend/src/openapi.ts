@@ -1,0 +1,75 @@
+import { OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi';
+
+import { getAppInfo } from './shared/app-info';
+import { registry } from './shared/openapi/registry';
+
+// Module schemas register their paths/components on import. Add every module
+// with API routes here.
+import './modules/account/account.schema';
+import './modules/admin/admin-ai.schema';
+import './modules/admin/admin.schema';
+import './modules/ai-agents/agents.schema';
+import './modules/ai-agents/playground.schema';
+import './modules/api-keys/api-keys.schema';
+import './modules/audit/audit.schema';
+import './modules/auth/auth.schema';
+import './modules/contact-exports/contact-exports.schema';
+import './modules/contact-imports/contact-imports.schema';
+import './modules/contacts/bulk.schema';
+import './modules/contact-lists/contact-lists.schema';
+import './modules/contacts/contacts.schema';
+import './modules/dnd/dnd.schema';
+import './modules/segments/segments.schema';
+import './modules/custom-fields/custom-fields.schema';
+import './modules/flow-audio/flow-audio.schema';
+import './modules/flows/flows.schema';
+import './modules/flows/simulator.schema';
+import './modules/health/health.schema';
+import './modules/knowledge/knowledge.schema';
+import './modules/mock-apis/mock.schema';
+import './modules/rbac/rbac.schema';
+import './modules/realtime-tickets/tickets.schema';
+import './modules/team/team.schema';
+import './modules/system/system.schema';
+import './modules/wallet/wallet.schema';
+import './modules/wallet/topups.schema';
+import './modules/billing/billing.schema';
+import './modules/billing/invoices.schema';
+import './modules/admin/admin-billing.schema';
+import './modules/notifications/notifications.schema';
+import './modules/payments/webhooks.schema';
+import './modules/calls/calls.schema';
+import './modules/campaigns/campaigns.schema';
+import './modules/whatsapp/whatsapp.openapi';
+import './modules/inbox/inbox.openapi';
+import './modules/whatsapp-billing/whatsapp-billing.openapi';
+import './modules/templates/templates.openapi';
+import './modules/whatsapp-calling/calling.openapi';
+
+type OpenApiDocument = ReturnType<OpenApiGeneratorV31['generateDocument']>;
+
+export const DEFAULT_SERVER_URL = 'http://localhost:5100';
+
+/**
+ * Builds the OpenAPI 3.1 document for the whole API (ADR 0029). The committed
+ * file (`npm run gen:openapi`) uses the local server URL; the served copy
+ * (`GET /api/v1/openapi.json`) uses `APP_URL`.
+ */
+export const buildOpenApiDocument = ({
+  serverUrl = DEFAULT_SERVER_URL,
+}: { serverUrl?: string } = {}): OpenApiDocument =>
+  new OpenApiGeneratorV31(registry.definitions).generateDocument({
+    openapi: '3.1.0',
+    info: {
+      title: 'Cell AI Voicebot API',
+      version: getAppInfo().version,
+      description:
+        'Multi-tenant AI voice calling platform API. Conventions: docs/conventions/api.md.',
+    },
+    servers: [
+      {
+        url: serverUrl,
+        description: serverUrl === DEFAULT_SERVER_URL ? 'Local development' : 'This server',
+      },
+    ],
+  });

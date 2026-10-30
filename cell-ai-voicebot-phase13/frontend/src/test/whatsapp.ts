@@ -1,0 +1,101 @@
+import type {
+  WhatsAppAdminStatus,
+  WhatsAppChannel,
+  WhatsAppChannelDetail,
+  WhatsAppConfig,
+} from '@/services/api/types';
+
+/** A connected Cloud API number (override what the test needs). */
+export const fakeChannel = (overrides: Partial<WhatsAppChannel> = {}): WhatsAppChannel => ({
+  id: 'wa1',
+  label: 'Support line',
+  provider: 'fake',
+  mode: 'cloud_api',
+  status: 'connected',
+  statusReason: null,
+  wabaId: 'fake_waba_aaaaaaaaaaaa',
+  wabaName: 'Test Business',
+  businessName: 'Test Business',
+  phoneNumberId: 'fake_phone_aaaaaaaaaaaa',
+  displayPhoneNumber: '+91 90000 12345',
+  phoneE164: '+919000012345',
+  verifiedName: 'Test Business',
+  nameStatus: 'APPROVED',
+  newNameStatus: null,
+  qualityRating: 'GREEN',
+  messagingLimitTier: 'TIER_1K',
+  isOnBizApp: false,
+  calling: { status: 'disabled', unavailableReason: null, restricted: false },
+  billing: { metaPayer: 'platform', creditLine: { status: 'attached' }, paymentMethodOk: null },
+  coexistence: null,
+  registration: { status: 'registered' },
+  subscription: { status: 'subscribed' },
+  restriction: null,
+  webhook: { lastEventAt: '2026-10-22T09:00:00.000Z', lastField: 'messages' },
+  connectedBy: 'u1',
+  connectedAt: '2026-10-22T08:00:00.000Z',
+  syncedAt: '2026-10-22T08:00:00.000Z',
+  disconnectedAt: null,
+  createdAt: '2026-10-22T08:00:00.000Z',
+  updatedAt: '2026-10-22T08:00:00.000Z',
+  ...overrides,
+});
+
+export const fakeChannelDetail = (
+  overrides: Partial<WhatsAppChannelDetail> = {},
+): WhatsAppChannelDetail => ({
+  ...fakeChannel(),
+  businessId: 'fake_biz_aaaaaaaaaaaa',
+  wabaCurrency: 'INR',
+  wabaTimezoneId: '71',
+  wabaReviewStatus: 'APPROVED',
+  businessVerificationStatus: 'not_verified',
+  throughputLevel: 'STANDARD',
+  accountMode: 'LIVE',
+  platformType: 'CLOUD_API',
+  codeVerificationStatus: 'VERIFIED',
+  phoneStatus: 'CONNECTED',
+  isOfficialBusinessAccount: false,
+  tokenCheckedAt: '2026-10-22T08:00:00.000Z',
+  tokenExpiresAt: null,
+  capabilities: null,
+  disconnectedBy: null,
+  events24h: { total: 3, byField: { messages: 2, account_update: 1 } },
+  history: [
+    { status: 'connected', reason: null, at: '2026-10-22T08:00:01.000Z', by: 'u1' },
+    { status: 'connecting', reason: null, at: '2026-10-22T08:00:00.000Z', by: 'u1' },
+  ],
+  ...overrides,
+});
+
+export const fakeWhatsAppConfig = (overrides: Partial<WhatsAppConfig> = {}): WhatsAppConfig => ({
+  enabled: true,
+  provider: 'fake',
+  appId: null,
+  configId: null,
+  graphVersion: 'v26.0',
+  ...overrides,
+});
+
+export const fakeAdminWhatsAppStatus = (
+  overrides: Partial<WhatsAppAdminStatus> = {},
+): WhatsAppAdminStatus => ({
+  enabled: true,
+  provider: 'fake',
+  graphVersion: 'v26.0',
+  configured: {
+    appId: false,
+    appSecret: true,
+    configId: false,
+    verifyToken: true,
+    creditLine: true,
+    systemUserToken: true,
+  },
+  webhookUrl: 'http://localhost:5100/api/v1/webhooks/meta',
+  deauthorizeUrl: 'http://localhost:5100/api/v1/meta/deauthorize',
+  dataDeletionUrl: 'http://localhost:5100/api/v1/meta/data-deletion',
+  lastEventAt: '2026-10-22T09:00:00.000Z',
+  channelsByStatus: { connected: 2, needs_reconnect: 1 },
+  eventsByStatus24h: { processed: 4, deferred: 10, failed: 1 },
+  ...overrides,
+});
