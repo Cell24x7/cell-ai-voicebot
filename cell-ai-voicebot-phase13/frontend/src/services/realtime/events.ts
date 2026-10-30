@@ -35,6 +35,8 @@ export interface WsEventMap {
   };
   /** No digit — key presses can be PINs. */
   'call.dtmf': { callId: string };
+  /** Phase 14: post-call insights changed (fetch the view). */
+  'call.insights': { callId: string; status: string; version: number };
   'call.ended': {
     callId: string;
     /** Campaign calls only (Phase 8). */
@@ -122,6 +124,8 @@ export interface WsEventMap {
   };
   /** Another agent is typing (internal only). */
   'inbox.typing': { conversationId: string; userId: string; name: string };
+  /** Phase 14: a chat summary changed (fetch the list). */
+  'inbox.conversation.summary': { conversationId: string; summaryId: string };
   'wallet.updated': {
     balanceMicros: number;
     holdMicros: number;
@@ -163,6 +167,7 @@ export const WS_EVENT_TYPES: readonly WsEventType[] = [
   'call.transcript',
   'call.dtmf',
   'call.ended',
+  'call.insights',
   'campaign.status',
   'campaign.progress',
   'whatsapp.channel.updated',
@@ -176,6 +181,7 @@ export const WS_EVENT_TYPES: readonly WsEventType[] = [
   'inbox.message.created',
   'inbox.message.updated',
   'inbox.typing',
+  'inbox.conversation.summary',
   'wallet.updated',
   'wallet.low_balance',
   'wallet.exhausted',

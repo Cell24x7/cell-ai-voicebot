@@ -1,6 +1,6 @@
 import mongoose, { Schema, type Model, type Types } from 'mongoose';
 
-import { CALL_LIMITS, CALL_LINES, INBOX_LIMITS } from '../../config/limits';
+import { CALL_LIMITS, CALL_LINES, INBOX_LIMITS, INSIGHTS_LIMITS } from '../../config/limits';
 import { basePlugin } from '../plugins/base';
 
 export type AccountStatus = 'active' | 'suspended';
@@ -69,6 +69,36 @@ export const DEFAULT_INBOX_SETTINGS: AccountInboxSettings = {
   notifyOnNewMessage: 'assigned_or_all',
 };
 
+/** Post-call AI (Phase 14). Human-call transcription stays in `whatsappCalling`. */
+export interface AccountInsightsSettings {
+  enabled: boolean;
+  chatSummaryOnClose: boolean;
+}
+
+export const DEFAULT_INSIGHTS_SETTINGS: AccountInsightsSettings = {
+  enabled: true,
+  chatSummaryOnClose: false,
+};
+
+/** One call outcome the account uses (key stable, label editable). */
+export interface AccountDisposition {
+  key: string;
+  label: string;
+  active: boolean;
+}
+
+/** Owner default (PHASE_14_PLAN §7 #3). */
+export const DEFAULT_DISPOSITIONS: AccountDisposition[] = [
+  { key: 'promise_to_pay', label: 'Promise to pay', active: true },
+  { key: 'paid', label: 'Paid', active: true },
+  { key: 'callback', label: 'Callback requested', active: true },
+  { key: 'dispute', label: 'Dispute', active: true },
+  { key: 'not_interested', label: 'Not interested', active: true },
+  { key: 'wrong_number', label: 'Wrong number', active: true },
+  { key: 'language_barrier', label: 'Language barrier', active: true },
+  { key: 'other', label: 'Other', active: true },
+];
+
 export interface AccountSettings {
   callingWindow: CallingWindow;
   callCaps: CallCaps;
@@ -81,6 +111,9 @@ export interface AccountSettings {
   templates?: AccountTemplateSettings;
   /** Phase 12 — absent on accounts created before migration 0013. */
   whatsappCalling?: AccountWhatsAppCallingSettings;
+  /** Phase 14 — absent on accounts created before migration 0016. */
+  insights?: AccountInsightsSettings;
+  dispositions?: AccountDisposition[];
 }
 
 /** GST billing details (PHASE_4_PLAN §1d) — buyer on invoices. Latin text only (PDF). */
@@ -132,6 +165,10 @@ export interface AccountDoc {
   whatsappBilling?: AccountWhatsAppBilling | null;
   /** WhatsApp call prices (Phase 12, superadmin): override of the platform calling settings. */
   whatsappCallingBilling?: AccountWhatsAppCallingBilling | null;
+  /** How long this account keeps data (Phase 14); `null` = the platform default. */
+  retention?: AccountRetention | null;
+  /** Superadmin upper limit for this account (Phase 14); `null` = the platform default. */
+  retentionCap?: AccountRetentionCap | null;
   billing?: (BillingProfile & { updatedAt: Date }) | null;
   createdAt: Date;
   updatedAt: Date;
@@ -145,6 +182,20 @@ export const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
   aiDisclosureEnabled: true,
   inbox: DEFAULT_INBOX_SETTINGS,
 };
+
+/** Days kept (Phase 14); each `null` = the platform default (env). Recordings ≤ calls. */
+export interface AccountRetention {
+  recordingsDays: number | null;
+  /** Call records, events, transcripts, insights, flow runs. */
+  callsDays: number | null;
+  /** WhatsApp messages, media and chat summaries. */
+  inboxDays: number | null;
+}
+
+export interface AccountRetentionCap {
+  callsDays: number | null;
+  inboxDays: number | null;
+}
 
 export const DEFAULT_ACCOUNT_LIMITS: AccountLimits = { maxConcurrentCalls: 10, dialsPerMinute: 60 };
 
@@ -318,6 +369,23 @@ const schema = new Schema<AccountDoc>({
         max: CALL_LIMITS.maxCallSecHard / 60,
       },
     },
+    insights: {
+      enabled: { type: Boolean, default: DEFAULT_INSIGHTS_SETTINGS.enabled },
+      chatSummaryOnClose: { type: Boolean, default: DEFAULT_INSIGHTS_SETTINGS.chatSummaryOnClose },
+    },
+    dispositions: {
+      type: [
+        new Schema<AccountDisposition>(
+          {
+            key: { type: String, required: true, match: /^[a-z0-9_]{1,40}$/ },
+            label: { type: String, required: true, maxlength: INSIGHTS_LIMITS.dispositionLabelMax },
+            active: { type: Boolean, default: true },
+          },
+          { _id: false },
+        ),
+      ],
+      default: () => DEFAULT_DISPOSITIONS.map((d) => ({ ...d })),
+    },
   },
   limits: {
     maxConcurrentCalls: { type: Number, default: DEFAULT_ACCOUNT_LIMITS.maxConcurrentCalls },
@@ -353,6 +421,27 @@ const schema = new Schema<AccountDoc>({
         markupBps: { type: Number, default: null, min: 0, max: 100_000 },
         fixedPerMinuteMicros: { type: Number, default: null, min: 0 },
         platformFeePerMinuteMicros: { type: Number, default: null, min: 0 },
+      },
+      { _id: false },
+    ),
+    default: null,
+  },
+  retention: {
+    type: new Schema<AccountRetention>(
+      {
+        recordingsDays: { type: Number, default: null, min: 1 },
+        callsDays: { type: Number, default: null, min: 1 },
+        inboxDays: { type: Number, default: null, min: 1 },
+      },
+      { _id: false },
+    ),
+    default: null,
+  },
+  retentionCap: {
+    type: new Schema<AccountRetentionCap>(
+      {
+        callsDays: { type: Number, default: null, min: 1 },
+        inboxDays: { type: Number, default: null, min: 1 },
       },
       { _id: false },
     ),

@@ -2,6 +2,8 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useEffect, type ReactNode } from 'react';
 
+import { APP_NAME } from '@/app/brand';
+
 /** Page title (also sets document.title) + optional actions on the right. */
 export function PageHeader({
   title,
@@ -13,7 +15,7 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   useEffect(() => {
-    document.title = `${title} · ${import.meta.env.VITE_APP_NAME || 'NotifyNow'}`;
+    document.title = `${title} · ${APP_NAME}`;
   }, [title]);
   return (
     <Stack

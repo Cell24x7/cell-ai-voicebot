@@ -7,6 +7,7 @@ import Typography from '@mui/material/Typography';
 import type { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router';
 
+import { APP_LOGO_URL, APP_NAME } from '@/app/brand';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LegalLinks } from '@/features/legal/LegalLinks';
 
@@ -33,9 +34,15 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
         <ThemeToggle />
       </Box>
       <Stack spacing={2} sx={{ width: '100%', maxWidth: 440 }}>
-        <Link component={RouterLink} to="/" underline="none" sx={{ textAlign: 'center' }}>
+        <Link
+          component={RouterLink}
+          to="/"
+          underline="none"
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}
+        >
+          <Box component="img" src={APP_LOGO_URL} alt="" sx={{ width: 40, height: 40 }} />
           <Typography variant="h5" component="p" sx={{ fontWeight: 700 }}>
-            {import.meta.env.VITE_APP_NAME || 'NotifyNow'}
+            {APP_NAME}
           </Typography>
         </Link>
         <Card variant="outlined">

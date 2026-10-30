@@ -35,7 +35,7 @@ export const legalValues = (
     email: value(env.VITE_LEGAL_EMAIL),
     grievanceOfficer: value(env.VITE_LEGAL_GRIEVANCE_OFFICER),
     website: value(env.VITE_LEGAL_WEBSITE),
-    appName: value(env.VITE_APP_NAME) ?? 'Cell AI Voicebot',
+    appName: value(env.VITE_APP_NAME) ?? 'NotifyNow',
   };
   const missing = (Object.keys(given) as (keyof LegalValues)[]).filter((k) => !given[k]);
   const values = Object.fromEntries(

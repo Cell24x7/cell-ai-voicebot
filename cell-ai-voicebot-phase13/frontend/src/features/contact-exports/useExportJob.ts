@@ -16,13 +16,27 @@ export const useCanExport = (): boolean => {
   return can('contacts.export') && !session?.impersonation;
 };
 
-/** One export job, live: WS `export.progress` when connected, polling every 3 s otherwise. */
-export const useExportJob = (id: string | undefined) => {
+type Job = Pick<ExportJob, 'status' | 'progress'>;
+
+/**
+ * One export job, live: WS `export.progress` when connected, polling every 3 s otherwise.
+ * `get` reads it (contact exports by default; Phase 14 record exports pass theirs).
+ */
+export function useExportJob(id: string | undefined): ReturnType<typeof useJob<ExportJob>>;
+export function useExportJob<T extends Job>(
+  id: string | undefined,
+  get: (id: string) => Promise<T>,
+): ReturnType<typeof useJob<T>>;
+export function useExportJob(id: string | undefined, get?: (id: string) => Promise<Job>) {
+  return useJob(id, get ?? contactExportsApi.get);
+}
+
+const useJob = <T extends Job>(id: string | undefined, get: (id: string) => Promise<T>) => {
   const queryClient = useQueryClient();
   const ws = useWsStatus();
   const query = useQuery({
     queryKey: exportKeys.detail(id ?? ''),
-    queryFn: () => contactExportsApi.get(id ?? ''),
+    queryFn: () => get(id ?? ''),
     enabled: Boolean(id),
     meta: { silent: true },
     refetchInterval: (q) =>
@@ -30,7 +44,7 @@ export const useExportJob = (id: string | undefined) => {
   });
   useWsEvent('export.progress', (event) => {
     if (!id || event.data.exportJobId !== id) return;
-    const current = queryClient.getQueryData<ExportJob>(exportKeys.detail(id));
+    const current = queryClient.getQueryData<T>(exportKeys.detail(id));
     if (current && current.status === event.data.status) {
       queryClient.setQueryData(exportKeys.detail(id), {
         ...current,

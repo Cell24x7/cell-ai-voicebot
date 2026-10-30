@@ -188,6 +188,35 @@ export const ERROR_CODES = {
     status: 409,
     message: 'No team member is available to take the call.',
   },
+  // Phase 14 — records, transcripts & analytics
+  INSIGHTS_NOT_AVAILABLE: {
+    status: 409,
+    message: 'This call has no transcript to review (not answered or too short).',
+  },
+  INSIGHTS_DISABLED: {
+    status: 409,
+    message: 'Post-call AI is turned off in Settings.',
+  },
+  DISPOSITION_UNKNOWN: {
+    status: 422,
+    message: 'Choose one of the call outcomes set up in Settings.',
+  },
+  CHAT_SUMMARY_EMPTY: {
+    status: 409,
+    message: 'There are no new messages to summarise in this chat.',
+  },
+  REPORT_RANGE_INVALID: {
+    status: 422,
+    message: 'Choose a date range of at most 366 days, with the start before the end.',
+  },
+  RETENTION_OUT_OF_BOUNDS: {
+    status: 422,
+    message: 'Choose a number of days within the allowed range.',
+  },
+  REPORT_SUBSCRIPTION_LIMIT: {
+    status: 422,
+    message: 'You already get the most report e-mails allowed. Remove one first.',
+  },
 } as const satisfies Record<string, { status: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

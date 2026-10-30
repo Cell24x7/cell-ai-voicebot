@@ -96,6 +96,7 @@ function Prices({ rates }: { rates: RateCardView }) {
       'Knowledge processing',
       `${formatCurrencyMicros(rates.embeddingPer1kTokensMicros)} / 1,000 tokens`,
     ],
+    ['Call transcription', `${formatCurrencyMicros(rates.sttPerMinuteMicros)} / minute`],
     ...(rates.commissionBps
       ? [['Platform commission', formatBps(rates.commissionBps)] as [string, string]]
       : []),

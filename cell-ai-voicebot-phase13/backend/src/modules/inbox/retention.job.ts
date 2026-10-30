@@ -2,11 +2,15 @@ import { Types } from 'mongoose';
 
 import { INBOX_LIMITS } from '../../config/limits';
 import type { StorageProvider } from '../../core/storage';
+import { AccountModel, type AccountDoc } from '../../db/models/account.model';
+import { AnalyticsMarkModel, analyticsMarkId } from '../../db/models/analytics-mark.model';
+import { ConversationSummaryModel } from '../../db/models/conversation-summary.model';
 import { ConversationModel } from '../../db/models/conversation.model';
 import { InboxUploadModel } from '../../db/models/inbox-upload.model';
 import { MessageModel, type MessageDoc } from '../../db/models/message.model';
 import { getLogger } from '../../shared/logger';
 import { recordAudit } from '../audit/audit.service';
+import { effectiveRetention } from '../retention/retention.service';
 
 import { buildPreview } from './preview';
 
@@ -15,6 +19,8 @@ export interface RetentionResult {
   media: number;
   uploads: number;
   conversations: number;
+  /** Phase 14 chat summaries. */
+  summaries: number;
 }
 
 const removeFile = async (
@@ -59,7 +65,7 @@ const recompute = async (conversationId: Types.ObjectId) => {
 
 /**
  * `inbox-retention` (daily, owner decision: 90 days — `INBOX_RETENTION_DAYS`, 0 =
- * keep): deletes messages older than the cutoff with their stored files in batches,
+ * keep; Phase 14: an account may keep chats for less, a superadmin may cap it): deletes messages older than the cutoff with their stored files in batches,
  * recomputes the touched conversations' list rows (the conversation, contact and
  * assignment stay), deletes unused uploads past their expiry, audits counts per
  * account. Resumable: a crash leaves only older-than-cutoff rows, deleted next run.
@@ -69,7 +75,13 @@ export const runInboxRetention = async (
   retentionDays: number,
   now = new Date(),
 ): Promise<RetentionResult> => {
-  const result: RetentionResult = { messages: 0, media: 0, uploads: 0, conversations: 0 };
+  const result: RetentionResult = {
+    messages: 0,
+    media: 0,
+    uploads: 0,
+    conversations: 0,
+    summaries: 0,
+  };
   const perAccount = new Map<
     string,
     { accountId: Types.ObjectId; messages: number; media: number; uploads: number }
@@ -83,11 +95,11 @@ export const runInboxRetention = async (
     }
     return t;
   };
-  if (retentionDays > 0) {
-    const cutoff = new Date(now.getTime() - retentionDays * 86_400_000);
-    const touched = new Set<string>();
+  const touched = new Set<string>();
+  /** Deletes matching messages with their stored files, a batch at a time. */
+  const purgeMessages = async (filter: Record<string, unknown>) => {
     for (;;) {
-      const batch = await MessageModel.find({ at: { $lt: cutoff } })
+      const batch = await MessageModel.find(filter)
         .select({
           accountId: 1,
           conversationId: 1,
@@ -98,7 +110,7 @@ export const runInboxRetention = async (
         .lean<
           Pick<MessageDoc, '_id' | 'accountId' | 'conversationId' | 'media' | 'interactive'>[]
         >();
-      if (!batch.length) break;
+      if (!batch.length) return;
       for (const m of batch) {
         const t = tally(m.accountId);
         if (await removeFile(storage, m.media?.storageKey)) {
@@ -109,14 +121,41 @@ export const runInboxRetention = async (
         touched.add(m.conversationId.toString());
       }
       const res = await MessageModel.deleteMany({ _id: { $in: batch.map((m) => m._id) } });
+      // counts stay in the report rollups; only the bookkeeping goes
+      await AnalyticsMarkModel.deleteMany({
+        _id: { $in: batch.map((m) => analyticsMarkId('message', m._id)) },
+      });
       result.messages += res.deletedCount;
       for (const m of batch) tally(m.accountId).messages += 1;
     }
-    for (const id of touched) {
-      await recompute(new Types.ObjectId(id));
-    }
-    result.conversations = touched.size;
+  };
+  const before = (days: number) => ({ $lt: new Date(now.getTime() - days * 86_400_000) });
+  // Phase 14: accounts that keep chats for less than the platform default go first
+  const platform = { callsDays: 0, inboxDays: retentionDays > 0 ? retentionDays : null };
+  const custom = await AccountModel.find({
+    $or: [{ 'retention.inboxDays': { $ne: null } }, { 'retentionCap.inboxDays': { $ne: null } }],
+  })
+    .select({ retention: 1, retentionCap: 1 })
+    .lean<Pick<AccountDoc, '_id' | 'retention' | 'retentionCap'>[]>();
+  for (const account of custom) {
+    const days = effectiveRetention(account, platform).inboxDays;
+    if (days === null) continue;
+    await purgeMessages({ accountId: account._id, at: before(days) });
+    // chat summaries are chat content — same cutoff
+    result.summaries += (
+      await ConversationSummaryModel.deleteMany({ accountId: account._id, createdAt: before(days) })
+    ).deletedCount;
   }
+  if (retentionDays > 0) {
+    await purgeMessages({ at: before(retentionDays) });
+    result.summaries += (
+      await ConversationSummaryModel.deleteMany({ createdAt: before(retentionDays) })
+    ).deletedCount;
+  }
+  for (const id of touched) {
+    await recompute(new Types.ObjectId(id));
+  }
+  result.conversations = touched.size;
   for (;;) {
     const uploads = await InboxUploadModel.find({ expiresAt: { $lt: now } })
       .select({ accountId: 1, storageKey: 1 })

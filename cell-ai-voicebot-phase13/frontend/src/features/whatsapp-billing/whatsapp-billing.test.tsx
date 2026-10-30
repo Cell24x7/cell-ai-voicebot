@@ -260,6 +260,7 @@ describe('wallet overview + settings', () => {
       commissionBps: 0,
       aiTextPer1kTokensMicros: 0,
       embeddingPer1kTokensMicros: 0,
+      sttPerMinuteMicros: 500_000,
       billUnansweredAttempts: false,
       source: 'default',
       effectiveFrom: '2026-10-01T00:00:00Z',

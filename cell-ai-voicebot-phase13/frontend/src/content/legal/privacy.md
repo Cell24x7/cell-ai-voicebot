@@ -56,7 +56,8 @@ Data is stored on servers in India. OpenAI and Meta may process data outside Ind
 ## 8. How long we keep data
 
 - Call records, recordings and transcripts: **180 days** by default, then deleted automatically.
-- WhatsApp messages and media: **90 days** by default (the customer can change this in Settings → Inbox), then deleted automatically.
+- WhatsApp messages and media: **90 days** by default, then deleted automatically.
+- Each customer can choose shorter periods in Settings → Data retention (recordings can be deleted before the call record), and we may set a shorter limit for an account. Daily report totals, which contain no personal data, are kept for 25 months.
 - Contacts: until the customer deletes them or closes its account.
 - Invoices and wallet ledger: as long as tax law requires.
 - Backups: up to **30 days**.

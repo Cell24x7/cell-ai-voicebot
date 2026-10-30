@@ -69,7 +69,9 @@ describe('nav config', () => {
     const live = visibleNavItems(() => true, false).map((i) => i.key);
     expect(live).toContain('whatsapp');
     expect(live.indexOf('inbox')).toBe(live.indexOf('whatsapp') - 1);
-    expect(live).not.toContain('reports');
+    expect(live).toContain('reports');
+    // Phase 13 builds hid the reports
+    expect(visibleNavItems(() => true, false, 13).map((i) => i.key)).not.toContain('reports');
     expect(live).not.toContain('integrations');
     expect(visibleNavItems((p) => p === 'flows.read', false).map((i) => i.key)).toEqual([
       'dashboard',
@@ -100,6 +102,7 @@ describe('AppLayout', () => {
       'Campaigns',
       'Inbox',
       'WhatsApp',
+      'Reports',
       'Team',
       'Settings',
     ]);
@@ -123,6 +126,7 @@ describe('AppLayout', () => {
       'Campaigns',
       'Inbox',
       'WhatsApp',
+      'Reports',
       'Settings',
     ]);
   });

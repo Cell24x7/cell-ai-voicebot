@@ -1,3 +1,4 @@
+import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
@@ -7,6 +8,7 @@ import Typography from '@mui/material/Typography';
 import { lazy, Suspense } from 'react';
 import { useLocation } from 'react-router';
 
+import { APP_LOGO_URL, APP_NAME } from '@/app/brand';
 import { useCan, useIsPlatformAdmin } from '@/features/auth/hooks';
 import { useAuthStore } from '@/features/auth/store';
 
@@ -63,9 +65,15 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 /** Permanent drawer on ≥ md, temporary (toggle) drawer on small screens. */
 export function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
   const brand = (
-    <Toolbar>
+    <Toolbar sx={{ gap: 1.25 }}>
+      <Box
+        component="img"
+        src={APP_LOGO_URL}
+        alt=""
+        sx={{ width: 32, height: 32, flexShrink: 0 }}
+      />
       <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>
-        {import.meta.env.VITE_APP_NAME || 'NotifyNow'}
+        {APP_NAME}
       </Typography>
     </Toolbar>
   );

@@ -53,6 +53,7 @@ export function RateCardDialog({
   const [tts, setTts] = useState(formatRupeesInput(initial.ttsPer1kCharsMicros));
   const [aiText, setAiText] = useState(formatRupeesInput(initial.aiTextPer1kTokensMicros));
   const [embedding, setEmbedding] = useState(formatRupeesInput(initial.embeddingPer1kTokensMicros));
+  const [stt, setStt] = useState(formatRupeesInput(initial.sttPerMinuteMicros));
   const [commission, setCommission] = useState(formatBps(initial.commissionBps).replace('%', ''));
   const [unanswered, setUnanswered] = useState(initial.billUnansweredAttempts);
   const [note, setNote] = useState('');
@@ -66,13 +67,14 @@ export function RateCardDialog({
   const t = money(tts);
   const x = money(aiText);
   const e = money(embedding);
+  const s = money(stt);
   const bps = parsePercentToBps(commission);
   const noteProblem = note.trim() && note.trim().length < 3 ? 'At least 3 characters' : null;
-  const valid = c.ok && a.ok && t.ok && x.ok && e.ok && bps !== null && !noteProblem;
+  const valid = c.ok && a.ok && t.ok && x.ok && e.ok && s.ok && bps !== null && !noteProblem;
 
   const save = async () => {
     setTouched(true);
-    if (!c.ok || !a.ok || !t.ok || !x.ok || !e.ok || bps === null || noteProblem) return;
+    if (!c.ok || !a.ok || !t.ok || !x.ok || !e.ok || !s.ok || bps === null || noteProblem) return;
     setSaving(true);
     setError(null);
     try {
@@ -84,6 +86,7 @@ export function RateCardDialog({
         commissionBps: bps,
         aiTextPer1kTokensMicros: x.micros,
         embeddingPer1kTokensMicros: e.micros,
+        sttPerMinuteMicros: s.micros,
         billUnansweredAttempts: unanswered,
         note: note.trim() || null,
       });
@@ -167,6 +170,13 @@ export function RateCardDialog({
               helperText={help(e, 'Knowledge processing and search')}
             />
           </Stack>
+          <TextField
+            label="Call transcription (₹ per minute)"
+            value={stt}
+            onChange={(ev) => setStt(ev.target.value)}
+            error={touched && !s.ok}
+            helperText={help(s, 'Recorded team calls turned into text, per second')}
+          />
           <TextField
             label="Platform commission (%)"
             value={commission}

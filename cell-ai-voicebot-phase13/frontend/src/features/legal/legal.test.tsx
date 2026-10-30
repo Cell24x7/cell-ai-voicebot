@@ -134,7 +134,7 @@ describe('legal values', () => {
         email: '[email]',
         grievanceOfficer: '[grievanceOfficer]',
         website: '[website]',
-        appName: 'Cell AI Voicebot',
+        appName: 'NotifyNow',
       },
       missing: ['company', 'address', 'email', 'grievanceOfficer', 'website'],
     });

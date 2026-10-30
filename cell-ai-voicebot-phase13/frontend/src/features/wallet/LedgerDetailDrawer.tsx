@@ -57,6 +57,9 @@ const USAGE_KIND_LABELS: Record<
   call: 'Call',
   whatsapp: 'WhatsApp message',
   whatsapp_call: 'WhatsApp call',
+  insights: 'Call insights (AI)',
+  stt: 'Call transcription',
+  chat_summary: 'Chat summary (AI)',
 };
 
 /** One ledger row in full: amounts, call breakdown (billable seconds, pulse, parts), refs. */

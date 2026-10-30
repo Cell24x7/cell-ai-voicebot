@@ -305,3 +305,18 @@ export type CallPermissionRequestResult = Created<
 >;
 export type CallAvailabilityStatus = Schemas['CallAvailability']['status'];
 export type WhatsAppChannelCalling = WhatsAppChannel['calling'];
+
+/** Phase 14 — post-call insights, outcomes, chat summaries, reports. */
+export type CallInsights = Schemas['CallInsights'];
+export type CallInsightVersion = Schemas['CallInsightVersion'];
+export type InsightsSettings = Schemas['InsightsSettings'];
+export type Dispositions = Schemas['Dispositions'];
+export type AccountDisposition = Dispositions['dispositions'][number];
+export type ChatSummary = Schemas['ChatSummary'];
+export type Report = Schemas['Report'];
+/** Phase 14 record exports (calls, message metadata, a report tab). */
+export type RecordExport = Schemas['RecordExport'];
+/** Phase 14 report e-mails (each person's own). */
+export type ReportSubscription = Schemas['ReportSubscription'];
+/** Phase 14 per-account retention (settings, effective days, platform, cap, bounds). */
+export type Retention = Schemas['Retention'];

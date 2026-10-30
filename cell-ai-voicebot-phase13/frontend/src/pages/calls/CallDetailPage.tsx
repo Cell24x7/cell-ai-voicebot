@@ -38,13 +38,14 @@ import {
   useCanListenCalls,
   useCanTriggerCalls,
 } from '@/features/calls/queries';
+import { InsightsCard } from '@/features/insights/InsightsCard';
 import { CallWhatsAppDetails } from '@/features/whatsapp-calling/CallWhatsAppDetails';
 import { callsApi } from '@/services/api/calls';
 import { getErrorMessage } from '@/services/api/errors';
 import type { Call } from '@/services/api/types';
 import { useWsEvent, useWsTopic } from '@/services/realtime';
 import { formatInAccountTz } from '@/utils/datetime';
-import { formatCurrencyMicros, formatNumber } from '@/utils/format';
+import { formatCurrencyMicros, formatDateOnly, formatNumber } from '@/utils/format';
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -58,6 +59,12 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
     </Stack>
   );
 }
+
+const SPEAKER: Record<'customer' | 'bot' | 'agent', string> = {
+  customer: 'Customer',
+  bot: 'Bot',
+  agent: 'Team member',
+};
 
 const str = (v: unknown): string =>
   typeof v === 'string' || typeof v === 'number' ? String(v) : '';
@@ -256,7 +263,20 @@ export function CallDetailPage() {
               <Divider sx={{ my: 1.5 }} />
               <Outcome call={c} />
             </Paper>
+            <InsightsCard
+              callId={c.id}
+              answered={Boolean(c.timestamps.answeredAt)}
+              live={live}
+              timezone={timezone}
+            />
+            {c.recording?.deletedAt && (
+              <Alert severity="info">
+                The recording was deleted on {formatDateOnly(c.recording.deletedAt)} under this
+                account's data retention setting. The transcript and summary are kept.
+              </Alert>
+            )}
             {c.recording &&
+              !c.recording.deletedAt &&
               (canListen ? (
                 <Paper variant="outlined" sx={{ p: 2 }}>
                   <RecordingPlayer
@@ -297,11 +317,19 @@ export function CallDetailPage() {
                             variant="body2"
                             sx={{ fontWeight: 600, mr: 1 }}
                           >
-                            {t.speaker === 'customer' ? 'Customer' : 'Bot'}
+                            {SPEAKER[t.speaker]}
                           </Typography>
                           <Typography component="span" variant="body2">
                             {t.text}
                           </Typography>
+                          {t.source === 'stt' && (
+                            <Chip
+                              size="small"
+                              variant="outlined"
+                              label="from the recording"
+                              sx={{ ml: 1 }}
+                            />
+                          )}
                           {t.interrupted && (
                             <Chip
                               size="small"

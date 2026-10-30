@@ -1,6 +1,7 @@
 import { apiClient, unwrap } from './client';
 import type {
   AccountLimits,
+  Retention,
   AdminAccountDetail,
   AdminAccountRow,
   AuthSession,
@@ -38,6 +39,9 @@ export const adminApi = {
   /** Dialing limits (max concurrent calls, dials per minute); audited. */
   setLimits: (id: string, body: Partial<AccountLimits>) =>
     unwrap(apiClient.patch<SuccessEnvelope<AccountLimits>>(`/admin/accounts/${id}/limits`, body)),
+  /** Phase 14: cap how long an account may keep call records / chats (`null` = platform default). */
+  setRetentionCap: (id: string, body: { callsDays: number | null; inboxDays: number | null }) =>
+    unwrap(apiClient.put<SuccessEnvelope<Retention>>(`/admin/accounts/${id}/retention-cap`, body)),
   /** Emergency stop: every scheduled / running campaign pauses as `admin`. */
   pauseCampaigns: (id: string) =>
     unwrap(

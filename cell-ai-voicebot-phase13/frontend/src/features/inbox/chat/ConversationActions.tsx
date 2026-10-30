@@ -1,3 +1,4 @@
+import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import MoreVertOutlined from '@mui/icons-material/MoreVertOutlined';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
@@ -9,6 +10,8 @@ import { lazy, Suspense, useState } from 'react';
 
 import { useConfirm } from '@/components/confirm-context';
 import { useSession } from '@/features/auth/hooks';
+import { useAuthStore } from '@/features/auth/store';
+import { ChatSummaryDrawer } from '@/features/insights/ChatSummaryDrawer';
 import { useImpersonating } from '@/features/wallet/queries';
 import { teamApi } from '@/services/api/team';
 import type { InboxConversationDetail } from '@/services/api/types';
@@ -90,6 +93,8 @@ export function ConversationActions({
   const config = useInboxConfig();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [simulating, setSimulating] = useState(false);
+  const [summary, setSummary] = useState(false);
+  const timezone = useAuthStore((st) => st.session?.account.timezone ?? 'Asia/Kolkata');
   const simulator = Boolean(import.meta.env.DEV && config.data?.fakeProvider && c.channel);
 
   const onBlock = async () => {
@@ -115,6 +120,18 @@ export function ConversationActions({
             Reopen conversation
           </Button>
         ))}
+      <Button size="small" startIcon={<AutoAwesomeOutlined />} onClick={() => setSummary(true)}>
+        Summary
+      </Button>
+      {summary && (
+        <ChatSummaryDrawer
+          conversationId={c.id}
+          open={summary}
+          onClose={() => setSummary(false)}
+          canSummarize={canReply}
+          timezone={timezone}
+        />
+      )}
       <IconButton aria-label="More actions" onClick={(e) => setAnchor(e.currentTarget)}>
         <MoreVertOutlined />
       </IconButton>

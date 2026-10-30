@@ -31,6 +31,8 @@ export interface WsEventMap {
   };
   /** No digit — key presses can be PINs. */
   'call.dtmf': { callId: string };
+  /** Phase 14: post-call insights changed (ids + status only — fetch the view). */
+  'call.insights': { callId: string; status: string; version: number };
   'call.ended': {
     callId: string;
     /** Campaign calls only. */
@@ -91,6 +93,8 @@ export interface WsEventMap {
     reactions: { emoji: string; by: 'customer' | 'agent' }[];
   };
   /** Topic — another agent is typing (team only). */
+  /** Phase 14: a chat summary changed (ids only — fetch the list). */
+  'inbox.conversation.summary': { conversationId: string; summaryId: string };
   'inbox.typing': { conversationId: string; userId: string; name: string };
   /** Account level (Phase 11) — status / quality / category only, never template text. */
   'whatsapp.template.updated': {
@@ -161,6 +165,7 @@ export const WS_EVENT_TYPES = [
   'call.transcript',
   'call.dtmf',
   'call.ended',
+  'call.insights',
   'campaign.status',
   'campaign.progress',
   'whatsapp.channel.updated',
@@ -169,6 +174,7 @@ export const WS_EVENT_TYPES = [
   'inbox.message.created',
   'inbox.message.updated',
   'inbox.typing',
+  'inbox.conversation.summary',
   'whatsapp.template.updated',
   'whatsapp.call.incoming',
   'whatsapp.call.taken',

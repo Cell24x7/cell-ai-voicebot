@@ -6,6 +6,11 @@ export interface AiJobData {
   'kb.reindex': { accountId: string; kbId: string };
   'playground.purge': Record<string, never>;
   'agents.purge_deleted': Record<string, never>;
+  /** Phase 14 post-call insights. */
+  'insights.sweep': Record<string, never>;
+  'insights.run': { accountId: string; callId: string; version: number };
+  'insights.stt': { accountId: string; callId: string };
+  'insights.chat_summary': { accountId: string; summaryId: string };
 }
 
 export type AiJobName = keyof AiJobData;
@@ -15,6 +20,10 @@ export const AI_JOB_NAMES = [
   'kb.reindex',
   'playground.purge',
   'agents.purge_deleted',
+  'insights.sweep',
+  'insights.run',
+  'insights.stt',
+  'insights.chat_summary',
 ] as const satisfies readonly AiJobName[];
 
 export const isAiJobName = (value: string): value is AiJobName =>
@@ -24,11 +33,17 @@ export const isAiJobName = (value: string): value is AiJobName =>
 export const AI_SCHEDULES = [
   { name: 'playground.purge', pattern: '30 3 * * *' },
   { name: 'agents.purge_deleted', pattern: '15 4 * * *' },
+  { name: 'insights.sweep', pattern: '* * * * *' },
 ] as const satisfies readonly { name: AiJobName; pattern: string }[];
 
 /** Enqueues AI jobs — the API depends on this interface, not on BullMQ. */
 export interface AiJobs {
-  enqueue<N extends AiJobName>(name: N, data: AiJobData[N]): Promise<void>;
+  /** Same `jobId` twice → one job (BullMQ ids never contain `:`). */
+  enqueue<N extends AiJobName>(
+    name: N,
+    data: AiJobData[N],
+    options?: { jobId?: string },
+  ): Promise<void>;
 }
 
 const JOB_OPTIONS: JobsOptions = {
@@ -39,8 +54,11 @@ const JOB_OPTIONS: JobsOptions = {
 };
 
 export const queueAiJobs = (queue: Queue): AiJobs => ({
-  async enqueue(name, data) {
-    await queue.add(name, data, JOB_OPTIONS);
+  async enqueue(name, data, options) {
+    await queue.add(name, data, {
+      ...JOB_OPTIONS,
+      ...(options?.jobId ? { jobId: options.jobId } : {}),
+    });
   },
 });
 

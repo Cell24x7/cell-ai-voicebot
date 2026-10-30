@@ -73,7 +73,7 @@ const envFor = (port: number, auth?: { user: string; pass: string }) => ({
   SMTP_SECURE: false,
   SMTP_USER: auth?.user,
   SMTP_PASS: auth?.pass,
-  MAIL_FROM: 'Cell AI Voicebot <no-reply@example.com>',
+  MAIL_FROM: 'NotifyNow <no-reply@example.com>',
 });
 
 const message = (to = 'user@example.com') => ({
@@ -108,12 +108,33 @@ describe('SmtpEmailProvider (in-process SMTP server)', () => {
     expect(mail?.from).toBe('no-reply@example.com');
     expect(mail?.to).toEqual(['user@example.com']);
     expect(mail?.raw).toContain('Subject: Hello from tests');
-    expect(mail?.raw).toContain('From: Cell AI Voicebot <no-reply@example.com>');
+    expect(mail?.raw).toContain('From: NotifyNow <no-reply@example.com>');
     expect(mail?.raw).toContain('body-text-marker');
     const log = lines.join('');
     expect(log).toContain('u***@example.com');
     expect(log).not.toContain('body-html-marker');
     expect(log).not.toContain('user@example.com');
+  });
+
+  it('passes extra headers through (List-Unsubscribe on report e-mails)', async () => {
+    const provider = new SmtpEmailProvider(
+      envFor(open.port),
+      createLogger({ NODE_ENV: 'test', LOG_LEVEL: 'silent' }),
+    );
+    await provider.send({
+      ...message('digest@example.com'),
+      headers: {
+        'List-Unsubscribe': '<https://api.example.com/api/v1/report-unsubscribe?token=a.b.c>',
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
+    });
+    await provider.close();
+    // long headers are folded (CRLF + space) — unfold before reading
+    const raw = (open.received.at(-1)?.raw ?? '').replace(/\r\n[ \t]+/g, ' ');
+    expect(raw).toContain(
+      'List-Unsubscribe: <https://api.example.com/api/v1/report-unsubscribe?token=a.b.c>',
+    );
+    expect(raw).toContain('List-Unsubscribe-Post: List-Unsubscribe=One-Click');
   });
 
   it('authenticates with SMTP_USER / SMTP_PASS', async () => {

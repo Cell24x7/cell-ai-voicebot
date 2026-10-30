@@ -30,6 +30,7 @@ import { createContactListsRouter } from './modules/contact-lists/contact-lists.
 import { createContactTagsRouter, createContactsRouter } from './modules/contacts/contacts.routes';
 import type { ContactJobs } from './modules/contacts/jobs';
 import { createCustomFieldsRouter } from './modules/custom-fields/custom-fields.routes';
+import { createDevJobsRouter } from './modules/dev-jobs/dev-jobs.routes';
 import { createDndRouter, createOptOutRouter } from './modules/dnd/dnd.routes';
 import { createOpenApiHandler } from './modules/docs/openapi.controller';
 import { createFlowAudioRouter } from './modules/flow-audio/flow-audio.routes';
@@ -37,12 +38,26 @@ import { createFlowsRouter } from './modules/flows/flows.routes';
 import { createInboxDisabledRouter, createInboxRouter } from './modules/inbox/inbox.routes';
 import { unavailableInboxJobs, type InboxJobs } from './modules/inbox/jobs';
 import { createInboxSettingsRouter } from './modules/inbox/settings.routes';
+import { summarizeOnClose } from './modules/insights/chat-summary.service';
+import {
+  createAccountInsightsRouter,
+  createCallInsightsRouter,
+  createChatSummaryRouter,
+} from './modules/insights/insights.routes';
 import { createKnowledgeRouter } from './modules/knowledge/knowledge.routes';
 import { createMockApisRouter } from './modules/mock-apis/mock.routes';
 import { createNotificationsRouter } from './modules/notifications/notifications.routes';
 import { createWebhooksRouter } from './modules/payments/webhooks.routes';
 import { createRbacRouter } from './modules/rbac/rbac.routes';
 import { createWsTicketsRouter } from './modules/realtime-tickets/tickets.routes';
+import { createRecordExportsRouter } from './modules/record-exports/record-exports.routes';
+import {
+  createReportSubscriptionsRouter,
+  createReportUnsubscribeRouter,
+} from './modules/report-subscriptions/report-subscriptions.routes';
+import type { ReportCacheStore } from './modules/reports/cache';
+import { createReportsRouter } from './modules/reports/reports.routes';
+import { createRetentionRouter } from './modules/retention/retention.routes';
 import { createSegmentsRouter } from './modules/segments/segments.routes';
 import { createSystemRouter } from './modules/system/system.routes';
 import { createTeamRouter } from './modules/team/team.routes';
@@ -141,6 +156,7 @@ export const createApiRouter = ({
   calls,
   campaigns = {},
   whatsapp,
+  reports = {},
 }: {
   env: Pick<
     Env,
@@ -175,6 +191,8 @@ export const createApiRouter = ({
   calls?: CallsApiDeps;
   campaigns?: CampaignsRouterDeps;
   whatsapp?: WhatsAppDeps;
+  /** Phase 14: report cache (Redis); `null` = no cache. */
+  reports?: { cache?: ReportCacheStore | null };
 }): Router => {
   const router = Router();
   router.use('/auth', createAuthRouter({ ...auth, env }));
@@ -184,7 +202,10 @@ export const createApiRouter = ({
       createInboxSettingsRouter({ retentionDays: whatsapp.ctx.env.INBOX_RETENTION_DAYS }),
     );
   }
+  router.use('/account', createAccountInsightsRouter());
+  router.use('/account', createRetentionRouter());
   router.use('/account', createAccountRouter());
+  router.use('/inbox', createChatSummaryRouter({ jobs: ai.jobs ?? unavailableAiJobs }));
   router.use('/team', createTeamRouter());
   router.use('/api-keys', createApiKeysRouter());
   router.use('/audit-logs', createAuditRouter());
@@ -260,6 +281,7 @@ export const createApiRouter = ({
           : {}),
         storage: whatsappRuntime.storage ?? contacts.storage,
         jobs: whatsappRuntime.inboxJobs ?? unavailableInboxJobs,
+        summaries: { onClosed: (c) => summarizeOnClose(c, ai.jobs ?? unavailableAiJobs) },
         ...(whatsappRuntime.inboxSendRateLimitStore
           ? { sendRateLimitStore: whatsappRuntime.inboxSendRateLimitStore }
           : {}),
@@ -329,6 +351,17 @@ export const createApiRouter = ({
     }),
   );
   router.use('/campaigns', createCampaignsRouter(campaigns));
+  router.use('/calls', createCallInsightsRouter({ jobs: ai.jobs ?? unavailableAiJobs }));
+  router.use('/reports', createReportsRouter({ cache: reports.cache ?? null }));
+  router.use('/report-subscriptions', createReportSubscriptionsRouter());
+  router.use('/report-unsubscribe', createReportUnsubscribeRouter());
+  router.use(
+    '/exports',
+    createRecordExportsRouter({
+      ...(contacts.storage ? { storage: contacts.storage } : {}),
+      ...(contacts.jobs ? { jobs: contacts.jobs } : {}),
+    }),
+  );
   if (calls) {
     router.use(
       '/calls',
@@ -342,6 +375,12 @@ export const createApiRouter = ({
     );
   }
   if (env.MOCK_APIS_ENABLED) router.use('/mock', createMockApisRouter());
+  if (env.MOCK_APIS_ENABLED && env.NODE_ENV !== 'production') {
+    router.use(
+      '/dev/jobs',
+      createDevJobsRouter(contacts.storage ? { storage: contacts.storage } : {}),
+    );
+  }
   if (whatsappRuntime && env.MOCK_APIS_ENABLED && env.NODE_ENV !== 'production') {
     router.use('/dev/meta', createDevSimulatorRouter(whatsappRuntime));
   }

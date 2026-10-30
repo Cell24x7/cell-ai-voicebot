@@ -15,6 +15,7 @@ import type {
 } from '@/services/api/types';
 import { fakeSession, signInAs } from '@/test/auth';
 import { renderWithProviders } from '@/test/render';
+import { fakeRetention } from '@/test/retention';
 
 vi.mock('@/services/api/admin', () => ({
   adminApi: { account: vi.fn(), accounts: vi.fn() },
@@ -78,6 +79,7 @@ const DETAIL: AdminAccountDetail = {
   owner: base.user as AdminAccountDetail['owner'],
   usersCount: 3,
   usersByStatus: { active: 3, invited: 0, disabled: 0 },
+  retention: fakeRetention(),
   limits: { maxConcurrentCalls: 10, dialsPerMinute: 60 },
   activeCampaigns: 0,
   adminPausedCampaigns: [],
@@ -99,6 +101,7 @@ const CARD = {
   billUnansweredAttempts: false,
   aiTextPer1kTokensMicros: 200_000,
   embeddingPer1kTokensMicros: 10_000,
+  sttPerMinuteMicros: 500_000,
 };
 const VERSION = (overrides: Partial<RateCardVersion> = {}): RateCardVersion => ({
   id: 'rc1',
@@ -232,6 +235,7 @@ describe('account rates tab', () => {
       billUnansweredAttempts: true,
       aiTextPer1kTokensMicros: 250_000,
       embeddingPer1kTokensMicros: 10_000,
+      sttPerMinuteMicros: 500_000,
       note: 'Festive offer',
     });
     expect(await screen.findByText('New prices saved for Demo Finance')).toBeInTheDocument();

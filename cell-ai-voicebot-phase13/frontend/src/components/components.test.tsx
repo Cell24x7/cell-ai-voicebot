@@ -155,7 +155,7 @@ describe('small components', () => {
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('Weird')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Team' })).toBeInTheDocument();
-    expect(document.title).toBe('Team · Cell AI Voicebot');
+    expect(document.title).toBe('Team · NotifyNow');
   });
 
   it('PageHeader subtitles may hold chips (no <div> inside a <p>)', () => {

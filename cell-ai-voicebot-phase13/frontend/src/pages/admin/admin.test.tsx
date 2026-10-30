@@ -8,6 +8,7 @@ import { ApiError } from '@/services/api/errors';
 import type { AdminAccountDetail, AdminAccountRow } from '@/services/api/types';
 import { fakeSession, signInAs } from '@/test/auth';
 import { renderWithProviders } from '@/test/render';
+import { fakeRetention } from '@/test/retention';
 
 vi.mock('@/services/api/admin', () => ({
   adminApi: {
@@ -18,6 +19,7 @@ vi.mock('@/services/api/admin', () => ({
     impersonate: vi.fn(),
     stopImpersonation: vi.fn(),
     setLimits: vi.fn(),
+    setRetentionCap: vi.fn(),
     pauseCampaigns: vi.fn(),
     resumeCampaign: vi.fn(),
   },
@@ -44,6 +46,7 @@ const detail = (overrides: Partial<AdminAccountDetail['account']> = {}): AdminAc
   account: { ...base.account, id: 'acc1', ...overrides },
   owner: base.user as AdminAccountDetail['owner'],
   usersCount: 3,
+  retention: fakeRetention(),
   usersByStatus: { active: 2, invited: 1, disabled: 0 },
   limits: { maxConcurrentCalls: 10, dialsPerMinute: 60 },
   activeCampaigns: 1,
@@ -137,6 +140,55 @@ describe('Admin accounts list', () => {
 });
 
 describe('Admin account detail', () => {
+  it('caps how long the account keeps data (empty = platform default)', async () => {
+    const user = userEvent.setup();
+    signInAs('superadmin');
+    api.account.mockResolvedValue(detail());
+    api.setRetentionCap.mockResolvedValue(fakeRetention());
+    renderWithProviders({ route: '/admin/accounts/acc1' });
+    const card = await screen.findByRole('region', { name: 'Data retention limit' });
+    expect(
+      within(card).getByText(/recordings 180 days, call records 180 days, WhatsApp chats 90 days/),
+    ).toBeInTheDocument();
+    const calls = within(card).getByLabelText('Call records at most (days)');
+    await user.type(calls, '5');
+    expect(within(card).getByText('Between 7 and 180 days')).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Save limit' })).toBeDisabled();
+    await user.clear(calls);
+    await user.type(calls, '60');
+    await user.click(within(card).getByRole('button', { name: 'Save limit' }));
+    await waitFor(() =>
+      expect(api.setRetentionCap).toHaveBeenCalledWith('acc1', { callsDays: 60, inboxDays: null }),
+    );
+    expect(await screen.findByText('Retention limit saved')).toBeInTheDocument();
+  });
+
+  it('shows a refused cap and chats kept forever', async () => {
+    const user = userEvent.setup();
+    signInAs('superadmin');
+    api.account.mockResolvedValue({
+      ...detail(),
+      retention: fakeRetention({
+        effective: { recordingsDays: 180, callsDays: 180, inboxDays: null },
+        platform: { callsDays: 180, inboxDays: null },
+      }),
+    });
+    api.setRetentionCap.mockRejectedValue(
+      new ApiError({
+        status: 422,
+        code: 'RETENTION_OUT_OF_BOUNDS',
+        message: 'Cap WhatsApp chats between 30 and 3650 days.',
+        kind: 'http',
+      }),
+    );
+    renderWithProviders({ route: '/admin/accounts/acc1' });
+    const card = await screen.findByRole('region', { name: 'Data retention limit' });
+    expect(within(card).getByText(/WhatsApp chats forever/)).toBeInTheDocument();
+    await user.type(within(card).getByLabelText('WhatsApp chats at most (days)'), '400');
+    await user.click(within(card).getByRole('button', { name: 'Save limit' }));
+    expect(await within(card).findByText(/Cap WhatsApp chats between/)).toBeInTheDocument();
+  });
+
   it('shows the overview, recent activity and the billing tabs', async () => {
     signInAs('superadmin');
     api.account.mockResolvedValue(detail());

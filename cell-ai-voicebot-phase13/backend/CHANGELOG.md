@@ -6,6 +6,26 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Phase 14 · Batch 3 (T14.9–T14.10) — demo history, perf, security, sign-off** — 2026-10-28
+  - `db:seed` (and the staging review demo, as test traffic) adds 60 days of report history: calls of every kind with "Demo:" insights, WhatsApp messages with statuses, AI charges through the engine, rollups rebuilt (no OpenAI calls).
+  - `npm run perf:reports` (throw-away `cav_perf`): 100,000 calls + 500,000 messages over 400 days → every report tab ≤ 225 ms p95 over 7 / 30 / 365 days, index scans only, recount 0 differences.
+  - Security tests: every new route isolated per account (404), permission matrix snapshot, unsubscribe rate limit, no phones / summaries in audit details. DEV-only `POST /api/v1/dev/jobs/calls-purge|inbox-retention|reports-email` for E2E.
+  - Docs: sign-off, OpenAI costs of insights / transcription / chat summaries, staging runbook (recount, reconcile, report e-mails, retention), ADR notes, README.
+
+- **Phase 14 · Batch 2 (T14.5–T14.8) — team-call transcription switch, exports, report e-mails, data retention** — 2026-10-27
+  - `PUT /account/insights-settings { transcribeHumanCalls }` (T14.5).
+  - Record exports: `POST /exports/calls|messages|report`, `GET /exports[/:id]` on the export-job pipeline (CSV / XLSX, calls-list filters, masked phones unless `contacts.export`, AI summaries on request, message metadata only, 200k rows, one at a time, download names without personal data); contact exports no longer list them.
+  - Report e-mails: own subscriptions (≤ 5), hourly `reports-email` job (account-local hour; daily / weekly / monthly; once per period; re-checked before delivery), `reports.digest` (numbers only), signed 90-day unsubscribe (page click + RFC 8058 one-click `List-Unsubscribe`).
+  - Per-account retention (`GET / PUT /account/retention`, superadmin `PUT /admin/accounts/:id/retention-cap`): purge jobs per account then at the platform default, batched and resumable; recording-only purge keeps the call (`recording.deletedAt`); rollups untouched. Error codes 90, audit actions 138.
+  - Tests 3275 → 3320, coverage 96.18 / 87.68 / 95.92 / 97.69. E2E 151 / 151 twice; backend log grep (8 392 lines): phones, summaries, tokens, passwords, SDP, unmasked e-mails → 0.
+
+- **Phase 14 · Batch 1 (T14.1–T14.4) — rollups, post-call insights, reports API, transcription + chat summaries** — 2026-10-27
+  - Daily report rollups (`statsDaily`) from one set of metric rules (`docs/analytics/METRICS.md`, ADR 0043): an analytics sweep every minute counts changed calls, WhatsApp messages and charges and applies only the difference (`analyticsMarks`), so late Meta durations and status webhooks never double count; `npm run analytics:rebuild`, a nightly recount of the last 3 days (fixes + tells the superadmins) and migration `0015-analytics` (backfill) use the same rules; purges keep the rollups (25 months).
+  - Post-call AI (ADR 0044): summary, outcome from the account's dispositions, sentiment and key facts (promise date / amount, callback, dispute, wrong number) for every answered call with a transcript — structured output, prompt with the transcript as data, charged once per version; flows, AI agents and people always win over the AI's outcome; regenerate, outcome by hand, settings, dispositions editor (migration `0016-insights`, existing calls never charged).
+  - `GET /reports/:tab` (overview, calls, whatsapp, templates, campaigns, flows, agents, team): KPIs with the previous period, day series, a table; account-local ranges ≤ 366 days, one slice at a time, cached 60 s, ETag / 304. Calls list filters by outcome, sentiment, promise, summary, answered by and number.
+  - Recorded human calls are transcribed when the account asked (stereo split → speech segments → `stt` turns, rate card `sttPerMinuteMicros`); WhatsApp chat summaries on demand or on close.
+  - Fixed: the seeded promise call flaked under full-suite load. Tests: 3198 → 3275, coverage 96.11 / 87.53 / 95.88 / 97.64.
+
 - **Phase 13 · Batch 1 (T13.1–T13.4) — Meta 2026 changes, legal pages, deploy artifacts, ops tooling** — 2026-10-26
   - Embedded Signup v4 session info (`waacId` → channel `waacId` / `wabaKind`, migration `0014-meta-2026`), Graph API v26.0 by default, `account_review_update` / `account_alerts` kept as deferred events, Meta's account model audit in ADR 0037.
   - `GET /health` (also `/api/v1/health`) names the running build (`version`, `commit`, `builtAt` from `GIT_SHA` / `BUILT_AT`); `HOST` env (the API listens on loopback behind nginx); SIGTERM closes live WebSockets before draining HTTP (fixed: an open socket hit the 15 s shutdown timeout). Fixed: with `HOST` defaulting to 0.0.0.0 the API stopped answering on IPv6 (`localhost` = ::1) — `HOST` is optional again.

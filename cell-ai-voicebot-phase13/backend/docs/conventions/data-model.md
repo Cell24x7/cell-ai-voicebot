@@ -325,21 +325,22 @@ Indexes: `{ accountId, createdAt: -1 }`, `{ status, completedAt }`. Retention: f
 
 #### ExportJob (`exportJobs`) — Phase 3 (+ campaign results, Phase 8)
 
-| Field                  | Type                                                  | R   | Notes                                                           |
-| ---------------------- | ----------------------------------------------------- | --- | --------------------------------------------------------------- |
-| kind                   | `contacts \| campaign_results`                        | ✓   | Phase 8; default `contacts`                                     |
-| campaignId             | ObjectId \| null                                      |     | Campaign of a `campaign_results` export                         |
-| format                 | `csv \| xlsx`                                         | ✓   | Default `csv`                                                   |
-| includePhone           | boolean                                               | ✓   | Full phones (creator had `contacts.export`), else last 4 digits |
-| scope                  | `ids \| filter \| list \| segment \| campaign`        | ✓   | `campaign` for campaign results                                 |
-| filter                 | `ContactFilter`                                       | ✓   | Resolved at creation                                            |
-| columns                | string[]                                              | ✓   |                                                                 |
-| status                 | `pending \| processing \| ready \| failed \| expired` | ✓   |                                                                 |
-| progress               | `{ processed, total }`                                | ✓   |                                                                 |
-| rowCount               | number                                                | ✓   |                                                                 |
-| fileKey                | string \| null                                        |     | Hidden; CSV with PII                                            |
-| createdBy              | ObjectId → users                                      | ✓   |                                                                 |
-| completedAt, expiresAt | Date                                                  |     | File deleted at `expiresAt` (24 h)                              |
+| Field                  | Type                                                          | R   | Notes                                                           |
+| ---------------------- | ------------------------------------------------------------- | --- | --------------------------------------------------------------- |
+| kind                   | `contacts \| campaign_results \| calls \| messages \| report` | ✓   | Phase 8; default `contacts`; the last three Phase 14            |
+| campaignId             | ObjectId \| null                                              |     | Campaign of a `campaign_results` export                         |
+| format                 | `csv \| xlsx`                                                 | ✓   | Default `csv`                                                   |
+| includePhone           | boolean                                                       | ✓   | Full phones (creator had `contacts.export`), else last 4 digits |
+| scope                  | `ids \| filter \| list \| segment \| campaign \| records`     | ✓   | `campaign` for campaign results, `records` for Phase 14 exports |
+| includeSummary         | boolean                                                       |     | Phase 14 calls export: the AI summary column                    |
+| filter                 | `ContactFilter`                                               | ✓   | Resolved at creation                                            |
+| columns                | string[]                                                      | ✓   |                                                                 |
+| status                 | `pending \| processing \| ready \| failed \| expired`         | ✓   |                                                                 |
+| progress               | `{ processed, total }`                                        | ✓   |                                                                 |
+| rowCount               | number                                                        | ✓   |                                                                 |
+| fileKey                | string \| null                                                |     | Hidden; CSV with PII                                            |
+| createdBy              | ObjectId → users                                              | ✓   |                                                                 |
+| completedAt, expiresAt | Date                                                          |     | File deleted at `expiresAt` (24 h)                              |
 
 Indexes: `{ accountId, createdAt: -1 }`, `{ status, expiresAt }`.
 
@@ -994,6 +995,59 @@ Indexes: `{ accountId: 1, channelId: 1, contactId: 1 }` unique, `{ accountId: 1,
 - **Call (T12.8):** `billing.whatsapp.durationSource: meta \| ours \| null` (which talk time was charged) and `metaLatePulses` (reconcile: Meta's pulses when its duration arrived after we charged ours — margin report only, no money moves).
 
 ---
+
+### 2.11 Analytics (Phase 14)
+
+#### StatsDaily (`statsDaily`) — Phase 14
+
+Daily report rollups (ADR 0043, glossary `docs/analytics/METRICS.md`). Tenant-scoped, **no personal data** — whole-number counters only; kept 25 months (nightly job), never touched by raw-data purges.
+
+| Field    | Type                                                             | R   | Notes                                                    |
+| -------- | ---------------------------------------------------------------- | --- | -------------------------------------------------------- |
+| day      | `YYYY-MM-DD`                                                     | ✓   | Account timezone                                         |
+| channel  | `voice \| whatsapp \| money`                                     | ✓   |                                                          |
+| test     | boolean                                                          | ✓   | Test calls counted apart                                 |
+| kind     | `all \| campaign \| flow \| agent \| user \| template \| number` | ✓   | The slice                                                |
+| refId    | ObjectId \| null                                                 |     | Campaign / flow / AI agent / user / template / number id |
+| counters | Map<string, integer>                                             | ✓   | Metric key → value (micros for money, seconds for time)  |
+
+Indexes: `stats_row` `{ accountId, day, channel, test, kind, refId }` unique, `{ accountId, kind, refId, day }`, `{ day }` (retention).
+
+#### AnalyticsMark (`analyticsMarks`) — Phase 14
+
+`_id` = `<call | message | ledger>-<id>`; `entity`; `rows` (what that row has added to `statsDaily`: `{ day, channel, test, kind, refId, counters }[]`). The sweep applies `next − rows` and stores `next`; deleted with the raw row by the purge jobs.
+
+**Additions (Phase 14):** index `analytics_sweep` `{ updatedAt: 1, _id: 1 }` on `calls`, `messages`, `ledgerEntries`; `analytics_rebuild` `{ accountId: 1, at: 1, _id: 1 }` on `messages`; notification type `analytics.reconcile_mismatch` (superadmins).
+
+#### CallInsight (`callInsights`) — Phase 14
+
+Post-call AI results per call and version (ADR 0044). **PII:** `output.summary`, `output.keyInfo`. Kept and purged with the call.
+
+| Field                                                | Type                                                                                                     | R   | Notes                                                                             |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --- | --------------------------------------------------------------------------------- |
+| callId                                               | ObjectId                                                                                                 | ✓   |                                                                                   |
+| version                                              | number                                                                                                   | ✓   | 1 = automatic; each regenerate + 1 (all kept)                                     |
+| status                                               | `pending \| done \| skipped \| failed`                                                                   | ✓   |                                                                                   |
+| reason                                               | string \| null                                                                                           |     | `not_answered`, `too_short`, `low_balance`, `invalid_output`, `provider_error`, … |
+| output                                               | `{ summary, suggestedDisposition, sentiment { label, score }, keyInfo { … }, confidence { … } }` \| null |     | Amounts in micros (model answers rupees)                                          |
+| model, promptVersion                                 | string, number                                                                                           |     |                                                                                   |
+| inputTokens, outputTokens, costMicros, ledgerEntryId | numbers / ObjectId                                                                                       |     | Charged once per version (`insights-<callId>-v<n>`)                               |
+| createdBy                                            | ObjectId \| null                                                                                         |     | Who asked for a regenerate                                                        |
+
+Indexes: `{ accountId, callId, version }` unique, `{ accountId, createdAt: -1 }`.
+
+#### ConversationSummary (`conversationSummaries`) — Phase 14
+
+WhatsApp chat summaries (ADR 0044). **PII:** `summary`. Fields: `conversationId`, `status` (`pending | done | skipped | failed`), `reason`, `fromMessageId` / `toMessageId` / `messageCount` (what it covers — the next starts after `toMessageId`), `summary` (≤ 2,000), `model`, tokens, `costMicros`, `createdBy` (`null` = on close). Indexes `{ accountId, conversationId, createdAt: -1 }`, `{ createdAt: 1 }` (inbox retention).
+
+#### ReportSubscription (`reportSubscriptions`) — Phase 14
+
+Each person's report e-mails. No personal data besides `userId`. Fields: `userId`, `frequency` (`daily | weekly | monthly`), `tabs` (`overview | calls | whatsapp | campaigns | team`, ≥ 1), `hour` (0–23, account timezone), `active` (one-click unsubscribe sets `false`), `slot` (unique per account / user, 0–4), `lastSentPeriod` (`YYYY-MM-DD` / `W-<monday>` / `YYYY-MM`; checkpointed after enqueue so failures remain retryable; the queue deduplicates each period). ≤ 5 per person, enforced by a partial unique `{ accountId, userId, slot }` index during concurrent creates. Other indexes: `{ accountId, userId }`, `{ active }`.
+
+**Additions (Phase 14, retention):** Account `retention { recordingsDays, callsDays, inboxDays }` and `retentionCap { callsDays, inboxDays }` (superadmin), each field days or `null` (= platform default `CALL_RETENTION_DAYS` / `INBOX_RETENTION_DAYS`); both `null` by default, so existing accounts behave as before. Recordings ≤ calls. Purges: per account, batched (1 000), resumable; a recording-only purge sets `recording.deletedAt` and keeps the call, transcript and insights.
+
+**Additions (Phase 14, insights):** Rate card `sttPerMinuteMicros` (₹0.50 placeholder; migration 0016 sets it on existing cards). Call `recording.deletedAt`.
+Call `dispositionSource: flow | agent | user | ai | null`, `insights { status, reason, version, sentiment, hasPromise, promiseAmountMicros, hasSummary, at } | null` (no text; `null` = not reviewed yet), index `insights_due { 'timestamps.endedAt': 1 }` partial `insights = null`. Account `settings.insights { enabled (true), chatSummaryOnClose (false) }`, `settings.dispositions { key ([a-z0-9_], stable), label (≤ 40), active }[]` (8 defaults, ≤ 30). Ledger usage kinds + `insights`, `stt`, `chat_summary`.
 
 ## 3. Embedded vs separate collection
 

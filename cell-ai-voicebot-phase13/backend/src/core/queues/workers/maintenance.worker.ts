@@ -1,6 +1,8 @@
 import type { Job, Queue, Worker } from 'bullmq';
 
 import { getEnv } from '../../../config/env';
+import { reconcileAnalytics } from '../../../modules/analytics/reconcile';
+import { sweepAnalytics, type AnalyticsDeps } from '../../../modules/analytics/sweep';
 import { purgeAuditLogs } from '../../../modules/audit/audit-purge';
 import { purgeCalls, reapCalls } from '../../../modules/calls/maintenance';
 import { CallRegistry } from '../../../modules/calls/registry';
@@ -13,6 +15,7 @@ import { purgeDeletedAudio } from '../../../modules/flow-audio/flow-audio.servic
 import { purgeDeletedFlows } from '../../../modules/flows/maintenance';
 import { INBOX_RETENTION_CRON, INBOX_RETENTION_JOB } from '../../../modules/inbox/jobs';
 import { runInboxRetention } from '../../../modules/inbox/retention.job';
+import { sendDueReports } from '../../../modules/report-subscriptions/report-subscriptions.service';
 import { purgeWebhookEvents } from '../../../modules/whatsapp/webhook-processor';
 import type { StorageProvider } from '../../storage';
 import { purgeTtsCache } from '../../voice/tts-cache';
@@ -35,6 +38,12 @@ export const CALLS_PURGE_JOB = 'calls-purge';
 export const TTS_CACHE_PURGE_JOB = 'tts-cache-purge';
 /** Expired Meta webhook events (backup of the TTL index, Phase 9). */
 export const WHATSAPP_EVENTS_PURGE_JOB = 'whatsapp-events-purge';
+/** Phase 14: counts changed calls / messages / ledger rows into the report rollups. */
+export const ANALYTICS_SWEEP_JOB = 'analytics-sweep';
+/** Phase 14: nightly recount of the last days from raw rows (+ rollup retention). */
+export const ANALYTICS_RECONCILE_JOB = 'analytics-reconcile';
+/** Phase 14: e-mailed reports due this hour (account-local hour, :05 past). */
+export const REPORTS_EMAIL_JOB = 'reports-email';
 
 /** Repeatable maintenance jobs (UTC crons). */
 export const MAINTENANCE_SCHEDULES = [
@@ -48,13 +57,21 @@ export const MAINTENANCE_SCHEDULES = [
   { name: TTS_CACHE_PURGE_JOB, pattern: '20 5 * * *' },
   { name: WHATSAPP_EVENTS_PURGE_JOB, pattern: '40 5 * * *' },
   { name: INBOX_RETENTION_JOB, pattern: INBOX_RETENTION_CRON },
+  { name: ANALYTICS_SWEEP_JOB, pattern: '* * * * *' },
+  { name: ANALYTICS_RECONCILE_JOB, pattern: '30 2 * * *' },
+  { name: REPORTS_EMAIL_JOB, pattern: '5 * * * *' },
 ] as const;
 
 export interface MaintenanceDeps extends Pick<QueueFactoryDeps, 'logger'> {
   storage?: StorageProvider;
   /** Live-call registry (calls reaper); default from REDIS_URL. */
   registry?: CallRegistry;
+  /** Analytics lock + watermarks (tests: a prefixed client); default from REDIS_URL. */
+  analytics?: Pick<AnalyticsDeps, 'redis' | 'prefix'>;
 }
+
+const analyticsDeps = (deps: MaintenanceDeps): Pick<AnalyticsDeps, 'redis' | 'prefix'> =>
+  deps.analytics ?? { redis: getAppRedis(getEnv().REDIS_URL, deps.logger) };
 
 const needStorage = (deps: MaintenanceDeps): StorageProvider => {
   if (!deps.storage) throw new Error('Maintenance job needs file storage');
@@ -102,10 +119,34 @@ export const processMaintenanceJob =
       case INBOX_RETENTION_JOB:
         result = { ...(await runInboxRetention(needStorage(deps), getEnv().INBOX_RETENTION_DAYS)) };
         break;
+      case ANALYTICS_SWEEP_JOB:
+        result = await sweepAnalytics(analyticsDeps(deps));
+        break;
+      case ANALYTICS_RECONCILE_JOB:
+        result = await reconcileAnalytics({
+          ...analyticsDeps(deps),
+          logger: deps.logger,
+          retention: {
+            callsDays: getEnv().CALL_RETENTION_DAYS,
+            inboxDays: getEnv().INBOX_RETENTION_DAYS,
+          },
+        });
+        break;
+      case REPORTS_EMAIL_JOB:
+        result = await sendDueReports({
+          appUrl: getEnv().FRONTEND_URL,
+          apiUrl: getEnv().APP_URL,
+          logger: deps.logger,
+        });
+        break;
       default:
         throw new Error(`Unknown maintenance job "${job.name}"`);
     }
-    deps.logger.info({ job: job.name, ...result }, 'maintenance: done');
+    // the minute sweep logs only when it counted something
+    const quiet =
+      job.name === ANALYTICS_SWEEP_JOB &&
+      !Object.entries(result).some(([k, v]) => k.endsWith('Changed') && v > 0);
+    if (!quiet) deps.logger.info({ job: job.name, ...result }, 'maintenance: done');
     return result;
   };
 

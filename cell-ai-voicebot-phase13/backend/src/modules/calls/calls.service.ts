@@ -148,6 +148,17 @@ export const toCallView = (c: CallDoc, names: Names) => {
     variables: { ...c.variables },
     outcome: { ...c.outcome },
     disposition: c.disposition,
+    dispositionSource: c.dispositionSource ?? null,
+    insights: c.insights
+      ? {
+          status: c.insights.status,
+          reason: c.insights.reason,
+          sentiment: c.insights.sentiment,
+          hasPromise: c.insights.hasPromise,
+          promiseAmountMicros: c.insights.promiseAmountMicros,
+          hasSummary: c.insights.hasSummary,
+        }
+      : null,
     languageDetected: c.languageDetected,
     metrics: {
       ...(c.metrics.whatsapp ? { whatsapp: { ...c.metrics.whatsapp } } : {}),
@@ -160,7 +171,12 @@ export const toCallView = (c: CallDoc, names: Names) => {
     },
     cost: { ...c.cost },
     recording: c.recording
-      ? { durationSec: c.recording.durationSec, sizeBytes: c.recording.sizeBytes }
+      ? {
+          durationSec: c.recording.durationSec,
+          sizeBytes: c.recording.sizeBytes,
+          // Phase 14 retention: the file is gone, the call stays
+          deletedAt: c.recording.deletedAt?.toISOString() ?? null,
+        }
       : null,
     flowRunId: c.flowRunId?.toString() ?? null,
     error: c.error ? { code: c.error.code } : null,
@@ -255,8 +271,11 @@ export const startWebCall = async (
   };
 };
 
-export const listCalls = async (req: Request, query: z.infer<typeof ListCallsQuery>) => {
-  const { accountId } = tenantFilter(req);
+/** The Mongo filter of a calls list / calls export (everything but the page cursor). */
+export const callsFilter = async (
+  accountId: Types.ObjectId,
+  query: Omit<z.infer<typeof ListCallsQuery>, 'cursor' | 'limit'>,
+): Promise<Record<string, unknown>> => {
   const filter: Record<string, unknown> = { accountId };
   if (query.status) filter.status = { $in: query.status };
   if (query.flowId) filter['source.flowId'] = new Types.ObjectId(query.flowId);
@@ -266,6 +285,18 @@ export const listCalls = async (req: Request, query: z.infer<typeof ListCallsQue
   if (query.provider) filter.provider = query.provider;
   if (query.direction) filter.direction = query.direction;
   if (query.mode) filter.mode = query.mode;
+  // Phase 14 record filters
+  if (query.disposition) filter.disposition = { $in: query.disposition };
+  if (query.sentiment) filter['insights.sentiment'] = query.sentiment;
+  if (query.hasPromise !== undefined)
+    filter['insights.hasPromise'] = query.hasPromise ? true : { $ne: true };
+  if (query.hasSummary !== undefined)
+    filter['insights.hasSummary'] = query.hasSummary ? true : { $ne: true };
+  if (query.channelId) filter['whatsapp.channelId'] = new Types.ObjectId(query.channelId);
+  if (query.answeredBy) {
+    const by = new Types.ObjectId(query.answeredBy);
+    filter.$and = [{ $or: [{ 'whatsapp.answeredBy': by }, { agentUserId: by }] }];
+  }
   const at: Record<string, Date> = {};
   if (query.from) at.$gte = new Date(query.from);
   if (query.to) at.$lt = new Date(query.to);
@@ -282,6 +313,12 @@ export const listCalls = async (req: Request, query: z.infer<typeof ListCallsQue
       .filter((id) => !query.contactId || id.toString() === query.contactId);
     filter.contactId = { $in: ids };
   }
+  return filter;
+};
+
+export const listCalls = async (req: Request, query: z.infer<typeof ListCallsQuery>) => {
+  const { accountId } = tenantFilter(req);
+  const filter = await callsFilter(accountId, query);
   if (query.cursor) {
     const c = decodeCursor(query.cursor);
     const cAt = new Date(c.at);
@@ -356,6 +393,8 @@ export const callEvents = async (req: Request, id: string) => {
 export const recordingLink = async (req: Request, id: string, deps: Pick<CallsDeps, 'storage'>) => {
   const call = await findCall(tenantFilter(req).accountId, id);
   if (!call.recording || !deps.storage) throw new NotFoundError('This call has no recording');
+  if (call.recording.deletedAt)
+    throw new NotFoundError('This recording was deleted under the account’s retention setting');
   const ttl = CALL_LIMITS.recordingUrlTtlSec;
   const url = await deps.storage.signedUrl(call.recording.fileKey, { expiresInSec: ttl });
   await auditRequest(req, 'call.recording_accessed', { target: { type: 'call', id } });

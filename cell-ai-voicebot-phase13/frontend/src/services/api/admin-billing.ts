@@ -30,6 +30,8 @@ export interface RateCardInput {
   /** Phase 5 — AI text and embedding prices per 1,000 tokens. */
   aiTextPer1kTokensMicros: number;
   embeddingPer1kTokensMicros: number;
+  /** Phase 14 — transcribing recorded human calls, per minute. */
+  sttPerMinuteMicros: number;
   note?: string | null;
 }
 

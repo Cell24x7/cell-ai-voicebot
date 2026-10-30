@@ -26,6 +26,8 @@ export const fakeCall = (overrides: Partial<Call> = {}): Call => ({
   variables: { name: 'Asha Verma' },
   outcome: { disposition: 'paid' },
   disposition: 'paid',
+  dispositionSource: null,
+  insights: null,
   languageDetected: 'hi',
   metrics: {
     latency: { p50Ms: 820, p95Ms: 1400, maxMs: 1600, samples: 4 },
@@ -42,7 +44,7 @@ export const fakeCall = (overrides: Partial<Call> = {}): Call => ({
     commissionMicros: 295_000,
     totalMicros: 895_000,
   },
-  recording: { durationSec: 26, sizeBytes: 793_004 },
+  recording: { durationSec: 26, sizeBytes: 793_004, deletedAt: null },
   flowRunId: 'r1',
   error: null,
   createdAt: '2026-10-15T10:00:00.000Z',

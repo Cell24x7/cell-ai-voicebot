@@ -84,7 +84,7 @@ test('data deletion request → confirmation code → public status page', async
   await page.goto(url);
   await expect(page.getByRole('heading', { name: 'Data deletion' })).toBeVisible();
   await expect(page.getByText(new RegExp(`Request ${code}: completed`))).toBeVisible();
-  await expect(page.getByText(/Remove the Cell AI Voicebot app in Facebook/)).toBeVisible();
+  await expect(page.getByText(/Remove the NotifyNow app in Facebook/)).toBeVisible();
   await page.goto('/data-deletion?code=AAAAAAAAAAAAAAAA');
   await expect(page.getByText(/couldn't find a deletion request/)).toBeVisible();
 });

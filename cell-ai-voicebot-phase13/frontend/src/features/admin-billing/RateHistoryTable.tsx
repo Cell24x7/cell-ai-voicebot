@@ -58,6 +58,12 @@ export function RateHistoryTable({
       render: (r) => (r.inheritsDefault ? '—' : formatCurrencyMicros(r.embeddingPer1kTokensMicros)),
     },
     {
+      key: 'stt',
+      header: 'Transcription / min',
+      align: 'right',
+      render: (r) => (r.inheritsDefault ? '—' : formatCurrencyMicros(r.sttPerMinuteMicros)),
+    },
+    {
       key: 'commission',
       header: 'Commission',
       align: 'right',

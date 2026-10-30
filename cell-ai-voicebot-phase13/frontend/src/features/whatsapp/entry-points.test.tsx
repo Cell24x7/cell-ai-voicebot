@@ -15,6 +15,7 @@ import { whatsappApi } from '@/services/api/whatsapp';
 import { fakeSession, signInAs } from '@/test/auth';
 import { fakeWaCall } from '@/test/calls-wa';
 import { renderWithProviders } from '@/test/render';
+import { fakeRetention } from '@/test/retention';
 import { fakeAdminWhatsAppStatus, fakeChannel, fakeWhatsAppConfig } from '@/test/whatsapp';
 
 import { WhatsAppDashboardCard } from './WhatsAppDashboardCard';
@@ -58,6 +59,7 @@ const detail = (over: Partial<AdminAccountDetail> = {}): AdminAccountDetail => (
   owner: base.user as AdminAccountDetail['owner'],
   usersCount: 1,
   usersByStatus: { active: 1, invited: 0, disabled: 0 },
+  retention: fakeRetention(),
   limits: { maxConcurrentCalls: 10, dialsPerMinute: 60 },
   activeCampaigns: 0,
   adminPausedCampaigns: [],

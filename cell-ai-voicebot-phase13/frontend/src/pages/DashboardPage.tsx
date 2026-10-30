@@ -12,6 +12,9 @@ import { SystemInfoCard } from '@/features/system/SystemInfoCard';
 import { useHasWallet } from '@/features/wallet/queries';
 import { WalletCard } from '@/features/wallet/WalletCard';
 
+const DashboardKpis = lazy(async () => ({
+  default: (await import('@/features/reports/DashboardKpis')).DashboardKpis,
+}));
 const CampaignsCard = lazy(async () => ({
   default: (await import('@/features/campaigns/CampaignsCard')).CampaignsCard,
 }));
@@ -29,10 +32,18 @@ export function DashboardPage() {
   const canSeeCampaigns = usePermission('campaigns.read');
   const canSeeWhatsApp = usePermission('whatsapp.read');
   const canSeeInbox = usePermission('inbox.read');
+  const canSeeReports = usePermission('reports.read');
   return (
     <>
       <PageHeader title="Dashboard" subtitle={`Welcome, ${session?.user.name ?? ''}`} />
       <Grid container spacing={2}>
+        {canSeeReports && (
+          <Grid size={12}>
+            <Suspense fallback={<Skeleton variant="rounded" height={120} />}>
+              <DashboardKpis />
+            </Suspense>
+          </Grid>
+        )}
         <Grid size={{ xs: 12, md: 6 }}>
           <Card variant="outlined">
             <CardContent>

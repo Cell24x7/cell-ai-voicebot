@@ -19,18 +19,17 @@ import { Link as RouterLink, useSearchParams } from 'react-router';
 import { DataTable, type Column } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { RelativeTime } from '@/components/RelativeTime';
-import { usePermission } from '@/features/auth/hooks';
+import { useCan, usePermission } from '@/features/auth/hooks';
 import { useAuthStore } from '@/features/auth/store';
-import {
-  dispositionLabel,
-  END_REASON_LABELS,
-  STATUS_LABELS,
-  statusColor,
-} from '@/features/calls/labels';
+import { END_REASON_LABELS, STATUS_LABELS, statusColor } from '@/features/calls/labels';
 import { useCallLiveUpdates, useCalls, useCanTriggerCalls } from '@/features/calls/queries';
 import { useCampaigns } from '@/features/campaigns/queries';
+import { SENTIMENT_LABELS, sentimentColor, type SentimentLabel } from '@/features/insights/labels';
+import { outcomeLabel, useDispositions } from '@/features/insights/queries';
+import { RecordExportButton } from '@/features/reports/RecordExportButton';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import type { ListCallsQuery } from '@/services/api/calls';
+import { recordExportsApi } from '@/services/api/record-exports';
 import type { Call } from '@/services/api/types';
 import { shiftYmd, startOfDayIso } from '@/utils/datetime';
 import { formatCurrencyMicros } from '@/utils/format';
@@ -78,6 +77,15 @@ export function CallsPage() {
   const mode = params.get('mode');
   const whatsapp = provider === 'whatsapp';
   const campaignId = params.get('campaignId') ?? '';
+  // Phase 14 record filters
+  const outcomes = (params.get('disposition') ?? '')
+    .split(',')
+    .filter((d) => /^[a-z0-9_]{1,40}$/.test(d));
+  const sentiment = params.get('sentiment');
+  const isSentiment = (v: string | null): v is SentimentLabel =>
+    v !== null && v in SENTIMENT_LABELS;
+  const promiseOnly = params.get('promise') === '1';
+  const dispositions = useDispositions();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDebouncedValue(search.trim(), 300);
 
@@ -104,6 +112,9 @@ export function CallsPage() {
     ...(params.get('agentId') ? { agentId: params.get('agentId') ?? '' } : {}),
     ...(params.get('contactId') ? { contactId: params.get('contactId') ?? '' } : {}),
     ...(campaignId ? { campaignId } : {}),
+    ...(outcomes.length ? { disposition: outcomes } : {}),
+    ...(isSentiment(sentiment) ? { sentiment } : {}),
+    ...(promiseOnly ? { hasPromise: true } : {}),
     ...(isProvider(provider) ? { provider } : {}),
     ...(whatsapp && (direction === 'inbound' || direction === 'outbound') ? { direction } : {}),
     ...(whatsapp && (mode === 'human' || mode === 'ai') ? { mode } : {}),
@@ -111,6 +122,9 @@ export function CallsPage() {
     ...(to ? { to: startOfDayIso(shiftYmd(to, 1), timezone) } : {}),
   };
   const calls = useCalls(query);
+  const can = useCan();
+  // the export takes the same filters, with days instead of instants
+  const { limit: _limit, from: _from, to: _to, ...exportFilters } = query;
   const filtered =
     status.length > 0 ||
     testOnly ||
@@ -118,6 +132,9 @@ export function CallsPage() {
     Boolean(from) ||
     Boolean(to) ||
     Boolean(campaignId) ||
+    outcomes.length > 0 ||
+    isSentiment(sentiment) ||
+    promiseOnly ||
     isProvider(provider);
 
   const columns: Column<Call>[] = [
@@ -166,8 +183,25 @@ export function CallsPage() {
     {
       key: 'result',
       header: 'Result',
-      render: (c) =>
-        dispositionLabel(c.disposition) ?? (c.endReason ? END_REASON_LABELS[c.endReason] : '—'),
+      render: (c) => (
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          <span>
+            {outcomeLabel(c.disposition, dispositions.data) ??
+              (c.endReason ? END_REASON_LABELS[c.endReason] : '—')}
+          </span>
+          {c.insights?.hasPromise && (
+            <Chip size="small" color="success" variant="outlined" label="Promise" />
+          )}
+          {c.insights?.sentiment && c.insights.sentiment !== 'neutral' && (
+            <Chip
+              size="small"
+              variant="outlined"
+              color={sentimentColor(c.insights.sentiment)}
+              label={SENTIMENT_LABELS[c.insights.sentiment]}
+            />
+          )}
+        </Stack>
+      ),
     },
     {
       key: 'duration',
@@ -189,16 +223,45 @@ export function CallsPage() {
         title="Calls"
         subtitle="Test calls and their recordings, transcripts and costs"
         actions={
-          canTrigger ? (
-            <Button
-              variant="contained"
-              startIcon={<AddIcCallOutlined />}
-              component={RouterLink}
-              to="/calls/test"
-            >
-              New test call
-            </Button>
-          ) : undefined
+          <Stack direction="row" spacing={1}>
+            {can('calls.export') && (
+              <RecordExportButton
+                title="Export calls"
+                note="Exports the calls matching the filters on this page (up to 200,000)."
+                options={[
+                  {
+                    key: 'includePhone',
+                    label: 'Full phone numbers',
+                    disabled: !can('contacts.export'),
+                    help: can('contacts.export')
+                      ? undefined
+                      : 'Numbers are shortened — full numbers need the contacts export permission.',
+                  },
+                  { key: 'includeSummary', label: 'AI summaries' },
+                ]}
+                start={(format, chosen) =>
+                  recordExportsApi.calls({
+                    ...exportFilters,
+                    format,
+                    ...(from ? { from } : {}),
+                    ...(to ? { to } : {}),
+                    includePhone: Boolean(chosen.includePhone),
+                    includeSummary: Boolean(chosen.includeSummary),
+                  })
+                }
+              />
+            )}
+            {canTrigger && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcCallOutlined />}
+                component={RouterLink}
+                to="/calls/test"
+              >
+                New test call
+              </Button>
+            )}
+          </Stack>
         }
       />
       <Stack spacing={2}>
@@ -335,6 +398,57 @@ export function CallsPage() {
               ))}
             </TextField>
           )}
+          <TextField
+            select
+            label="Outcome"
+            size="small"
+            sx={{ minWidth: 180 }}
+            value={outcomes}
+            slotProps={{
+              select: {
+                multiple: true,
+                displayEmpty: true,
+                renderValue: (v) =>
+                  (v as string[]).length
+                    ? (v as string[]).map((k) => outcomeLabel(k, dispositions.data)).join(', ')
+                    : 'All',
+              },
+              inputLabel: { shrink: true },
+            }}
+            onChange={(e) => set('disposition', (e.target.value as unknown as string[]).join(','))}
+          >
+            {(dispositions.data ?? []).map((d) => (
+              <MenuItem key={d.key} value={d.key}>
+                <Checkbox size="small" checked={outcomes.includes(d.key)} />
+                <ListItemText primary={d.label} />
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Customer mood"
+            size="small"
+            sx={{ minWidth: 150 }}
+            value={isSentiment(sentiment) ? sentiment : ''}
+            onChange={(e) => set('sentiment', e.target.value)}
+            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+          >
+            <MenuItem value="">Any</MenuItem>
+            {(Object.keys(SENTIMENT_LABELS) as SentimentLabel[]).map((k) => (
+              <MenuItem key={k} value={k}>
+                {SENTIMENT_LABELS[k]}
+              </MenuItem>
+            ))}
+          </TextField>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={promiseOnly}
+                onChange={(e) => set('promise', e.target.checked ? '1' : null)}
+              />
+            }
+            label="Promise to pay"
+          />
           <FormControlLabel
             control={
               <Switch

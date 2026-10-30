@@ -20,7 +20,17 @@ const CallsTab = lazy(async () => ({
   default: (await import('@/features/settings/CallsTab')).CallsTab,
 }));
 
+// Phase 14: AI & outcomes
+const InsightsSettingsTab = lazy(async () => ({
+  default: (await import('@/features/insights/InsightsSettingsTab')).InsightsSettingsTab,
+}));
 // the inbox tab needs the inbox hooks → its own chunk
+const RetentionTab = lazy(async () => ({
+  default: (await import('@/features/settings/RetentionTab')).RetentionTab,
+}));
+const NotificationsTab = lazy(async () => ({
+  default: (await import('@/features/settings/NotificationsTab')).NotificationsTab,
+}));
 const InboxSettingsTab = lazy(async () => ({
   default: (await import('@/features/settings/InboxSettingsTab')).InboxSettingsTab,
 }));
@@ -31,6 +41,19 @@ const TABS = [
   { key: 'account', label: 'Account', Component: AccountTab, permission: 'account.read' },
   { key: 'calls', label: 'Calls', Component: CallsTab, permission: 'account.read' },
   { key: 'inbox', label: 'Inbox', Component: InboxSettingsTab, permission: 'account.read' },
+  { key: 'ai', label: 'AI & outcomes', Component: InsightsSettingsTab, permission: 'account.read' },
+  {
+    key: 'retention',
+    label: 'Data retention',
+    Component: RetentionTab,
+    permission: 'account.read',
+  },
+  {
+    key: 'notifications',
+    label: 'Notifications',
+    Component: NotificationsTab,
+    permission: 'reports.read',
+  },
   { key: 'billing', label: 'Billing details', Component: BillingTab, permission: 'wallet.read' },
   { key: 'api-keys', label: 'API keys', Component: ApiKeysTab, permission: 'apikeys.read' },
   { key: 'audit', label: 'Audit log', Component: AuditTab, permission: 'audit.read' },

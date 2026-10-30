@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { callsApi } from '@/services/api/calls';
 import { campaignsApi } from '@/services/api/campaigns';
 import { ApiError } from '@/services/api/errors';
+import { insightsApi } from '@/services/api/insights';
 import { signInAs } from '@/test/auth';
 import { fakeCall, fakeEvents, fakeTranscript } from '@/test/calls';
 import { fakeCampaignListItem } from '@/test/campaigns';
@@ -24,6 +25,23 @@ vi.mock('@/services/api/calls', () => ({
 }));
 
 vi.mock('@/services/api/campaigns', () => ({ campaignsApi: { list: vi.fn() } }));
+vi.mock('@/services/api/insights', () => ({
+  insightsApi: {
+    get: vi.fn(() =>
+      Promise.resolve({
+        callId: 'c1',
+        status: null,
+        reason: null,
+        disposition: null,
+        dispositionSource: null,
+        latest: null,
+        history: [],
+        canRegenerate: false,
+      }),
+    ),
+    dispositions: vi.fn(() => Promise.resolve({ dispositions: [] })),
+  },
+}));
 
 const api = vi.mocked(callsApi);
 const page = (data: ReturnType<typeof fakeCall>[], nextCursor: string | null = null) => ({
@@ -147,6 +165,76 @@ describe('/calls list', () => {
     expect(screen.getByRole('textbox', { name: 'Contact name' })).toHaveValue('');
   });
 
+  it('record filters (outcome, mood, promise) come from the URL; results show outcome labels and chips', async () => {
+    const user = userEvent.setup();
+    signInAs('owner');
+    vi.mocked(insightsApi.dispositions).mockResolvedValue({
+      dispositions: [
+        { key: 'promise_to_pay', label: 'PTP', active: true },
+        { key: 'callback', label: 'Call back', active: true },
+      ],
+    });
+    api.list.mockResolvedValue(
+      page([
+        fakeCall({
+          disposition: 'promise_to_pay',
+          insights: {
+            status: 'done',
+            reason: null,
+            sentiment: 'negative',
+            hasPromise: true,
+            promiseAmountMicros: 1_000_000,
+            hasSummary: true,
+          },
+        }),
+        fakeCall({
+          id: 'c2',
+          disposition: null,
+          endReason: 'no_answer',
+          insights: {
+            status: 'done',
+            reason: null,
+            sentiment: 'neutral',
+            hasPromise: false,
+            promiseAmountMicros: null,
+            hasSummary: true,
+          },
+        }),
+      ]),
+    );
+    renderWithProviders({
+      route: '/calls?disposition=promise_to_pay,Bad!&sentiment=negative&promise=1',
+    });
+    const table = await screen.findByRole('table', { name: 'Calls' });
+    expect(await within(table).findByText('PTP')).toBeInTheDocument();
+    expect(within(table).getByText('Promise')).toBeInTheDocument();
+    expect(within(table).getByText('Negative')).toBeInTheDocument();
+    expect(within(table).queryByText('Neutral')).not.toBeInTheDocument();
+    expect(api.list).toHaveBeenCalledWith({
+      limit: 25,
+      disposition: ['promise_to_pay'],
+      sentiment: 'negative',
+      hasPromise: true,
+    });
+    expect(screen.getByRole('combobox', { name: 'Outcome' })).toHaveTextContent('PTP');
+    await user.click(screen.getByRole('combobox', { name: 'Outcome' }));
+    await user.click(await screen.findByRole('option', { name: 'Call back' }));
+    await waitFor(() =>
+      expect(api.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ disposition: ['promise_to_pay', 'callback'] }),
+      ),
+    );
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('combobox', { name: 'Customer mood' }));
+    await user.click(await screen.findByRole('option', { name: 'Any' }));
+    await user.click(screen.getByRole('switch', { name: 'Promise to pay' }));
+    await waitFor(() =>
+      expect(api.list).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ hasPromise: true, sentiment: 'negative' }),
+      ),
+    );
+  });
+
   it('the status filter (multi select) and live updates', async () => {
     const user = userEvent.setup();
     signInAs('owner');
@@ -233,6 +321,38 @@ describe('/calls campaign entry points', () => {
 });
 
 describe('/calls/:id detail', () => {
+  it('a transcribed team call: "Team member" lines from the recording; the AI insights card', async () => {
+    signInAs('viewer');
+    api.get.mockResolvedValue(fakeCall({ provider: 'whatsapp', mode: 'human' }));
+    api.transcript.mockResolvedValue([
+      {
+        seq: 1,
+        speaker: 'customer',
+        text: 'Hello ji',
+        language: null,
+        startMs: 500,
+        endMs: 1500,
+        interrupted: false,
+        source: 'stt',
+      },
+      {
+        seq: 2,
+        speaker: 'agent',
+        text: 'Namaste',
+        language: null,
+        startMs: 2000,
+        endMs: 3000,
+        interrupted: false,
+        source: 'stt',
+      },
+    ]);
+    renderWithProviders({ route: '/calls/c1' });
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    expect(await within(transcript).findByText('Team member')).toBeInTheDocument();
+    expect(within(transcript).getAllByText('from the recording')).toHaveLength(2);
+    expect(await screen.findByRole('region', { name: 'AI insights' })).toBeInTheDocument();
+  });
+
   it('summary, outcome, cost, quality, timeline and transcript; recording on demand with seek', async () => {
     const user = userEvent.setup();
     signInAs('agent');
@@ -297,6 +417,20 @@ describe('/calls/:id detail', () => {
     fireEvent.error(screen.getByLabelText('Call recording'));
     expect(await screen.findByText('The recording could not be played.')).toBeInTheDocument();
     play.mockRestore();
+  });
+
+  it('a recording deleted by the retention setting: no player, a note, the transcript stays', async () => {
+    signInAs('owner');
+    api.get.mockResolvedValue(
+      fakeCall({
+        recording: { durationSec: 26, sizeBytes: 793_004, deletedAt: '2026-10-20T01:00:00.000Z' },
+      }),
+    );
+    renderWithProviders({ route: '/calls/c1' });
+    expect(await screen.findByText(/The recording was deleted on/)).toBeInTheDocument();
+    expect(screen.getByText(/data retention setting/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load recording' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Transcript' })).toBeInTheDocument();
   });
 
   it('viewers see no player; recording link errors show; agent source and typed values', async () => {

@@ -14,6 +14,8 @@ import { inboxMigration } from './0011-inbox';
 import { templatesBillingMigration } from './0012-templates-billing';
 import { whatsappCallingMigration } from './0013-whatsapp-calling';
 import { meta2026Migration } from './0014-meta-2026';
+import { analyticsMigration } from './0015-analytics';
+import { insightsMigration } from './0016-insights';
 
 /** Ordered migration registry. Add new files here (no fs globbing — keeps builds simple). */
 export const MIGRATIONS: Migration[] = [
@@ -31,4 +33,6 @@ export const MIGRATIONS: Migration[] = [
   templatesBillingMigration,
   whatsappCallingMigration,
   meta2026Migration,
+  analyticsMigration,
+  insightsMigration,
 ];

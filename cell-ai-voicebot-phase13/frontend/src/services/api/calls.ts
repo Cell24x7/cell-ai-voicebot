@@ -44,12 +44,29 @@ export interface ListCallsQuery {
   from?: string;
   to?: string;
   q?: string;
+  /** Phase 14 record filters. */
+  disposition?: string[];
+  sentiment?: 'positive' | 'neutral' | 'negative';
+  hasPromise?: boolean;
+  hasSummary?: boolean;
+  answeredBy?: string;
+  channelId?: string;
 }
 
-const listParams = ({ status, isTest, ...rest }: ListCallsQuery) => ({
+const listParams = ({
+  status,
+  isTest,
+  disposition,
+  hasPromise,
+  hasSummary,
+  ...rest
+}: ListCallsQuery) => ({
   ...rest,
   ...(status?.length ? { status: status.join(',') } : {}),
   ...(isTest === undefined ? {} : { isTest: String(isTest) }),
+  ...(disposition?.length ? { disposition: disposition.join(',') } : {}),
+  ...(hasPromise === undefined ? {} : { hasPromise: String(hasPromise) }),
+  ...(hasSummary === undefined ? {} : { hasSummary: String(hasSummary) }),
 });
 
 /** `/api/v1/calls` — browser test calls, history, transcripts, recordings. */

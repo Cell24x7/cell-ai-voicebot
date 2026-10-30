@@ -45,6 +45,11 @@ import './modules/inbox/inbox.openapi';
 import './modules/whatsapp-billing/whatsapp-billing.openapi';
 import './modules/templates/templates.openapi';
 import './modules/whatsapp-calling/calling.openapi';
+import './modules/insights/insights.schema';
+import './modules/reports/reports.schema';
+import './modules/record-exports/record-exports.schema';
+import './modules/report-subscriptions/report-subscriptions.schema';
+import './modules/retention/retention.schema';
 
 type OpenApiDocument = ReturnType<OpenApiGeneratorV31['generateDocument']>;
 
@@ -61,7 +66,7 @@ export const buildOpenApiDocument = ({
   new OpenApiGeneratorV31(registry.definitions).generateDocument({
     openapi: '3.1.0',
     info: {
-      title: 'Cell AI Voicebot API',
+      title: 'NotifyNow API',
       version: getAppInfo().version,
       description:
         'Multi-tenant AI voice calling platform API. Conventions: docs/conventions/api.md.',

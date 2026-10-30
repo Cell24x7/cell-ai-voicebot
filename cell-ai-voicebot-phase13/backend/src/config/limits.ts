@@ -531,3 +531,62 @@ export const WHATSAPP_CALL_LIMITS = {
   ringTargetsMax: 50,
   sdpMaxBytes: 16_384,
 } as const;
+
+/** Reports + analytics rollups (Phase 14, PHASE_14_PROMPT §1). */
+export const REPORT_LIMITS = {
+  maxRangeDays: 366,
+  cacheTtlSec: 60,
+  tableMaxRows: 500,
+  exportMaxRows: 200_000,
+  rollupRetentionMonths: 25,
+  reconcileDays: 3,
+  subscriptionsPerUser: 5,
+  slowReportMs: 1_500,
+  /** Changed entities per sweep batch (one transaction per batch). */
+  sweepBatch: 500,
+  /** The sweep re-reads this much before its watermark (late commits; idempotent). */
+  sweepOverlapSec: 120,
+  /** One analytics writer at a time (sweep, reconcile, rebuild CLI). */
+  lockTtlSec: 600,
+  /** Rebuilds read raw rows from this many days around the range (replies, refunds). */
+  rebuildMarginDays: 2,
+} as const;
+
+/** Call-duration buckets (seconds, lower bounds) for medians without raw rows. */
+export const DURATION_BUCKETS_SEC = [0, 15, 30, 60, 120, 300, 600, 1_800] as const;
+/** First-response buckets (seconds, lower bounds). */
+export const RESPONSE_BUCKETS_SEC = [0, 60, 300, 900, 3_600, 14_400, 86_400] as const;
+
+/** Post-call AI insights + chat summaries (Phase 14, PHASE_14_PROMPT §1). */
+export const INSIGHTS_LIMITS = {
+  minCustomerTurns: 2,
+  maxTranscriptChars: 24_000,
+  summaryMaxChars: 600,
+  maxOutputTokens: 800,
+  retries: 1,
+  chatMaxMessages: 200,
+  /** Recorded calls are cut into speech segments (one transcript turn each). */
+  sttSegmentMaxSec: 30,
+  sttSegmentMinMs: 300,
+  sttMaxSegments: 400,
+  /** Calls ended at least this long ago are picked up (recording upload, last turns). */
+  settleSec: 15,
+  /** The insights sweep looks back this far when it has no watermark. */
+  sweepLookbackHours: 24,
+  sweepBatch: 200,
+  dispositionsMax: 30,
+  dispositionLabelMax: 40,
+  /** Key information below this confidence is shown as "unsure". */
+  lowConfidence: 0.6,
+} as const;
+
+/** Per-account retention (Phase 14, PHASE_14_PLAN §1h). Maximums come from the env defaults. */
+export const RETENTION_LIMITS = {
+  callsMinDays: 7,
+  inboxMinDays: 30,
+  recordingsMinDays: 1,
+  /** Upper bound when the platform keeps chats forever (`INBOX_RETENTION_DAYS=0`). */
+  maxDays: 3650,
+  /** Rows per purge batch (resumable: each batch is deleted before the next is read). */
+  purgeBatch: 1000,
+} as const;

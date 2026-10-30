@@ -6,6 +6,17 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Phase 14 · Batch 3 (T14.9–T14.10) — end-to-end checks** — 2026-10-28
+  - Phase 14 complete (sign-off in the backend repo, `docs/phases/PHASE_14_SIGNOFF.md`): tests 1386 (96.21 / 92.12 / 93.82 / 96.96), Playwright 158 / 158.
+  - Playwright `reports-insights.spec.ts` (insights state on a call, outcome change → calls report, calls export file, report e-mail through Mailpit + its unsubscribe link, retention purge → "recording deleted", viewer / agent views) and `insights-chat.spec.ts` (chat summary, chat retention); helpers `e2e/reports.ts`. Suite 151 → 158.
+
+- **Phase 14 · Batch 2 (T14.5–T14.8) — call insights, reports, exports, report e-mails, data retention** — 2026-10-27
+  - Call detail: AI insights card (summary, outcome with who set it, mood, promise date / amount, regenerate with history), outcome editing, "Team member" lines from the recording; Calls list outcome / mood / promise filters; inbox chat summary drawer; Settings → AI & outcomes (insights on / off, chat summary on close, team-call transcription, the account's outcomes); STT prices in billing views; live `call.insights` / `inbox.conversation.summary` updates.
+  - Reports (`/reports/:tab`, 8 tabs, `reports.read`): KPI tiles against the period before, trend charts with a table view, detail tables with drill-down, a URL-backed filter bar (period, compare, calls channel, one slice, test calls); dashboard KPI row.
+  - Calls list and every report tab export CSV / XLSX (full phones only with `contacts.export`, AI summaries on request, WhatsApp messages without text) with live progress, a download link and Recent exports; Settings → Notifications → Email reports (up to five, daily / weekly / monthly, account-local hour); public `/report-emails/unsubscribe` (stops after a click).
+  - Settings → Data retention (recordings, call records, WhatsApp chats; confirm before a shorter period deletes data), superadmin data retention limit, "recording deleted" on call detail, Privacy Policy draft sentence.
+  - Tests 1359 → 1386, coverage 96.21 / 92.12 / 93.82 / 96.96. Bundle (gzip): main 312.8 KB, ReportsPage 6.0 KB (lazy), TrendChart 7.7 KB (lazy), RetentionTab 2.2 KB (lazy). E2E 151 / 151 twice (port 3150), backend log grep 0.
+
 - **Phase 13 · Batch 1 (T13.1–T13.4) — Embedded Signup v4, legal pages, staging build** — 2026-10-26
   - Embedded Signup v4: `FB.login` sends `extras: {}` for Cloud API numbers (coexistence keeps the Business app feature), no `sessionInfoVersion`; session messages from any https `*.facebook.com` origin, every `FINISH*` event (incl. on-behalf-of migration and grant-only access), `CANCEL` with an `error_message` as an error, `waac_id` passed on; Meta's automatic app event logging switched off; the SDK follows Graph v26.0.
   - Public `/privacy`, `/terms`, `/contact` and the `/data-deletion` instructions (no login): safe Markdown subset (no HTML; `javascript:`, protocol-relative and backslash / control-character links dropped), company details from public `VITE_LEGAL_*`, a Draft banner until approved; links on every auth screen, the user menu and the sign-up consent line; icons (1024 / 512 / 192 / Apple / favicon) + web manifest via `npm run icons`.

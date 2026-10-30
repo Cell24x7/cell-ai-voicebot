@@ -30,6 +30,9 @@ import type { AdminAccountDetail } from '@/services/api/types';
 import { auditActorText, auditMetaText } from '@/utils/audit-format';
 import { formatInAccountTz } from '@/utils/datetime';
 
+const RetentionCapCard = lazy(async () => ({
+  default: (await import('@/features/admin/RetentionCapCard')).RetentionCapCard,
+}));
 const LimitsCard = lazy(async () => ({
   default: (await import('@/features/admin/LimitsCard')).LimitsCard,
 }));
@@ -97,6 +100,9 @@ function Overview({ detail }: { detail: AdminAccountDetail }) {
           key={`${String(detail.limits.maxConcurrentCalls)}:${String(detail.limits.dialsPerMinute)}`}
           detail={detail}
         />
+      </Suspense>
+      <Suspense fallback={<Skeleton variant="rounded" height={160} />}>
+        <RetentionCapCard key={JSON.stringify(detail.retention.cap)} detail={detail} />
       </Suspense>
       <Suspense fallback={<Skeleton variant="rounded" height={160} />}>
         <WhatsAppCard detail={detail} />
