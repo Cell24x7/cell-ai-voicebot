@@ -32,6 +32,8 @@ id_rsa*
 # Live Server Deployment Scripts & Credentials (DO NOT SHARE WITH COLLABORATORS)
 deploy_live/
 deploy_live/*
+*.bat
+
 
 # Archives & Large packages
 *.zip
