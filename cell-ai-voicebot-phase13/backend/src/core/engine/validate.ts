@@ -1,6 +1,6 @@
 import { FLOW_LIMITS } from '../../config/limits';
 import type { NodeType } from '../../db/models/flow.model';
-import { urlBlockReason, type GuardPolicy } from '../ai/ip-guard';
+import { urlBlockReason, type GuardPolicy } from '../../shared/net/url-guard';
 import { templateTokens } from '../templating';
 
 import { graphSizeBytes } from './canonical';
@@ -39,6 +39,8 @@ export const ISSUE_CODES = [
   'sms_long',
   'speak_long',
   'limits_exceeded',
+  // Phase 15: a Send WhatsApp step whose template isn't approved on the number (warning)
+  'template_not_approved',
 ] as const;
 export type IssueCode = (typeof ISSUE_CODES)[number];
 

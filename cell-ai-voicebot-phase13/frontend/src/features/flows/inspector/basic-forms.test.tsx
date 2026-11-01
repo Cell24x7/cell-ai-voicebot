@@ -4,12 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { agentsApi } from '@/services/api/agents';
 import { flowAudioApi } from '@/services/api/flow-audio';
+import { templatesApi } from '@/services/api/templates';
+import { whatsappApi } from '@/services/api/whatsapp';
 import { pick, renderStepForm } from '@/test/inspector';
+import { fakeTemplateListItem } from '@/test/templates';
+import { fakeChannel } from '@/test/whatsapp';
 
 vi.mock('@/services/api/agents', () => ({ agentsApi: { list: vi.fn() } }));
 vi.mock('@/services/api/flow-audio', () => ({
   flowAudioApi: { list: vi.fn(), url: vi.fn(), upload: vi.fn() },
 }));
+vi.mock('@/services/api/templates', () => ({ templatesApi: { list: vi.fn() } }));
+vi.mock('@/services/api/whatsapp', () => ({ whatsappApi: { channels: vi.fn() } }));
 
 const AUDIO = {
   id: 'au1',
@@ -26,6 +32,8 @@ const AUDIO = {
 beforeEach(() => {
   vi.mocked(agentsApi.list).mockRejectedValue(new Error('offline'));
   vi.mocked(flowAudioApi.list).mockResolvedValue([AUDIO] as never);
+  vi.mocked(templatesApi.list).mockResolvedValue([]);
+  vi.mocked(whatsappApi.channels).mockResolvedValue({ items: [] } as never);
 });
 
 const type = (label: string | RegExp, value: string) =>
@@ -156,6 +164,7 @@ describe('basic step forms', () => {
     const f = renderStepForm('send_sms', { text: '' });
     type('SMS text', 'x'.repeat(170));
     expect(screen.getByText('170 / 500 · 2 SMS')).toBeInTheDocument();
+    expect(screen.getByText(/SMS sending starts with phone lines/)).toBeInTheDocument();
     type('DLT template id (optional)', '1107');
     expect(f.last().dltTemplateId).toBe('1107');
     type('DLT template id (optional)', '');
@@ -174,6 +183,62 @@ describe('basic step forms', () => {
     expect(f.last().params).toEqual(['', '{{name}}']);
     await userEvent.click(screen.getByRole('button', { name: 'Remove parameter 1' }));
     expect(f.last().params).toEqual(['{{name}}']);
+  });
+
+  it('whatsapp: picks the number and an approved template', async () => {
+    vi.mocked(whatsappApi.channels).mockResolvedValue({
+      items: [fakeChannel(), fakeChannel({ id: 'wa2', label: 'Sales' })],
+    } as never);
+    vi.mocked(templatesApi.list).mockResolvedValue([
+      fakeTemplateListItem(),
+      fakeTemplateListItem('APPROVED', 'UTILITY', {
+        id: 't2',
+        name: 'promo_hi',
+        language: 'hi',
+        channelIds: ['wa2'],
+      }),
+    ]);
+    const f = renderStepForm('send_whatsapp', { templateName: '', params: [] });
+    expect(screen.getByText(/Sent after the call ends/)).toBeInTheDocument();
+    expect(await screen.findByText(/Pick one, or type the name below/)).toBeInTheDocument();
+    expect(templatesApi.list).toHaveBeenCalledWith({ status: ['APPROVED'] });
+    await pick('Send from', /Sales/);
+    expect(f.last().channelId).toBe('wa2');
+    await pick('Approved template', 'promo_hi (hi)');
+    expect(f.last()).toMatchObject({ templateName: 'promo_hi', language: 'hi' });
+  });
+
+  it('whatsapp: shows the chosen template and filters by number', async () => {
+    vi.mocked(whatsappApi.channels).mockResolvedValue({ items: [fakeChannel()] } as never);
+    vi.mocked(templatesApi.list).mockResolvedValue([fakeTemplateListItem()]);
+    const f = renderStepForm('send_whatsapp', {
+      templateName: 'emi_reminder',
+      language: 'en',
+      channelId: 'wa1',
+      params: [],
+    });
+    expect(await screen.findByText('Needs 4 parameter(s)')).toBeInTheDocument();
+    await pick('Send from', 'Default number');
+    expect(f.last().channelId).toBeNull();
+  });
+
+  it('whatsapp: no approved templates and an unusual language', async () => {
+    vi.mocked(templatesApi.list).mockResolvedValue([
+      fakeTemplateListItem('APPROVED', 'UTILITY', { channelIds: ['x'] }),
+    ]);
+    renderStepForm(
+      'send_whatsapp',
+      {
+        templateName: 'a',
+        language: 'mr',
+        channelId: 'wa1',
+        params: [],
+      },
+      { errors: { channelId: 'Choose the number' } },
+    );
+    expect(await screen.findByText(/No approved templates yet/)).toBeInTheDocument();
+    expect(screen.getByText('Choose the number')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Template language' })).toHaveTextContent('mr');
   });
 
   it('wait: pause seconds', () => {

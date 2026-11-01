@@ -20,6 +20,7 @@ import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusChip } from '@/components/StatusChip';
 import { adminKeys } from '@/features/admin/keys';
+import { OwnerPasswordDialog } from '@/features/admin/OwnerPasswordDialog';
 import { SuspendDialog } from '@/features/admin/SuspendDialog';
 import { AccountRatesTab } from '@/features/admin-billing/AccountRatesTab';
 import { AccountWalletTab } from '@/features/admin-billing/AccountWalletTab';
@@ -62,12 +63,8 @@ function Fact({ label, value }: { label: string; value: ReactNode }) {
 
 function Overview({ detail }: { detail: AdminAccountDetail }) {
   const { account, owner, usersByStatus } = detail;
-  const resend = useMutation({
-    mutationFn: () => adminApi.resendOwnerInvite(account.id),
-    meta: { silent: true },
-    onSuccess: () => enqueueSnackbar('Invitation sent', { variant: 'success' }),
-    onError: (e) => enqueueSnackbar(getErrorMessage(e), { variant: 'error' }),
-  });
+  const queryClient = useQueryClient();
+  const [changingPassword, setChangingPassword] = useState(false);
   return (
     <Stack spacing={3}>
       <Grid container spacing={2}>
@@ -92,23 +89,29 @@ function Overview({ detail }: { detail: AdminAccountDetail }) {
             <CardContent>
               <Stack spacing={1.5}>
                 <Fact label="Owner" value={owner ? `${owner.name} · ${owner.email}` : '—'} />
-                {owner?.status === 'invited' && (
+                {owner && (
                   <Stack
                     direction="row"
                     spacing={1}
                     sx={{ alignItems: 'center', flexWrap: 'wrap' }}
                   >
-                    <Typography variant="body2" color="text.secondary">
-                      The owner hasn&apos;t accepted the invitation yet.
-                    </Typography>
-                    <Button
-                      size="small"
-                      disabled={resend.isPending}
-                      onClick={() => resend.mutate()}
-                    >
-                      Resend invitation
+                    {owner.status === 'invited' && (
+                      <Typography variant="body2" color="text.secondary">
+                        The owner hasn&apos;t set a password yet.
+                      </Typography>
+                    )}
+                    <Button size="small" onClick={() => setChangingPassword(true)}>
+                      {owner.status === 'invited' ? 'Set password' : 'Change password'}
                     </Button>
                   </Stack>
+                )}
+                {owner && changingPassword && (
+                  <OwnerPasswordDialog
+                    accountId={account.id}
+                    ownerEmail={owner.email}
+                    onClose={() => setChangingPassword(false)}
+                    onDone={() => void queryClient.invalidateQueries({ queryKey: adminKeys.all })}
+                  />
                 )}
                 <Fact
                   label="Users"

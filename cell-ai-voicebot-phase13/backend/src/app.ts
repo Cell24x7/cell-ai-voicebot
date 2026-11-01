@@ -5,6 +5,7 @@ import type { Store } from 'express-rate-limit';
 import type { Env } from './config/env';
 import {
   BILLING_LIMITS,
+  WEBHOOK_LIMITS,
   WHATSAPP_LIMITS,
   JSON_BODY_LIMIT,
   UNLIMITED_PATHS,
@@ -22,7 +23,10 @@ import { createDocsRouter } from './modules/docs/docs.routes';
 import { createFilesRouter } from './modules/files/files.routes';
 import type { ReadinessDeps } from './modules/health/health.controller';
 import { createHealthRouter } from './modules/health/health.routes';
+import { DEV_RECEIVER_PATH } from './modules/mock-apis/webhook-receiver';
+import { publicApiGate, type PublicApiStores } from './modules/public-api/key-limits';
 import type { ReportCacheStore } from './modules/reports/cache';
+import type { WebhookHooks } from './modules/webhooks/deliver.job';
 import { createApiRouter, type AiDeps, type CallsApiDeps, type WhatsAppDeps } from './routes';
 import { getAppInfo } from './shared/app-info';
 import type { Logger } from './shared/logger';
@@ -74,6 +78,10 @@ export interface AppDeps {
   whatsapp?: WhatsAppDeps;
   /** Phase 14 report cache (the app Redis in `server.ts`); none in most tests. */
   reportCache?: ReportCacheStore;
+  /** Phase 15 per-key limiter stores (`rl:key:<id>:r|w`); MemoryStore when omitted. */
+  publicApiStores?: PublicApiStores;
+  /** Phase 15 webhook test hooks (fake resolver / dial to a local receiver). */
+  webhooks?: WebhookHooks;
 }
 
 /**
@@ -102,6 +110,8 @@ export const createApp = ({
   campaigns = {},
   whatsapp,
   reportCache,
+  publicApiStores = {},
+  webhooks,
 }: AppDeps): Express => {
   // Wallet low-balance / exhausted alerts run after every committed wallet change.
   registerWalletAlerts();
@@ -128,6 +138,9 @@ export const createApp = ({
     '/api/v1/webhooks/meta',
     raw({ type: 'application/json', limit: WHATSAPP_LIMITS.webhookMaxBytes }),
   );
+  // DEV ONLY: the mock webhook receiver checks signatures over the raw bytes.
+  if (env.MOCK_APIS_ENABLED)
+    app.use(DEV_RECEIVER_PATH, raw({ type: () => true, limit: WEBHOOK_LIMITS.maxPayloadBytes }));
   app.use(json({ limit: JSON_BODY_LIMIT }));
   app.use(urlencoded({ extended: false, limit: URLENCODED_BODY_LIMIT }));
   app.use(cookieParser());
@@ -140,7 +153,9 @@ export const createApp = ({
   app.use(health);
   app.use('/api/v1', health);
   if (storage instanceof LocalStorage) app.use(createFilesRouter(storage));
-  if (env.API_DOCS_ENABLED) app.use(createDocsRouter());
+  app.use(createDocsRouter(env.API_DOCS_ENABLED ? 'full' : 'public'));
+  // Public API (X-API-Key): key check, request log and per-key limits before any router.
+  app.use('/api/v1', publicApiGate(publicApiStores));
   app.use(
     '/api/v1',
     createApiRouter({
@@ -160,6 +175,7 @@ export const createApp = ({
       campaigns,
       ...(whatsapp ? { whatsapp: { ...whatsapp, storage: whatsapp.storage ?? storage } } : {}),
       reports: { cache: reportCache ?? null },
+      ...(webhooks ? { webhooks } : {}),
     }),
   );
 

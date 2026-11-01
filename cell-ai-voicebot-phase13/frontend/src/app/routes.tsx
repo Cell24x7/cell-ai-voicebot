@@ -316,6 +316,24 @@ export const routes: RouteObject[] = [
             ],
           },
           {
+            path: '/integrations/:tab?',
+            element: (
+              <RequirePermission anyOf={['integrations.manage', 'contacts.import']}>
+                <Outlet />
+              </RequirePermission>
+            ),
+            children: [
+              {
+                // Phase 15: webhooks, after-the-call rules, sheet imports — its own chunk
+                index: true,
+                lazy: async () => ({
+                  Component: (await import('@/pages/integrations/IntegrationsPage'))
+                    .IntegrationsPage,
+                }),
+              },
+            ],
+          },
+          {
             path: '/reports/:tab?',
             element: (
               <RequirePermission perm="reports.read">

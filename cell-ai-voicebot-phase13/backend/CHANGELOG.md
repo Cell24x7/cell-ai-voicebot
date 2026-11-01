@@ -6,6 +6,31 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Superadmin Add account: password instead of invitation** — 2026-11-01
+  - The superadmin sets the owner's password when creating an account; the owner is active at once and no e-mail is sent.
+  - `POST /api/v1/admin/accounts/:id/owner-password` replaces `resend-owner-invite`: it sets a new password and ends the owner's sessions. An owner invited earlier becomes active.
+
+- **Phase 15 · Batch 3 (T15.8–T15.10) — public docs, dev mocks, seeds, perf, security, sign-off** — 2026-11-01
+  - `/api/docs` is always served; in production it lists only the Public API routes, with guides from `docs/api/` (`GET /api/v1/openapi.public.json`). Node, Python and PHP signature samples; Node and Python run against the golden vectors.
+  - Dev mocks: `/mock/payment-link`, `/mock/webhook-receiver` (checks signatures, last 50 receipts, no payloads), `/mock/dev-receiver`.
+  - `db:seed` adds a demo key, a webhook, two rules and a paused sheet. `npm run perf:webhooks`: 25,000 / 25,000 deliveries, p95 29 ms. Security: every key route isolated, scope × route matrix.
+  - Fixed: after-call rules never ran for unanswered, too-short or insights-off calls; those calls now also send `call.insights.ready`.
+  - Tests 3532 → 3555, coverage 96.08 / 87.42 / 95.72 / 97.6. Playwright 163 / 163 twice; backend log grep (9,389 lines) → 0.
+  - Docs: ADR 0045, `docs/setup/webhooks.md`, runbook, `docs/ops/release-phase-15.md`, sign-off. Not done: 50 rps API perf, per-account key limits.
+
+- **Phase 15 · Batch 2 (T15.5–T15.7) — WhatsApp after calls, Google Sheets, integrations screens** — 2026-10-30
+  - Flow "Send WhatsApp" steps now send after the call settles. After-the-call rules (≤ 20) match on outcome, mood, promise, missed calls in a row and call kind, and send at "now", "after N minutes" or "the next calling hour". `postcall.send` re-checks opt-out, DND, template approval, wallet and the marketing limit. Every skip is recorded with an exact reason, and `GET /calls/:id/after-call` lists them.
+  - Scheduled Google Sheet imports (published CSV, once / hourly / daily, ≤ 5 per account) run through the file-import pipeline into their own list. There is an Apps Script receiver for sending events to a sheet, plus Zapier / Make / n8n guides.
+  - Fixed (hotfix `0053a8d` on `main`): a Tech Provider app gets code 10 for the WABA field `primary_funding_id`, which stopped every number at "Action needed". `getWaba` now reads the WABA without it.
+  - Tests 3479 → 3532, coverage 96.07 / 87.4 / 95.68 / 97.59. Playwright 158 / 158 (second run). The first run had 9 load flakes (sign-up timing out under load); all 31 tests in those files passed alone. Backend log grep (8,779 lines): full API keys, `whsec_` secrets, signatures, phones, names, message texts and summaries → 0.
+
+- **Phase 15 · Batch 1 (T15.1–T15.4) — public API, outbound webhooks** — 2026-10-30
+  - One API, two auths (ADR 0045): the dashboard routes for contacts, calls, insights, campaigns, reports, exports, templates and WhatsApp AI calls accept an `X-API-Key` with the route's scope (`access({ permission, scope })`); 13 grouped scopes; keys get an IP allowlist, an expiry, per-key limits (600 reads / 60 writes a minute), a 7-day request log, daily usage and `PATCH /api-keys/:id`; `externalRef` on calls and messages; migration `0017-integrations`.
+  - Contacts upsert by phone / externalId and bulk upsert (≤ 1,000, a result per row); `POST /messages/template` / `/text` and `GET /messages/:id` through the inbox send path (`origin: api`, Idempotency-Key required); `POST /calls` `variables`; keys see approved templates only. The API never clears an opt-out or DND.
+  - Outbound webhooks (ADR 0046): outbox + one job per attempt (1 m, 5 m, 30 m, 2 h, 12 h), HMAC-SHA256 over the raw bytes (golden vectors from openssl), secret rotation with a 24 h overlap, auto-disable after 5 events given up or 24 h failing (notification + e-mail + audit), test event, delivery log, replay; the URL guard (moved to `shared/net`) runs at save and at every delivery. All 11 events wired, one per real change.
+  - External-client integration test: an API key and a local receiver → contact → call → signed `call.completed` → the same result from `GET /calls/:id`; template → `whatsapp.message.status` sent / delivered / read.
+  - Tests 3331 → 3479, coverage 96.17 / 87.72 / 95.88 / 97.67. Flakes (pass alone 3 / 3): two `dispatcher.test.ts` cases under full-suite load.
+
 - **Phase 14 · Batch 3 (T14.9–T14.10) — demo history, perf, security, sign-off** — 2026-10-28
   - `db:seed` (and the staging review demo, as test traffic) adds 60 days of report history: calls of every kind with "Demo:" insights, WhatsApp messages with statuses, AI charges through the engine, rollups rebuilt (no OpenAI calls).
   - `npm run perf:reports` (throw-away `cav_perf`): 100,000 calls + 500,000 messages over 400 days → every report tab ≤ 225 ms p95 over 7 / 30 / 365 days, index scans only, recount 0 differences.

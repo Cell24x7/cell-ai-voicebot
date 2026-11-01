@@ -25,6 +25,9 @@ vi.mock('@/services/api/calls', () => ({
 }));
 
 vi.mock('@/services/api/campaigns', () => ({ campaignsApi: { list: vi.fn() } }));
+vi.mock('@/services/api/outcome-rules', () => ({
+  outcomeRulesApi: { afterCall: vi.fn(() => Promise.resolve([])) },
+}));
 vi.mock('@/services/api/insights', () => ({
   insightsApi: {
     get: vi.fn(() =>

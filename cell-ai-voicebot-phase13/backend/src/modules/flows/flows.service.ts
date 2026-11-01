@@ -4,8 +4,6 @@ import type { z } from 'zod';
 
 import type { Env } from '../../config/env';
 import { FLOW_LIMITS } from '../../config/limits';
-import { outgoingPolicy } from '../../core/ai/ip-guard';
-import { seal, secretHint } from '../../core/ai/secret-box';
 import { graphChecksum, graphSizeBytes } from '../../core/engine/canonical';
 import {
   FlowGraphSchema,
@@ -30,6 +28,7 @@ import {
 import { UserModel } from '../../db/models/user.model';
 import { requireAuth } from '../../shared/auth/auth-context';
 import { tenantFilter, toObjectId } from '../../shared/auth/tenant';
+import { seal, secretHint } from '../../shared/crypto/secret-box';
 import {
   AppError,
   ConflictError,
@@ -37,9 +36,11 @@ import {
   ValidationError,
   type ErrorDetail,
 } from '../../shared/errors/app-error';
+import { outgoingPolicy } from '../../shared/net/url-guard';
 import { escapeRegex } from '../../shared/utils/regex';
 import { accountVariables } from '../ai-agents/variables';
 import { auditRequest } from '../audit/audit.service';
+import { whatsappStepIssues } from '../post-call/flow-templates';
 
 import type { CreateFlowBody, ListFlowsQuery, UpdateFlowBody } from './flows.schema';
 import { campaignsUsingFlow } from './in-use';
@@ -245,7 +246,11 @@ export const issuesOf = async (
   accountId: Types.ObjectId,
   graph: FlowGraph,
   deps: Pick<FlowsDeps, 'env' | 'extraPorts'>,
-): Promise<Issue[]> => validateFlow(graph, await validationContext(accountId, graph, deps));
+): Promise<Issue[]> => [
+  ...validateFlow(graph, await validationContext(accountId, graph, deps)),
+  // Phase 15: Send WhatsApp steps warn when their template can't be sent yet
+  ...(await whatsappStepIssues(accountId, graph)),
+];
 
 /** `FLOW_INVALID` with the issues as details. */
 export const flowInvalid = (issues: Issue[]): AppError => {

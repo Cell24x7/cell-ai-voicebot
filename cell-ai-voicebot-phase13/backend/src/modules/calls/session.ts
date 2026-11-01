@@ -27,6 +27,8 @@ import {
   type TranscriptSpeaker,
 } from '../../db/models/transcript-turn.model';
 import type { Logger } from '../../shared/logger';
+import { collectFlowMessages } from '../post-call/collect';
+import { publishCallCompleted, publishCallStarted } from '../webhooks/publish';
 
 import type { CallBillingPort } from './billing';
 import { finalStatus, endReasonFor } from './lifecycle';
@@ -240,6 +242,8 @@ export class CallSession {
       ),
     );
     await this.setStatus('in_progress', { 'timestamps.answeredAt': new Date(this.answeredAt) });
+    // Phase 15: `call.started` webhook (never throws)
+    void publishCallStarted(this.callId);
     if (deps.recording.enabled) {
       try {
         const recorder = await CallRecorder.open(deps.recordingDir, this.callId, deps.leg.rate);
@@ -635,6 +639,10 @@ export class CallSession {
       disposition: result.disposition,
       costMicros: cost.totalMicros,
     });
+    // Phase 15: `call.completed` webhook from the stored call (once per call)
+    await publishCallCompleted(this.callId);
+    // Phase 15: Send WhatsApp steps of the flow go out now (never throws)
+    await collectFlowMessages(this.callId);
     logger.info(
       { callId: this.callId, accountId: this.accountId, status, endReason: reason, durationSec },
       'call: ended',

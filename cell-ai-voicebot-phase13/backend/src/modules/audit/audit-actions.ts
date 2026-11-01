@@ -144,6 +144,19 @@ export const AUDIT_ACTIONS = [
   'report_subscription.created',
   'report_subscription.updated',
   'report_subscription.deleted',
+  // Phase 15 (integrations)
+  'apikey.updated',
+  'webhook_endpoint.created',
+  'webhook_endpoint.updated',
+  'webhook_endpoint.deleted',
+  'webhook_endpoint.secret_rotated',
+  'webhook_endpoint.disabled',
+  'webhook_endpoint.enabled',
+  'outcome_rule.created',
+  'outcome_rule.updated',
+  'outcome_rule.deleted',
+  'sheet_import.created',
+  'sheet_import.deleted',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

@@ -72,7 +72,9 @@ describe('nav config', () => {
     expect(live).toContain('reports');
     // Phase 13 builds hid the reports
     expect(visibleNavItems(() => true, false, 13).map((i) => i.key)).not.toContain('reports');
-    expect(live).not.toContain('integrations');
+    // Phase 15: Integrations is live; Phase 14 builds hid it
+    expect(live).toContain('integrations');
+    expect(visibleNavItems(() => true, false, 14).map((i) => i.key)).not.toContain('integrations');
     expect(visibleNavItems((p) => p === 'flows.read', false).map((i) => i.key)).toEqual([
       'dashboard',
       'flows',
@@ -88,6 +90,14 @@ describe('nav config', () => {
 });
 
 describe('AppLayout', () => {
+  it('shows Integrations with either integrations.manage or contacts.import', () => {
+    const keys = (perms: string[]) =>
+      visibleNavItems((p) => perms.includes(p), false).map((i) => i.key);
+    expect(keys(['integrations.manage'])).toContain('integrations');
+    expect(keys(['contacts.import'])).toContain('integrations'); // managers: Google Sheets
+    expect(keys(['contacts.read', 'calls.read'])).not.toContain('integrations');
+  });
+
   it('shows the menu for an owner (no superadmin section)', () => {
     signInAs('owner');
     renderWithProviders({ route: '/' });
@@ -103,6 +113,7 @@ describe('AppLayout', () => {
       'Inbox',
       'WhatsApp',
       'Reports',
+      'Integrations',
       'Team',
       'Settings',
     ]);

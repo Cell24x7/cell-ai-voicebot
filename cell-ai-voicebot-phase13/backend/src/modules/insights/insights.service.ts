@@ -48,6 +48,8 @@ import {
 import { getLogger } from '../../shared/logger';
 import { ymdInZone } from '../../shared/time';
 import { auditRequest } from '../audit/audit.service';
+import { evaluateOutcomeRules } from '../post-call/evaluate';
+import { publishInsightsReady } from '../webhooks/publish';
 
 import { ModelInsightsSchema, toInsightOutput } from './insights.schema';
 
@@ -130,6 +132,12 @@ const state = (
 });
 
 const emit = (callId: Types.ObjectId, status: string, version: number): void => {
+  // Phase 15: `call.insights.ready` webhook once a version finished (never throws)
+  if (status !== 'pending') {
+    void publishInsightsReady(callId, version);
+    // Phase 15: "After the call" rules run once the outcome / insights are known
+    void evaluateOutcomeRules(callId);
+  }
   const rt = tryGetRealtime();
   if (!rt) return;
   void rt
@@ -208,10 +216,12 @@ export const sweepInsights = async (deps: InsightsDeps): Promise<Record<string, 
     }
     if (reason) {
       skipped += 1;
-      await CallModel.updateOne(
+      const marked = await CallModel.updateOne(
         { _id: call._id, insights: null },
         { $set: { insights: state('skipped', 0, reason, now) } },
       );
+      // unanswered, too short or insights off: webhooks and after-the-call rules still run
+      if (marked.modifiedCount) emit(call._id, 'skipped', 0);
       continue;
     }
     const claimed = await CallModel.updateOne(

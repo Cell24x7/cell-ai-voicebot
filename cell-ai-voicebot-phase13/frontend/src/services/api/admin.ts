@@ -22,6 +22,7 @@ export interface CreateAccountInput {
   businessName: string;
   ownerName: string;
   ownerEmail: string;
+  ownerPassword: string;
   ownerPhone?: string;
 }
 
@@ -29,8 +30,8 @@ export interface CreateAccountInput {
 export const adminApi = {
   createAccount: (body: CreateAccountInput) =>
     unwrap(apiClient.post<SuccessEnvelope<PublicAccount>>('/admin/accounts', body)),
-  resendOwnerInvite: async (id: string) => {
-    await apiClient.post(`/admin/accounts/${id}/resend-owner-invite`);
+  setOwnerPassword: async (id: string, password: string) => {
+    await apiClient.post(`/admin/accounts/${id}/owner-password`, { password });
   },
   accounts: async (query: AdminAccountsQuery) =>
     (

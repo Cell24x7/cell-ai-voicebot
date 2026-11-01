@@ -44,8 +44,12 @@ const KEY = {
   name: 'CRM sync',
   prefix: 'cav_test_ABCD',
   scopes: ['calls:read'],
+  ipAllowlist: [],
+  expiresAt: null,
   lastUsedAt: null,
   revokedAt: null,
+  requests24h: 0,
+  requests7d: 0,
   createdBy: 'u1',
   createdAt: '2026-10-08T00:00:00Z',
 };
@@ -103,7 +107,7 @@ describe('API keys tab', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: /webhooks:manage/ }));
     await userEvent.click(screen.getByRole('checkbox', { name: /webhooks:manage/ }));
     expect(screen.getByRole('button', { name: 'Create key' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('checkbox', { name: /calls:write/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /^calls:write/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Create key' }));
     expect(await screen.findByText('At most 20 keys.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));

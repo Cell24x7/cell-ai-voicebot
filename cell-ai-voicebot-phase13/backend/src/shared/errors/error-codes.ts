@@ -217,6 +217,27 @@ export const ERROR_CODES = {
     status: 422,
     message: 'You already get the most report e-mails allowed. Remove one first.',
   },
+  API_KEY_IP_DENIED: {
+    status: 403,
+    message: 'This API key is not allowed from this IP address.',
+  },
+  API_KEY_EXPIRED: { status: 401, message: 'This API key has expired.' },
+  WEBHOOK_URL_BLOCKED: {
+    status: 422,
+    message: 'This address is not allowed for webhooks.',
+  },
+  SHEET_URL_INVALID: {
+    status: 422,
+    message: 'Use the link of a Google Sheet published to the web as CSV.',
+  },
+  OUTCOME_RULE_LIMIT: {
+    status: 422,
+    message: 'You already have the most after-call rules allowed. Remove one first.',
+  },
+  WEBHOOK_ENDPOINT_LIMIT: {
+    status: 422,
+    message: 'You already have the most webhooks allowed. Remove one first.',
+  },
 } as const satisfies Record<string, { status: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

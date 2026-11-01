@@ -1,15 +1,15 @@
 import { expect, test } from '@playwright/test';
 
 import { PASSWORD } from './env';
-import { signInAsSuperadmin, uniqueEmail } from './helpers';
-import { extractLink, waitForEmail } from './mailpit';
+import { signIn, signInAsSuperadmin, uniqueEmail } from './helpers';
 
-test('a superadmin adds an account; the owner accepts the e-mailed invitation and signs in', async ({
+test('a superadmin adds an account with a password and changes it; the owner signs in', async ({
   page,
   browser,
 }) => {
   const email = uniqueEmail('adminmade');
   const business = `Admin Made ${Date.now().toString(36)}`;
+  const nextPassword = `${PASSWORD}-next`;
   await signInAsSuperadmin(page);
   await page.goto('/admin/accounts');
   await page.getByRole('button', { name: 'Add account' }).click();
@@ -17,26 +17,24 @@ test('a superadmin adds an account; the owner accepts the e-mailed invitation an
   await dialog.getByLabel('Business name').fill(business);
   await dialog.getByLabel('Owner name').fill('Meera Shah');
   await dialog.getByLabel('Owner email').fill(email);
-  await dialog.getByRole('button', { name: 'Create and send invitation' }).click();
-
-  // the new account opens, its owner still invited
+  await dialog.getByLabel('Owner password').fill(PASSWORD);
+  await dialog.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('heading', { level: 1, name: business })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Resend invitation' })).toBeVisible();
 
-  // the owner sets a password from the e-mail and lands in their account
-  const context = await browser.newContext();
-  const owner = await context.newPage();
-  await owner.goto(extractLink(await waitForEmail(email, /invited/i), '/accept-invite'));
-  await owner.getByLabel('Password', { exact: true }).fill(PASSWORD);
-  await owner.getByLabel('Repeat password').fill(PASSWORD);
-  await owner.getByRole('button', { name: 'Accept invitation' }).click();
-  await expect(owner.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
-  await owner.getByRole('link', { name: 'Team' }).click();
-  await expect(owner.getByRole('button', { name: 'Invite member' })).toBeVisible();
-  await context.close();
+  const ownerSignsIn = async (password: string) => {
+    const context = await browser.newContext();
+    const owner = await context.newPage();
+    await signIn(owner, email, password);
+    await expect(owner.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
+    await context.close();
+  };
+  await ownerSignsIn(PASSWORD);
 
-  // the admin no longer sees the resend button
-  await page.reload();
-  await expect(page.getByRole('heading', { level: 1, name: business })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Resend invitation' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Change password' }).click();
+  const change = page.getByRole('dialog', { name: 'Change owner password' });
+  await change.getByLabel('New password').fill(nextPassword);
+  await change.getByLabel('Repeat password').fill(nextPassword);
+  await change.getByRole('button', { name: 'Change password' }).click();
+  await expect(page.getByText('Password changed')).toBeVisible();
+  await ownerSignsIn(nextPassword);
 });

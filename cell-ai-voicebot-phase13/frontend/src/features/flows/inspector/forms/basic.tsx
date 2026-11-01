@@ -7,9 +7,13 @@ import FormGroup from '@mui/material/FormGroup';
 import FormHelperText from '@mui/material/FormHelperText';
 import FormLabel from '@mui/material/FormLabel';
 import IconButton from '@mui/material/IconButton';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+
+import { useTemplates } from '@/features/templates/queries';
+import { useChannels } from '@/features/whatsapp/queries';
 
 import { AudioPicker } from '../AudioPicker';
 import { NumberInput, SelectInput, TemplateField, Toggle } from '../fields';
@@ -208,7 +212,7 @@ export function SmsForm({ config, set, errors, variables, readOnly }: StepFormPr
         slotProps={{ htmlInput: { maxLength: 30 } }}
       />
       <Typography variant="caption" color="text.secondary">
-        Queued during the call and sent after it ends.
+        Queued during the call. SMS sending starts with phone lines.
       </Typography>
     </Stack>
   );
@@ -216,12 +220,62 @@ export function SmsForm({ config, set, errors, variables, readOnly }: StepFormPr
 
 export function WhatsappForm({ config, set, errors, variables, readOnly }: StepFormProps) {
   const params = strings(config.params);
+  const channelId = str(config.channelId);
+  const channels = useChannels();
+  const templates = useTemplates({ status: ['APPROVED'] });
+  const offered = (templates.data ?? []).filter(
+    (t) => !channelId || t.channelIds.includes(channelId),
+  );
+  const name = str(config.templateName);
+  const language = str(config.language, 'hi');
+  const chosen = offered.find((t) => t.name === name && t.language === language);
   return (
     <Stack spacing={2}>
       <TextField
+        select
+        label="Send from"
+        size="small"
+        value={channelId}
+        onChange={(e) => set({ channelId: e.target.value || null })}
+        disabled={readOnly}
+        error={Boolean(errors.channelId)}
+        helperText={errors.channelId ?? "Empty = the account's only connected number"}
+      >
+        <MenuItem value="">Default number</MenuItem>
+        {(channels.data?.items ?? []).map((c) => (
+          <MenuItem key={c.id} value={c.id}>
+            {c.label} {c.displayPhoneNumber ?? ''}
+          </MenuItem>
+        ))}
+      </TextField>
+      <TextField
+        select
+        label="Approved template"
+        size="small"
+        value={chosen?.id ?? ''}
+        onChange={(e) => {
+          const t = offered.find((x) => x.id === e.target.value);
+          if (t) set({ templateName: t.name, language: t.language });
+        }}
+        disabled={readOnly}
+        helperText={
+          chosen
+            ? `Needs ${String(chosen.variablesCount)} parameter(s)`
+            : offered.length
+              ? 'Pick one, or type the name below'
+              : 'No approved templates yet — type the name below'
+        }
+      >
+        {offered.map((t) => (
+          <MenuItem key={t.id} value={t.id}>
+            {t.name} ({t.language})
+          </MenuItem>
+        ))}
+      </TextField>
+      <TextField
         label="Template name"
         size="small"
-        value={str(config.templateName)}
+        value={name}
         onChange={(e) => set({ templateName: e.target.value.toLowerCase() })}
         error={Boolean(errors.templateName)}
         helperText={errors.templateName ?? 'As approved in WhatsApp (a-z, 0-9, _)'}
@@ -229,11 +283,12 @@ export function WhatsappForm({ config, set, errors, variables, readOnly }: StepF
       />
       <SelectInput
         label="Template language"
-        value={str(config.language, 'hi')}
-        onChange={(language) => set({ language })}
+        value={language}
+        onChange={(l) => set({ language: l })}
         options={[
           { value: 'hi', label: 'Hindi' },
           { value: 'en', label: 'English' },
+          ...(['hi', 'en'].includes(language) ? [] : [{ value: language, label: language }]),
         ]}
         readOnly={readOnly}
       />
@@ -265,6 +320,10 @@ export function WhatsappForm({ config, set, errors, variables, readOnly }: StepF
           Add parameter
         </Button>
       )}
+      <Typography variant="caption" color="text.secondary">
+        Sent after the call ends, with the same rules as the dashboard (approved template, opt-out,
+        DND, wallet). Skipped messages show the reason on the call.
+      </Typography>
     </Stack>
   );
 }

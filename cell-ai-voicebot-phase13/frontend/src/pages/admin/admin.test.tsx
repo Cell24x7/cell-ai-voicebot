@@ -14,7 +14,7 @@ vi.mock('@/services/api/admin', () => ({
   adminApi: {
     accounts: vi.fn(),
     createAccount: vi.fn(),
-    resendOwnerInvite: vi.fn(),
+    setOwnerPassword: vi.fn(),
     account: vi.fn(),
     suspend: vi.fn(),
     enable: vi.fn(),
@@ -87,10 +87,10 @@ describe('Add account (superadmin)', () => {
     return screen.getByRole('dialog', { name: 'Add account' });
   };
 
-  it('creates the account, sends the invitation and opens it', async () => {
+  it('creates the account with a password and opens it', async () => {
     api.createAccount.mockResolvedValue({ ...detail().account, name: 'New Biz' });
     const dialog = await open();
-    const save = within(dialog).getByRole('button', { name: 'Create and send invitation' });
+    const save = within(dialog).getByRole('button', { name: 'Create account' });
     expect(save).toBeDisabled();
     await userEvent.type(within(dialog).getByLabelText('Business name'), ' New Biz ');
     await userEvent.type(within(dialog).getByLabelText('Owner name'), 'Meera');
@@ -98,15 +98,19 @@ describe('Add account (superadmin)', () => {
     expect(save).toBeDisabled();
     await userEvent.clear(within(dialog).getByLabelText('Owner email'));
     await userEvent.type(within(dialog).getByLabelText('Owner email'), 'meera@example.com');
+    await userEvent.type(within(dialog).getByLabelText(/Owner password/), 'short');
+    expect(save).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText(/Owner password/), '-enough-now');
     await userEvent.type(within(dialog).getByLabelText('Owner phone (optional)'), '+919876543210');
     await userEvent.click(save);
     expect(api.createAccount).toHaveBeenCalledWith({
       businessName: 'New Biz',
       ownerName: 'Meera',
       ownerEmail: 'meera@example.com',
+      ownerPassword: 'short-enough-now',
       ownerPhone: '+919876543210',
     });
-    expect(await screen.findByText(/invitation sent to meera@example.com/)).toBeInTheDocument();
+    expect(await screen.findByText(/The owner can sign in now/)).toBeInTheDocument();
     expect(await screen.findByRole('tab', { name: /overview/i })).toBeInTheDocument();
   });
 
@@ -123,42 +127,63 @@ describe('Add account (superadmin)', () => {
     await userEvent.type(within(dialog).getByLabelText('Business name'), 'New Biz');
     await userEvent.type(within(dialog).getByLabelText('Owner name'), 'Meera');
     await userEvent.type(within(dialog).getByLabelText('Owner email'), 'used@example.com');
-    await userEvent.click(within(dialog).getByRole('button', { name: /Create and send/ }));
+    await userEvent.type(within(dialog).getByLabelText(/Owner password/), 'long-enough-pass');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create account' }));
     expect(await within(dialog).findByText(/already belongs/)).toBeInTheDocument();
     expect(api.createAccount).toHaveBeenCalledWith({
       businessName: 'New Biz',
       ownerName: 'Meera',
       ownerEmail: 'used@example.com',
+      ownerPassword: 'long-enough-pass',
     });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
-  it('offers Resend invitation only while the owner is invited', async () => {
+  it('changes the owner password; checks the repeat and shows a refusal', async () => {
+    signInAs('superadmin');
+    api.account.mockResolvedValue(detail());
+    api.setOwnerPassword
+      .mockRejectedValueOnce(
+        new ApiError({
+          status: 422,
+          code: 'VALIDATION_FAILED',
+          message: 'This password is too common.',
+          kind: 'http',
+        }),
+      )
+      .mockResolvedValueOnce(undefined);
+    renderWithProviders({ route: '/admin/accounts/acc1' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Change password' }));
+    const dialog = screen.getByRole('dialog', { name: 'Change owner password' });
+    const save = within(dialog).getByRole('button', { name: 'Change password' });
+    expect(save).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText(/New password/), 'green-falcon-77');
+    await userEvent.type(within(dialog).getByLabelText(/Repeat password/), 'different');
+    expect(within(dialog).getByText("Passwords don't match.")).toBeInTheDocument();
+    expect(save).toBeDisabled();
+    await userEvent.clear(within(dialog).getByLabelText(/Repeat password/));
+    await userEvent.type(within(dialog).getByLabelText(/Repeat password/), 'green-falcon-77');
+    await userEvent.click(save);
+    expect(await within(dialog).findByText('This password is too common.')).toBeInTheDocument();
+    await userEvent.click(save);
+    expect(api.setOwnerPassword).toHaveBeenLastCalledWith('acc1', 'green-falcon-77');
+    expect(await screen.findByText('Password changed')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('says Set password for an owner invited earlier; Cancel closes', async () => {
     signInAs('superadmin');
     const invited = detail();
     api.account.mockResolvedValue({
       ...invited,
       owner: { ...invited.owner, status: 'invited' } as AdminAccountDetail['owner'],
     });
-    api.resendOwnerInvite
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(
-        new ApiError({ status: 429, code: 'RATE_LIMITED', message: 'Try later.', kind: 'http' }),
-      );
-    const first = renderWithProviders({ route: '/admin/accounts/acc1' });
-    const button = await screen.findByRole('button', { name: 'Resend invitation' });
-    await userEvent.click(button);
-    expect(api.resendOwnerInvite).toHaveBeenCalledWith('acc1');
-    expect(await screen.findByText('Invitation sent')).toBeInTheDocument();
-    await userEvent.click(button);
-    expect(await screen.findByText('Try later.')).toBeInTheDocument();
-    first.unmount();
-
-    api.account.mockResolvedValue(detail());
     renderWithProviders({ route: '/admin/accounts/acc1' });
-    await screen.findByRole('button', { name: 'Impersonate' });
-    expect(screen.queryByRole('button', { name: 'Resend invitation' })).toBeNull();
+    expect(await screen.findByText(/hasn't set a password yet/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Set password' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });
 

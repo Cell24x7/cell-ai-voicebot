@@ -4,7 +4,6 @@ import type { Store } from 'express-rate-limit';
 import type { Env } from './config/env';
 import { createFakeProvider, type AiProvider } from './core/ai';
 import { unavailableAiJobs, type AiJobs } from './core/ai/jobs';
-import { secretBoxKey } from './core/ai/secret-box';
 import { unavailableBillingJobs, type BillingJobs } from './core/billing/jobs';
 import { createPaymentProvider, type PaymentProvider } from './core/payments';
 import type { StorageProvider } from './core/storage';
@@ -32,7 +31,10 @@ import type { ContactJobs } from './modules/contacts/jobs';
 import { createCustomFieldsRouter } from './modules/custom-fields/custom-fields.routes';
 import { createDevJobsRouter } from './modules/dev-jobs/dev-jobs.routes';
 import { createDndRouter, createOptOutRouter } from './modules/dnd/dnd.routes';
-import { createOpenApiHandler } from './modules/docs/openapi.controller';
+import {
+  createOpenApiHandler,
+  createPublicOpenApiHandler,
+} from './modules/docs/openapi.controller';
 import { createFlowAudioRouter } from './modules/flow-audio/flow-audio.routes';
 import { createFlowsRouter } from './modules/flows/flows.routes';
 import { createInboxDisabledRouter, createInboxRouter } from './modules/inbox/inbox.routes';
@@ -48,6 +50,8 @@ import { createKnowledgeRouter } from './modules/knowledge/knowledge.routes';
 import { createMockApisRouter } from './modules/mock-apis/mock.routes';
 import { createNotificationsRouter } from './modules/notifications/notifications.routes';
 import { createWebhooksRouter } from './modules/payments/webhooks.routes';
+import { createAfterCallRouter, createOutcomeRulesRouter } from './modules/post-call/rules.routes';
+import { createMessagesRouter } from './modules/public-api/messages.routes';
 import { createRbacRouter } from './modules/rbac/rbac.routes';
 import { createWsTicketsRouter } from './modules/realtime-tickets/tickets.routes';
 import { createRecordExportsRouter } from './modules/record-exports/record-exports.routes';
@@ -59,11 +63,17 @@ import type { ReportCacheStore } from './modules/reports/cache';
 import { createReportsRouter } from './modules/reports/reports.routes';
 import { createRetentionRouter } from './modules/retention/retention.routes';
 import { createSegmentsRouter } from './modules/segments/segments.routes';
+import { createSheetImportsRouter } from './modules/sheet-imports/sheet-imports.routes';
 import { createSystemRouter } from './modules/system/system.routes';
 import { createTeamRouter } from './modules/team/team.routes';
 import { unavailableTemplateJobs, type TemplateJobs } from './modules/templates/jobs';
 import { createTemplatesRouter } from './modules/templates/templates.routes';
 import { createWalletRouter } from './modules/wallet/wallet.routes';
+import { webhookRuntime, type WebhookHooks } from './modules/webhooks/deliver.job';
+import {
+  createWebhookDeliveriesRouter,
+  createWebhookEndpointsRouter,
+} from './modules/webhooks/endpoints.routes';
 import { createDevSimulatorRouter } from './modules/whatsapp/dev-simulator.routes';
 import { createMetaCallbacksRouter } from './modules/whatsapp/meta-callbacks.routes';
 import { createBusinessProfileRouter } from './modules/whatsapp/profile.routes';
@@ -81,6 +91,8 @@ import { createCallingRouter } from './modules/whatsapp-calling/calling.routes';
 import type { CallingJobs } from './modules/whatsapp-calling/jobs';
 import type { CallingRuntime } from './modules/whatsapp-calling/runtime';
 import { createInboxCallingHook } from './modules/whatsapp-calling/webhooks';
+import { secretBoxKey } from './shared/crypto/secret-box';
+import { AppError } from './shared/errors/app-error';
 
 /** Everything under /api/v1. Add each module router here. */
 /** What the contact modules need: file storage + the background job queue (Phase 3). */
@@ -157,10 +169,12 @@ export const createApiRouter = ({
   campaigns = {},
   whatsapp,
   reports = {},
+  webhooks = {},
 }: {
   env: Pick<
     Env,
     | 'APP_URL'
+    | 'FRONTEND_URL'
     | 'CORS_ORIGINS'
     | 'NODE_ENV'
     | 'PAYMENT_PROVIDER'
@@ -170,6 +184,7 @@ export const createApiRouter = ({
     | 'RAZORPAY_KEY_SECRET'
     | 'RAZORPAY_WEBHOOK_SECRET'
     | 'MOCK_APIS_ENABLED'
+    | 'PORT'
     | 'AI_TEXT_MODELS'
     | 'OPENAI_TEXT_MODEL'
     | 'AI_FUNCTIONS_ALLOW_PRIVATE_HOSTS'
@@ -193,6 +208,8 @@ export const createApiRouter = ({
   whatsapp?: WhatsAppDeps;
   /** Phase 14: report cache (Redis); `null` = no cache. */
   reports?: { cache?: ReportCacheStore | null };
+  /** Phase 15 webhook delivery test hooks (fake resolver / dial to a local receiver, timeout). */
+  webhooks?: WebhookHooks;
 }): Router => {
   const router = Router();
   router.use('/auth', createAuthRouter({ ...auth, env }));
@@ -227,6 +244,7 @@ export const createApiRouter = ({
   );
   router.use('/ws', createWsTicketsRouter());
   router.get('/openapi.json', createOpenApiHandler(env.APP_URL));
+  router.get('/openapi.public.json', createPublicOpenApiHandler(env.APP_URL));
   router.use('/system', createSystemRouter());
   router.use('/rbac', createRbacRouter());
   router.use('/contacts', createOptOutRouter());
@@ -273,6 +291,18 @@ export const createApiRouter = ({
     );
     router.use('/whatsapp', createWhatsAppRouter(whatsappRuntime));
     router.use(
+      '/messages',
+      createMessagesRouter(() => {
+        const storage = whatsappRuntime.storage ?? contacts.storage;
+        if (!storage) throw new AppError('PROVIDER_UNAVAILABLE', 'File storage is not configured.');
+        return {
+          wa: whatsappRuntime.ctx,
+          storage,
+          jobs: whatsappRuntime.inboxJobs ?? unavailableInboxJobs,
+        };
+      }),
+    );
+    router.use(
       '/inbox',
       createInboxRouter({
         ctx: whatsappRuntime.ctx,
@@ -293,6 +323,7 @@ export const createApiRouter = ({
   } else {
     router.use('/whatsapp', createWhatsAppDisabledRouter());
     router.use('/inbox', createInboxDisabledRouter());
+    router.use('/messages', createInboxDisabledRouter({ apiKeys: true }));
   }
   router.use(
     '/webhooks',
@@ -306,6 +337,10 @@ export const createApiRouter = ({
     createContactImportsRouter({ storage: contacts.storage, jobs: contacts.jobs }),
   );
   router.use('/custom-fields', createCustomFieldsRouter({ jobs: contacts.jobs }));
+  router.use(
+    '/sheet-imports',
+    createSheetImportsRouter({ env, ...(contacts.jobs ? { jobs: contacts.jobs } : {}) }),
+  );
   router.use(
     '/agents',
     createAgentsRouter({
@@ -352,8 +387,12 @@ export const createApiRouter = ({
   );
   router.use('/campaigns', createCampaignsRouter(campaigns));
   router.use('/calls', createCallInsightsRouter({ jobs: ai.jobs ?? unavailableAiJobs }));
+  router.use('/calls', createAfterCallRouter());
+  router.use('/outcome-rules', createOutcomeRulesRouter());
   router.use('/reports', createReportsRouter({ cache: reports.cache ?? null }));
   router.use('/report-subscriptions', createReportSubscriptionsRouter());
+  router.use('/webhook-endpoints', createWebhookEndpointsRouter(webhookRuntime(env, webhooks)));
+  router.use('/webhook-deliveries', createWebhookDeliveriesRouter());
   router.use('/report-unsubscribe', createReportUnsubscribeRouter());
   router.use(
     '/exports',
@@ -374,7 +413,7 @@ export const createApiRouter = ({
       }),
     );
   }
-  if (env.MOCK_APIS_ENABLED) router.use('/mock', createMockApisRouter());
+  if (env.MOCK_APIS_ENABLED) router.use('/mock', createMockApisRouter(env));
   if (env.MOCK_APIS_ENABLED && env.NODE_ENV !== 'production') {
     router.use(
       '/dev/jobs',

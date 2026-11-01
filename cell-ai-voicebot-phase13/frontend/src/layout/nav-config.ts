@@ -24,6 +24,8 @@ export interface NavItem {
   icon: SvgIconComponent;
   /** Hidden without this permission. */
   permission?: string;
+  /** Hidden without at least one of these (the page shows the parts each allows). */
+  anyPermission?: readonly string[];
   /** Platform superadmins only. */
   platformOnly?: boolean;
   /** Not built yet — hidden until its phase ships. */
@@ -121,7 +123,8 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Integrations',
     path: '/integrations',
     icon: ExtensionOutlined,
-    permission: 'integrations.manage',
+    // webhooks / after the call need integrations.manage; Google Sheets contacts.import
+    anyPermission: ['integrations.manage', 'contacts.import'],
     phase: 15,
   },
   { key: 'team', label: 'Team', path: '/team', icon: GroupOutlined, permission: 'team.read' },
@@ -160,7 +163,7 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 /** The phase currently shipped — items of later phases are hidden. */
-export const LIVE_PHASE = 14;
+export const LIVE_PHASE = 15;
 
 export const visibleNavItems = (
   can: (permission: string) => boolean,
@@ -171,5 +174,6 @@ export const visibleNavItems = (
     (item) =>
       (item.phase === undefined || item.phase <= livePhase) &&
       (!item.permission || can(item.permission)) &&
+      (!item.anyPermission || item.anyPermission.some(can)) &&
       (!item.platformOnly || isPlatformAdmin),
   );

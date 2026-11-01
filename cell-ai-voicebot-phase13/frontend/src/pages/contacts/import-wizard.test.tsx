@@ -138,6 +138,10 @@ describe('upload step', () => {
     vi.mocked(contactImportsApi.get).mockResolvedValue(job());
     signInAs('manager');
     renderWithProviders({ route: '/contacts/import' });
+    expect(screen.getByRole('link', { name: 'Import from Google Sheet' })).toHaveAttribute(
+      'href',
+      '/integrations/sheets',
+    );
     await userEvent.upload(fileInput(), new File(['x'], 'old.xls'), { applyAccept: false });
     expect(screen.getByText(/save it as .xlsx/)).toBeInTheDocument();
     const big = new File(['x'], 'big.csv');
@@ -194,6 +198,9 @@ describe('upload step', () => {
     expect(screen.queryByText('Options')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Download a sample sheet' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Import from Google Sheet' }),
     ).not.toBeInTheDocument();
   });
 });

@@ -320,3 +320,13 @@ export type RecordExport = Schemas['RecordExport'];
 export type ReportSubscription = Schemas['ReportSubscription'];
 /** Phase 14 per-account retention (settings, effective days, platform, cap, bounds). */
 export type Retention = Schemas['Retention'];
+/** Phase 15 — API key details, webhooks, after-the-call rules, sheet imports. */
+export type ApiKeyScopeInfo = Schemas['ApiKeyScopeInfo'];
+export type ApiRequestLog = Schemas['ApiRequestLog'];
+export type WebhookEndpoint = Schemas['WebhookEndpoint'];
+export type WebhookEndpointWithSecret = Schemas['WebhookEndpointWithSecret'];
+export type WebhookDelivery = Schemas['WebhookDelivery'];
+export type OutcomeRule = Schemas['OutcomeRule'];
+export type AfterCallMessage = Schemas['AfterCallMessage'];
+export type SheetImport = Schemas['SheetImport'];
+export type SheetPreview = Schemas['SheetPreview'];

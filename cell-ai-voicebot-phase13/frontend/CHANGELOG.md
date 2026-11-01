@@ -6,6 +6,23 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Superadmin Add account: password instead of invitation** — 2026-11-01
+  - The superadmin sets the owner's password when creating an account; the owner is active at once and no e-mail is sent.
+  - `POST /api/v1/admin/accounts/:id/owner-password` replaces `resend-owner-invite`: it sets a new password and ends the owner's sessions. An owner invited earlier becomes active.
+
+- **Phase 15 · Batch 3 (T15.8–T15.10) — dev receiver, end-to-end checks** — 2026-11-01
+  - Phase 15 complete (sign-off in the backend repo, `docs/phases/PHASE_15_SIGNOFF.md`). Webhook form: "Use the dev receiver" when the mock APIs are on.
+  - Fixed: managers had no Integrations menu link to their Google Sheets tab.
+  - Playwright `integrations-*.spec.ts`: keys, webhooks, replay, roles, after-call rule, flow Send WhatsApp. Suite 158 → 163. Tests 1436 → 1442, coverage 96.3 / 92.28 / 94 / 97.02. Bundle (gzip): main 315.2 KB, IntegrationsPage 9.7 KB (lazy).
+
+- **Phase 15 · Batch 2 (T15.7) — Integrations, API key details, WhatsApp after calls** — 2026-10-30
+  - Integrations (`/integrations/:tab`, `LIVE_PHASE` 15):
+    - Webhooks: secret shown once, send test, delivery log with filters and replay, failing-endpoint banner.
+    - After the call: rules with a live template preview and values from the contact, the call or the AI insights.
+    - Google Sheets: check the link, map the columns, schedule, run now.
+  - Settings → API keys: grouped scopes, IP allowlist, expiry, a change dialog, a 7-day request log and "Test a key". The flow "Send WhatsApp" step gets number and approved-template pickers. The call page gets an "After the call" card with the exact skip reasons. The contacts import links to Google Sheets.
+  - Tests 1386 → 1436, coverage 96.31 / 92.27 / 94.02 / 97.03. Bundle (gzip): main 314.6 KB (+1.8 KB), IntegrationsPage 9.6 KB (lazy). E2E 158 / 158 (port 3150), backend log grep 0.
+
 - **Phase 14 · Batch 3 (T14.9–T14.10) — end-to-end checks** — 2026-10-28
   - Phase 14 complete (sign-off in the backend repo, `docs/phases/PHASE_14_SIGNOFF.md`): tests 1386 (96.21 / 92.12 / 93.82 / 96.96), Playwright 158 / 158.
   - Playwright `reports-insights.spec.ts` (insights state on a call, outcome change → calls report, calls export file, report e-mail through Mailpit + its unsubscribe link, retention purge → "recording deleted", viewer / agent views) and `insights-chat.spec.ts` (chat summary, chat retention); helpers `e2e/reports.ts`. Suite 151 → 158.

@@ -2,11 +2,13 @@ import { TZDate } from '@date-fns/tz';
 import ArrowBack from '@mui/icons-material/ArrowBack';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
+import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Skeleton from '@mui/material/Skeleton';
 import Step from '@mui/material/Step';
 import StepLabel from '@mui/material/StepLabel';
 import Stepper from '@mui/material/Stepper';
+import Typography from '@mui/material/Typography';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { useState } from 'react';
@@ -119,6 +121,14 @@ export function ImportWizardPage() {
             void navigate(`/contacts/import/${created.id}`, { replace: true });
           }}
         />
+        {kind === 'contacts' && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Keep a Google Sheet in sync instead?{' '}
+            <Link component={RouterLink} to="/integrations/sheets">
+              Import from Google Sheet
+            </Link>
+          </Typography>
+        )}
       </>
     );
   }

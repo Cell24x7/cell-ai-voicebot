@@ -12,6 +12,7 @@ import { enqueueSnackbar } from 'notistack';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
+import { PASSWORD_MIN } from '@/features/auth/schemas';
 import { adminApi } from '@/services/api/admin';
 import { getErrorMessage } from '@/services/api/errors';
 
@@ -19,28 +20,34 @@ import { adminKeys } from './keys';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Creates a customer account; the owner sets their password from the e-mailed invitation. */
+/** Creates a customer account; the owner signs in with the password set here. */
 export function CreateAccountDialog({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [businessName, setBusinessName] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerPassword, setOwnerPassword] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
   const email = ownerEmail.trim();
   const phone = ownerPhone.trim();
-  const ready = businessName.trim().length >= 2 && Boolean(ownerName.trim()) && EMAIL.test(email);
+  const ready =
+    businessName.trim().length >= 2 &&
+    Boolean(ownerName.trim()) &&
+    EMAIL.test(email) &&
+    ownerPassword.length >= PASSWORD_MIN;
   const create = useMutation({
     mutationFn: () =>
       adminApi.createAccount({
         businessName: businessName.trim(),
         ownerName: ownerName.trim(),
         ownerEmail: email,
+        ownerPassword,
         ...(phone ? { ownerPhone: phone } : {}),
       }),
     meta: { silent: true },
     onSuccess: (account) => {
-      enqueueSnackbar(`${account.name} created — invitation sent to ${email}`, {
+      enqueueSnackbar(`${account.name} created. The owner can sign in now.`, {
         variant: 'success',
       });
       void queryClient.invalidateQueries({ queryKey: adminKeys.all });
@@ -53,7 +60,8 @@ export function CreateAccountDialog({ onClose }: { onClose: () => void }) {
       <DialogTitle id="create-account-title">Add account</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 2 }}>
-          The owner gets an e-mail with a link to set their password. The link works for 7 days.
+          The owner signs in with this e-mail and password. No e-mail is sent, so share the password
+          with them yourself.
         </DialogContentText>
         <Stack spacing={2}>
           {create.error && <Alert severity="error">{getErrorMessage(create.error)}</Alert>}
@@ -77,6 +85,14 @@ export function CreateAccountDialog({ onClose }: { onClose: () => void }) {
             onChange={(e) => setOwnerEmail(e.target.value)}
           />
           <TextField
+            label="Owner password"
+            type="password"
+            autoComplete="new-password"
+            value={ownerPassword}
+            onChange={(e) => setOwnerPassword(e.target.value)}
+            helperText={`At least ${PASSWORD_MIN} characters.`}
+          />
+          <TextField
             label="Owner phone (optional)"
             placeholder="+919876543210"
             value={ownerPhone}
@@ -91,7 +107,7 @@ export function CreateAccountDialog({ onClose }: { onClose: () => void }) {
           disabled={!ready || create.isPending}
           onClick={() => create.mutate()}
         >
-          Create and send invitation
+          Create account
         </Button>
       </DialogActions>
     </Dialog>

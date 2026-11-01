@@ -19,6 +19,7 @@ import { Link as RouterLink, useParams } from 'react-router';
 
 import { PageHeader } from '@/components/PageHeader';
 import { useAuthStore } from '@/features/auth/store';
+import { AfterCallCard } from '@/features/calls/detail/AfterCallCard';
 import { RecordingPlayer } from '@/features/calls/detail/RecordingPlayer';
 import { callKeys } from '@/features/calls/keys';
 import {
@@ -269,6 +270,7 @@ export function CallDetailPage() {
               live={live}
               timezone={timezone}
             />
+            {!live && <AfterCallCard callId={c.id} timezone={timezone} />}
             {c.recording?.deletedAt && (
               <Alert severity="info">
                 The recording was deleted on {formatDateOnly(c.recording.deletedAt)} under this

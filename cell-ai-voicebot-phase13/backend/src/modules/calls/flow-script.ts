@@ -4,7 +4,6 @@ import { Types } from 'mongoose';
 import type { Env } from '../../config/env';
 import { FLOW_LIMITS } from '../../config/limits';
 import type { HttpToolOptions } from '../../core/ai/http-tool';
-import { outgoingPolicy } from '../../core/ai/ip-guard';
 import type { AiProvider } from '../../core/ai/types';
 import { mongoStatsRecorder } from '../../core/engine/stats';
 import type { StorageProvider } from '../../core/storage';
@@ -16,6 +15,7 @@ import type { CallDoc } from '../../db/models/call.model';
 import { CallModel } from '../../db/models/call.model';
 import { FlowAudioModel } from '../../db/models/flow-audio.model';
 import { FlowRunModel } from '../../db/models/flow-run.model';
+import { outgoingPolicy } from '../../shared/net/url-guard';
 import { createFlowEffects } from '../flows/effects';
 import { findFlow, type FlowsDeps } from '../flows/flows.service';
 import { resolveStartValues, resolveVersion, type RunContact } from '../flows/run-values';
@@ -62,7 +62,9 @@ export const flowScript = async (call: CallDoc, deps: FlowScriptDeps): Promise<S
     .lean<{ testPhone: string | null }>();
   const { contact, seed } = await resolveStartValues(accountId, graph, {
     contactId: call.contactId,
-    variables: call.manualVariables,
+    variables: call.contactId ? undefined : call.manualVariables,
+    // a public-API call with a contact: its `variables` seed the flow
+    overrides: call.contactId ? call.manualVariables : undefined,
     testPhone: withPhone?.testPhone ?? null,
   });
   // campaign calls: the audience snapshot wins for the fields the flow uses

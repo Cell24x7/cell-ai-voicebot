@@ -1,6 +1,15 @@
+import { PUBLIC_API_LIMITS } from '../../config/limits';
 import { CONTACT_SOURCE_TYPES } from '../../db/models/contact.model';
 import { registry } from '../../shared/openapi/registry';
-import { bearer, errors, noContentResponse, ok, okPage } from '../../shared/openapi/responses';
+import {
+  bearer,
+  bearerOrKey,
+  errors,
+  noContentResponse,
+  ok,
+  okPage,
+  PUBLIC_API_TAG,
+} from '../../shared/openapi/responses';
 import { z } from '../../shared/openapi/zod';
 import { ObjectIdSchema, PaginationQuerySchema, sortSchema } from '../../shared/validation/schemas';
 
@@ -49,6 +58,39 @@ export const UpdateContactBody = z
   .refine((b) => Object.keys(b).length > 0, 'Nothing to update');
 
 export const ContactIdParams = z.strictObject({ id: ObjectIdSchema });
+
+/** Public API: `POST /contacts?upsert=phone|externalId` updates the matching contact instead of a 409. */
+export const CreateContactQuery = z.strictObject({
+  upsert: z.enum(['phone', 'externalId']).optional(),
+});
+
+export const BulkUpsertBody = z.strictObject({
+  upsert: z.enum(['phone', 'externalId']).default('phone'),
+  rows: z.array(CreateContactBody).min(1).max(PUBLIC_API_LIMITS.bulkUpsertMax),
+});
+
+export const BulkUpsertResultSchema = registry.register(
+  'ContactBulkUpsertResult',
+  z.object({
+    created: z.number().int(),
+    updated: z.number().int(),
+    failed: z.number().int(),
+    results: z.array(
+      z.object({
+        index: z.number().int(),
+        status: z.enum(['created', 'updated', 'failed']),
+        id: z.string().optional(),
+        error: z
+          .object({
+            code: z.string(),
+            message: z.string(),
+            details: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
+          })
+          .optional(),
+      }),
+    ),
+  }),
+);
 
 const BoolQuery = z
   .enum(['true', 'false'])
@@ -129,6 +171,7 @@ export const ContactSchema = registry.register(
 );
 
 const tags = ['Contacts'];
+const publicTags = [...tags, PUBLIC_API_TAG];
 const json = <T extends z.ZodType>(schema: T) => ({
   body: { content: { 'application/json': { schema } } },
 });
@@ -136,9 +179,9 @@ const json = <T extends z.ZodType>(schema: T) => ({
 registry.registerPath({
   method: 'get',
   path: '/api/v1/contacts',
-  tags,
+  tags: publicTags,
   summary: 'Contacts with search, filters, sort, pagination (contacts.read)',
-  security: bearer,
+  security: bearerOrKey,
   request: { query: ListContactsQuery },
   responses: { 200: okPage(ContactSchema), 401: errors[401], 403: errors[403], 422: errors[422] },
 });
@@ -156,9 +199,9 @@ registry.registerPath({
 registry.registerPath({
   method: 'get',
   path: '/api/v1/contacts/{id}',
-  tags,
+  tags: publicTags,
   summary: 'One contact with its list names',
-  security: bearer,
+  security: bearerOrKey,
   request: { params: ContactIdParams },
   responses: { 200: ok(ContactSchema), 403: errors[403], 404: errors[404] },
 });
@@ -166,12 +209,13 @@ registry.registerPath({
 registry.registerPath({
   method: 'post',
   path: '/api/v1/contacts',
-  tags,
+  tags: publicTags,
   summary:
-    'Create a contact (contacts.write). A live duplicate phone / external id → 409 with existingId; a deleted one is revived.',
-  security: bearer,
-  request: json(CreateContactBody),
+    'Create a contact (contacts.write). A live duplicate phone / external id → 409 with existingId; a deleted one is revived. `?upsert=phone|externalId` updates the matching contact instead (200). Opt-out / DND are never cleared here.',
+  security: bearerOrKey,
+  request: { ...json(CreateContactBody), query: CreateContactQuery },
   responses: {
+    200: ok(ContactSchema, 'Updated (upsert matched an existing contact)'),
     201: ok(ContactSchema, 'Created'),
     403: errors[403],
     409: errors[409],
@@ -180,11 +224,22 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'post',
+  path: '/api/v1/contacts/bulk-upsert',
+  tags: publicTags,
+  summary:
+    'Create or update up to 1,000 contacts by phone or externalId (contacts.write) — a result per row; one bad row never stops the others. Idempotency-Key optional.',
+  security: bearerOrKey,
+  request: json(BulkUpsertBody),
+  responses: { 200: ok(BulkUpsertResultSchema), 403: errors[403], 422: errors[422] },
+});
+
+registry.registerPath({
   method: 'patch',
   path: '/api/v1/contacts/{id}',
-  tags,
+  tags: publicTags,
   summary: 'Update a contact — variables merge, `null` clears; tags / lists replace',
-  security: bearer,
+  security: bearerOrKey,
   request: { params: ContactIdParams, ...json(UpdateContactBody) },
   responses: {
     200: ok(ContactSchema),
