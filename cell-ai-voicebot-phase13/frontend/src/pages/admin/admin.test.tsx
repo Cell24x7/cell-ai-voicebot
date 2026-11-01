@@ -13,6 +13,8 @@ import { fakeRetention } from '@/test/retention';
 vi.mock('@/services/api/admin', () => ({
   adminApi: {
     accounts: vi.fn(),
+    createAccount: vi.fn(),
+    resendOwnerInvite: vi.fn(),
     account: vi.fn(),
     suspend: vi.fn(),
     enable: vi.fn(),
@@ -69,6 +71,95 @@ const detail = (overrides: Partial<AdminAccountDetail['account']> = {}): AdminAc
       at: '2026-10-08T00:00:00Z',
     },
   ],
+});
+
+describe('Add account (superadmin)', () => {
+  const open = async () => {
+    signInAs('superadmin');
+    api.accounts.mockResolvedValue({
+      success: true,
+      data: [ROW],
+      meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    } as never);
+    api.account.mockResolvedValue(detail());
+    renderWithProviders({ route: '/admin/accounts' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Add account' }));
+    return screen.getByRole('dialog', { name: 'Add account' });
+  };
+
+  it('creates the account, sends the invitation and opens it', async () => {
+    api.createAccount.mockResolvedValue({ ...detail().account, name: 'New Biz' });
+    const dialog = await open();
+    const save = within(dialog).getByRole('button', { name: 'Create and send invitation' });
+    expect(save).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText('Business name'), ' New Biz ');
+    await userEvent.type(within(dialog).getByLabelText('Owner name'), 'Meera');
+    await userEvent.type(within(dialog).getByLabelText('Owner email'), 'not-an-email');
+    expect(save).toBeDisabled();
+    await userEvent.clear(within(dialog).getByLabelText('Owner email'));
+    await userEvent.type(within(dialog).getByLabelText('Owner email'), 'meera@example.com');
+    await userEvent.type(within(dialog).getByLabelText('Owner phone (optional)'), '+919876543210');
+    await userEvent.click(save);
+    expect(api.createAccount).toHaveBeenCalledWith({
+      businessName: 'New Biz',
+      ownerName: 'Meera',
+      ownerEmail: 'meera@example.com',
+      ownerPhone: '+919876543210',
+    });
+    expect(await screen.findByText(/invitation sent to meera@example.com/)).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: /overview/i })).toBeInTheDocument();
+  });
+
+  it('shows server errors and leaves the phone out when empty; cancel closes', async () => {
+    api.createAccount.mockRejectedValue(
+      new ApiError({
+        status: 409,
+        code: 'CONFLICT_DUPLICATE',
+        message: 'This e-mail already belongs to a user.',
+        kind: 'http',
+      }),
+    );
+    const dialog = await open();
+    await userEvent.type(within(dialog).getByLabelText('Business name'), 'New Biz');
+    await userEvent.type(within(dialog).getByLabelText('Owner name'), 'Meera');
+    await userEvent.type(within(dialog).getByLabelText('Owner email'), 'used@example.com');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Create and send/ }));
+    expect(await within(dialog).findByText(/already belongs/)).toBeInTheDocument();
+    expect(api.createAccount).toHaveBeenCalledWith({
+      businessName: 'New Biz',
+      ownerName: 'Meera',
+      ownerEmail: 'used@example.com',
+    });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('offers Resend invitation only while the owner is invited', async () => {
+    signInAs('superadmin');
+    const invited = detail();
+    api.account.mockResolvedValue({
+      ...invited,
+      owner: { ...invited.owner, status: 'invited' } as AdminAccountDetail['owner'],
+    });
+    api.resendOwnerInvite
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(
+        new ApiError({ status: 429, code: 'RATE_LIMITED', message: 'Try later.', kind: 'http' }),
+      );
+    const first = renderWithProviders({ route: '/admin/accounts/acc1' });
+    const button = await screen.findByRole('button', { name: 'Resend invitation' });
+    await userEvent.click(button);
+    expect(api.resendOwnerInvite).toHaveBeenCalledWith('acc1');
+    expect(await screen.findByText('Invitation sent')).toBeInTheDocument();
+    await userEvent.click(button);
+    expect(await screen.findByText('Try later.')).toBeInTheDocument();
+    first.unmount();
+
+    api.account.mockResolvedValue(detail());
+    renderWithProviders({ route: '/admin/accounts/acc1' });
+    await screen.findByRole('button', { name: 'Impersonate' });
+    expect(screen.queryByRole('button', { name: 'Resend invitation' })).toBeNull();
+  });
 });
 
 describe('Admin accounts list', () => {

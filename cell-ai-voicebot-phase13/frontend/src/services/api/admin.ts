@@ -18,8 +18,20 @@ export interface AdminAccountsQuery {
   search?: string;
 }
 
+export interface CreateAccountInput {
+  businessName: string;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone?: string;
+}
+
 /** Superadmin endpoints (`/api/v1/admin/*`). */
 export const adminApi = {
+  createAccount: (body: CreateAccountInput) =>
+    unwrap(apiClient.post<SuccessEnvelope<PublicAccount>>('/admin/accounts', body)),
+  resendOwnerInvite: async (id: string) => {
+    await apiClient.post(`/admin/accounts/${id}/resend-owner-invite`);
+  },
   accounts: async (query: AdminAccountsQuery) =>
     (
       await apiClient.get<ListEnvelope<AdminAccountRow, OffsetPageMeta>>('/admin/accounts', {

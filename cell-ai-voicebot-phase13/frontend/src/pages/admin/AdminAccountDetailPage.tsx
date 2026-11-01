@@ -62,6 +62,12 @@ function Fact({ label, value }: { label: string; value: ReactNode }) {
 
 function Overview({ detail }: { detail: AdminAccountDetail }) {
   const { account, owner, usersByStatus } = detail;
+  const resend = useMutation({
+    mutationFn: () => adminApi.resendOwnerInvite(account.id),
+    meta: { silent: true },
+    onSuccess: () => enqueueSnackbar('Invitation sent', { variant: 'success' }),
+    onError: (e) => enqueueSnackbar(getErrorMessage(e), { variant: 'error' }),
+  });
   return (
     <Stack spacing={3}>
       <Grid container spacing={2}>
@@ -86,6 +92,24 @@ function Overview({ detail }: { detail: AdminAccountDetail }) {
             <CardContent>
               <Stack spacing={1.5}>
                 <Fact label="Owner" value={owner ? `${owner.name} · ${owner.email}` : '—'} />
+                {owner?.status === 'invited' && (
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
+                      The owner hasn&apos;t accepted the invitation yet.
+                    </Typography>
+                    <Button
+                      size="small"
+                      disabled={resend.isPending}
+                      onClick={() => resend.mutate()}
+                    >
+                      Resend invitation
+                    </Button>
+                  </Stack>
+                )}
                 <Fact
                   label="Users"
                   value={`${detail.usersCount} total · ${usersByStatus.active} active · ${usersByStatus.invited} invited · ${usersByStatus.disabled} disabled`}

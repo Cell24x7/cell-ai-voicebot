@@ -1,3 +1,4 @@
+import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
@@ -10,6 +11,7 @@ import { DataTable, type Column } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { RelativeTime } from '@/components/RelativeTime';
 import { StatusChip } from '@/components/StatusChip';
+import { CreateAccountDialog } from '@/features/admin/CreateAccountDialog';
 import { adminKeys } from '@/features/admin/keys';
 import { adminApi, type AdminAccountsQuery } from '@/services/api/admin';
 import type { AdminAccountRow } from '@/services/api/types';
@@ -37,6 +39,7 @@ export function AdminAccountsPage() {
   const [status, setStatus] = useState<AdminAccountsQuery['status'] | ''>('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -61,7 +64,15 @@ export function AdminAccountsPage() {
 
   return (
     <>
-      <PageHeader title="Accounts" subtitle="All customer accounts on the platform." />
+      <PageHeader
+        title="Accounts"
+        subtitle="All customer accounts on the platform."
+        actions={
+          <Button variant="contained" onClick={() => setAdding(true)}>
+            Add account
+          </Button>
+        }
+      />
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
         <TextField
           size="small"
@@ -110,6 +121,7 @@ export function AdminAccountsPage() {
             : undefined
         }
       />
+      {adding && <CreateAccountDialog onClose={() => setAdding(false)} />}
     </>
   );
 }
