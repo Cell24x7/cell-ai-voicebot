@@ -4,8 +4,27 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Inbound messages and delivery statuses no longer scan an account's messages (partial indexes were not used).
+- Sends no longer answer 500 when many hit one wallet at once.
+
 ### Added
 
+- **Phase 16 · Batch 3 (T16.7–T16.11) — compliance, hardening, load checks** — 2026-11-02
+  - Compliance page and CSV, opt-out words, consent warnings, calling-hours ceiling.
+  - Superadmin two-step sign-in, per-account API key limits, a rate limit inventory, audit kept for 2 years.
+  - Load checks: `perf:inbox`, `perf:api`, `perf:ws`, `perf:soak`; results in `docs/ops/capacity.md`.
+
+- **Phase 16 · Batch 2 (T16.4–T16.6) — sensitive fields, erasure, account export and delete** — 2026-11-02
+  - A custom field marked sensitive is sealed at rest. Lists and API keys get the mask; calls and templates get the real value.
+  - `POST /contacts/:id/erase`, bulk erase and suppressions: a leak scan over two accounts proves nothing is left (ADR 0048).
+  - `POST /account/export` (streamed zip) and `POST /account/delete` (7 days to cancel, then a resumable purge). Migration `0018-security-privacy`. New permissions `contacts.erase`, `account.export`, `account.delete`.
+
+- **Phase 16 · Batch 1 (T16.1–T16.3) — threat model, dependency and header fixes, key rotation** — 2026-11-01
+  - `docs/security/THREAT_MODEL.md`, `DATA_MAP.md` (a test requires every model) and `docs/ops/secret-rotation.md`.
+  - `npm audit --omit=dev` reports 0. In production `/api/v1/openapi.json` serves the public spec unless `API_DOCS_ENABLED`. `HSTS_BY_PROXY` ends the double header. `npm run check:headers` tests each DNS address.
+  - Secret box v2 names its key; `ENCRYPTION_KEYS_OLD` and `npm run keys:reseal` rotate keys without downtime (ADR 0047).
 - **Superadmin Add account: password instead of invitation** — 2026-11-01
   - The superadmin sets the owner's password when creating an account; the owner is active at once and no e-mail is sent.
   - `POST /api/v1/admin/accounts/:id/owner-password` replaces `resend-owner-invite`: it sets a new password and ends the owner's sessions. An owner invited earlier becomes active.

@@ -27,6 +27,7 @@ import { useCan, useSession } from '@/features/auth/hooks';
 import { useCanTriggerCalls } from '@/features/calls/queries';
 import { ContactFormDialog } from '@/features/contacts/ContactFormDialog';
 import { ContactStatusChips } from '@/features/contacts/ContactsTab';
+import { EraseContactsDialog } from '@/features/contacts/EraseContactsDialog';
 import { contactKeys, dndKeys } from '@/features/contacts/keys';
 import { useContactTags, useCustomFields, useListOptions } from '@/features/contacts/queries';
 import { contactsApi, type ContactInput } from '@/services/api/contacts';
@@ -78,10 +79,12 @@ export function ContactDetailPage() {
   const can = useCan();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
-  const timezone = useSession()?.account.timezone ?? 'Asia/Kolkata';
+  const session = useSession();
+  const timezone = session?.account.timezone ?? 'Asia/Kolkata';
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const [editing, setEditing] = useState(false);
   const [calling, setCalling] = useState(false);
+  const [erasing, setErasing] = useState(false);
   const canCall = useCanTriggerCalls();
   const fields = useCustomFields();
   const lists = useListOptions();
@@ -278,6 +281,17 @@ export function ContactDetailPage() {
                       Delete
                     </MenuItem>
                   )}
+                  {can('contacts.erase') && !session?.impersonation && (
+                    <MenuItem
+                      onClick={() => {
+                        setMenu(null);
+                        setErasing(true);
+                      }}
+                      sx={{ color: 'error.main' }}
+                    >
+                      Erase permanently
+                    </MenuItem>
+                  )}
                 </Menu>
               </>
             )}
@@ -428,6 +442,17 @@ export function ContactDetailPage() {
           onClose={() => setEditing(false)}
           fields={fields.data ?? []}
           contact={c}
+        />
+      )}
+      {erasing && (
+        <EraseContactsDialog
+          ids={[c.id]}
+          label={c.name ?? phone}
+          onClose={() => setErasing(false)}
+          onDone={() => {
+            void queryClient.invalidateQueries({ queryKey: contactKeys.all });
+            void navigate('/contacts/all');
+          }}
         />
       )}
     </>

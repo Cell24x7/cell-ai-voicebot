@@ -59,6 +59,8 @@ const f = (key: string, label: string, type: CustomField['type']): CustomField =
   required: false,
   defaultValue: null,
   order: 1,
+  sensitive: false,
+  sensitiveJob: null,
   createdAt: 'x',
   updatedAt: 'x',
 });

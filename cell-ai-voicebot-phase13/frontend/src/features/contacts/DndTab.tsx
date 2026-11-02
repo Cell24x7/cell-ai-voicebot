@@ -28,6 +28,7 @@ const SOURCE: Record<DndEntry['source'], string> = {
   upload: 'Uploaded file',
   keyword: 'Said "stop" on a call',
   dtmf: 'Pressed a key on a call',
+  voice: 'Asked on a call',
   whatsapp: 'Sent STOP on WhatsApp',
 };
 

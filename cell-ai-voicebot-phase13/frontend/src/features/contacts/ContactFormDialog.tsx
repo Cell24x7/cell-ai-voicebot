@@ -71,8 +71,9 @@ export function ContactFormDialog({
     meta: { silent: true },
     onSuccess: (saved) => {
       enqueueSnackbar(contact ? 'Contact saved' : 'Contact added', { variant: 'success' });
-      void queryClient.invalidateQueries({ queryKey: contactKeys.all });
+      // the answer has sensitive values masked: refetch, or the page keeps showing the mask
       queryClient.setQueryData(contactKeys.detail(saved.id), saved);
+      void queryClient.invalidateQueries({ queryKey: contactKeys.all });
       onClose();
     },
     onError: (error) => {
@@ -155,12 +156,13 @@ export function ContactFormDialog({
                       key={f.key}
                       label={f.label}
                       required={f.required}
-                      type={INPUT_TYPE[f.type]}
+                      type={f.sensitive ? 'text' : INPUT_TYPE[f.type]}
                       {...form.register(`variables.${f.key}`)}
                       error={Boolean(fieldError)}
                       helperText={fieldError?.message}
                       slotProps={{
-                        inputLabel: f.type === 'date' ? { shrink: true } : undefined,
+                        inputLabel:
+                          f.type === 'date' && !f.sensitive ? { shrink: true } : undefined,
                         input:
                           f.type === 'currency'
                             ? {

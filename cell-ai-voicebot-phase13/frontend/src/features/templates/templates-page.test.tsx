@@ -57,6 +57,8 @@ beforeEach(() => {
       required: false,
       defaultValue: null,
       order: 0,
+      sensitive: false,
+      sensitiveJob: null,
       createdAt: '2026-10-01T00:00:00Z',
       updatedAt: '2026-10-01T00:00:00Z',
     },

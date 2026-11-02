@@ -15,6 +15,7 @@ const ALL = [
   'contacts.write',
   'contacts.import',
   'contacts.export',
+  'contacts.erase',
   'dnd.manage',
   'wallet.read',
   'wallet.topup',
@@ -48,7 +49,7 @@ const ALL = [
 
 /** Mirrors the backend role matrix (PHASE_2_PLAN §1b) for UI tests. */
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
-  owner: ALL,
+  owner: [...ALL, 'account.export', 'account.delete'],
   admin: ALL,
   manager: [
     'account.read',
@@ -142,6 +143,7 @@ export const fakeSession = (
     slug: 'demo-finance',
     status: 'active',
     suspendReason: null,
+    deletion: null,
     ownerId: 'u1',
     isPlatform: role === 'superadmin',
     timezone: 'Asia/Kolkata',

@@ -13,6 +13,9 @@ export const useCustomFields = (withUsage = false) =>
     queryKey: fieldKeys.list(withUsage),
     queryFn: () => customFieldsApi.list(withUsage),
     meta: { silent: true },
+    // while a field's values are being sealed or opened
+    refetchInterval: (query) =>
+      query.state.data?.some((f) => f.sensitiveJob?.status === 'running') ? 3_000 : false,
   });
 
 /** Lists for pickers (first 100, newest first). */

@@ -8,6 +8,7 @@ import type { PriceCategory } from '../../core/billing/whatsapp';
 import { REACTIONS_BILLABLE } from '../../core/meta';
 import { storageKey } from '../../core/storage/keys';
 import { isDuplicateKeyError } from '../../db/errors';
+import { AccountModel } from '../../db/models/account.model';
 import { ContactModel, type ContactDoc } from '../../db/models/contact.model';
 import { ConversationModel, type ConversationDoc } from '../../db/models/conversation.model';
 import { InboxUploadModel, type InboxUploadDoc } from '../../db/models/inbox-upload.model';
@@ -24,9 +25,11 @@ import {
   WhatsAppChannelModel,
   type WhatsAppChannelDoc,
 } from '../../db/models/whatsapp-channel.model';
+import { stringEq } from '../../db/partial-match';
 import { withTransaction } from '../../db/transaction';
 import { AppError, NotFoundError, ValidationError } from '../../shared/errors/app-error';
 import { getLogger } from '../../shared/logger';
+import { isBlockedForOutreach } from '../privacy/suppression';
 import {
   assertMarketingFrequency,
   assertTemplateAllowed,
@@ -63,6 +66,24 @@ const bad = (path: string, message: string) => new ValidationError([{ path, mess
 export const isWindowOpen = (c: Pick<ConversationDoc, 'windowExpiresAt'>, now: Date): boolean =>
   Boolean(c.windowExpiresAt && c.windowExpiresAt > now);
 
+/** Marketing without recorded consent: a warning, or a refusal with `requireOptInForMarketing`. */
+export const consentWarnings = async (
+  accountId: Types.ObjectId,
+  contact: Pick<ContactDoc, 'consent'>,
+  category: string,
+): Promise<string[]> => {
+  if (category !== 'MARKETING' || contact.consent) return [];
+  const account = await AccountModel.findById(accountId)
+    .select({ 'settings.requireOptInForMarketing': 1 })
+    .lean<{ settings?: { requireOptInForMarketing?: boolean } }>();
+  if (account?.settings?.requireOptInForMarketing) {
+    throw new AppError('TEMPLATE_MARKETING_BLOCKED', undefined, [
+      { path: 'contact', message: 'no_consent' },
+    ]);
+  }
+  return ['no_consent'];
+};
+
 export const assertCanSend = async (
   conversation: ConversationDoc,
   now: Date,
@@ -73,6 +94,10 @@ export const assertCanSend = async (
   ).lean<WhatsAppChannelDoc>();
   if (!channel || !SENDABLE.has(channel.status)) throw new AppError('WHATSAPP_CHANNEL_NOT_READY');
   if (conversation.blocked) throw new AppError('WHATSAPP_RECIPIENT_BLOCKED');
+  // a template is business-initiated: an opt-out outlives erasure
+  if (!window && (await isBlockedForOutreach(conversation.accountId, [conversation.phoneE164]))) {
+    throw new AppError('WHATSAPP_RECIPIENT_BLOCKED');
+  }
   // templates (Phase 11) are the way to write when the window is closed
   if (window && !isWindowOpen(conversation, now)) {
     throw new AppError('WHATSAPP_WINDOW_CLOSED', undefined, [
@@ -139,6 +164,8 @@ const cardOf = (c: ContactDoc): MessageContactCard => ({
 });
 
 interface Built {
+  /** Shown to the sender; the message still goes. */
+  warnings?: string[];
   content: NormalizedContent;
   uploads: InboxUploadDoc[];
   reactionTarget: MessageDoc | null;
@@ -377,6 +404,7 @@ const buildTemplateContent = async (
   if (template.category === 'MARKETING') {
     await assertMarketingFrequency(actor.accountId, contact._id, now);
   }
+  const warnings = await consentWarnings(actor.accountId, contact, template.category);
   const prepared = await prepareTemplateSend({ template, contact, variables: input.variables });
   const uploads: InboxUploadDoc[] = [];
   let media: MessageMedia | null = null;
@@ -439,6 +467,7 @@ const buildTemplateContent = async (
     uploads,
     reactionTarget: null,
     prepared,
+    warnings,
   };
 };
 
@@ -520,7 +549,10 @@ const announce = async (
 };
 
 const findByClientId = (actor: SendActor, clientId: string) =>
-  MessageModel.findOne({ accountId: actor.accountId, clientId }).lean<MessageDoc>();
+  MessageModel.findOne({
+    accountId: actor.accountId,
+    clientId: stringEq(clientId),
+  }).lean<MessageDoc>();
 
 /**
  * Sends a message / writes a note (PHASE_10_PLAN §1d): checks, idempotency by
@@ -537,7 +569,7 @@ export const sendMessage = async (
     origin?: Extract<MessageOrigin, 'agent' | 'api' | 'system'>;
     externalRef?: string | null;
   } = {},
-): Promise<{ message: MessageDoc; created: boolean }> => {
+): Promise<{ message: MessageDoc; created: boolean; warnings?: string[] }> => {
   const conversation = await ConversationModel.findOne({
     _id: new Types.ObjectId(conversationId),
     accountId: actor.accountId,
@@ -664,7 +696,7 @@ export const sendMessage = async (
   }
   await announce(conversation, message, { replyTo: reply.target, userId: actor.userId });
   await ix.jobs.enqueueSend(message._id.toString());
-  return { message, created: true };
+  return { message, created: true, warnings: built.warnings ?? [] };
 };
 
 /** A failed outgoing message sent again as a new message (`retryOf`), window re-checked. */

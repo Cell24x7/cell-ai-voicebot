@@ -10,6 +10,7 @@ import {
   type ImportTotals,
 } from '../../db/models/import-job.model';
 import { loadContactContext, type ContactContext } from '../contacts/context';
+import { suppressedPhones } from '../privacy/suppression';
 
 import {
   applyRequired,
@@ -96,6 +97,8 @@ export const analyseBatch = async (
   const existing = new Map<string, ExistingContact>();
   const externalOwner = new Map<string, string>();
   const dnd = new Set<string>();
+  const suppressed =
+    job.kind === 'contacts' ? await suppressedPhones(job.accountId, phones) : new Map();
   if (phones.length) {
     if (job.kind === 'contacts') {
       const found = await ContactModel.find({
@@ -120,7 +123,7 @@ export const analyseBatch = async (
       if (externalIds.length) {
         const owners = await ContactModel.find({
           accountId: job.accountId,
-          externalId: { $in: externalIds },
+          externalId: { $in: externalIds, $type: 'string' },
         })
           .select({ externalId: 1, phoneE164: 1 })
           .lean<{ externalId: string; phoneE164: string }[]>();
@@ -166,6 +169,10 @@ export const analyseBatch = async (
     }
     if (job.kind === 'dnd') {
       return { candidate, cells, outcome: dnd.has(phone) ? 'unchanged' : 'created', reasons: [] };
+    }
+    // an erased or opted-out number doesn't come back through a file or a sheet
+    if (suppressed.has(phone)) {
+      return { candidate, cells, outcome: 'invalid', reasons: ['suppressed'] };
     }
     const match = existing.get(phone);
     const required = applyRequired(

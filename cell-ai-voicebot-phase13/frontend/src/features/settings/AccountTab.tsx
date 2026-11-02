@@ -19,6 +19,8 @@ import { getErrorMessage } from '@/services/api/errors';
 import type { PublicAccount } from '@/services/api/types';
 import { timezoneOptions } from '@/utils/timezone';
 
+import { DataRightsSection } from './DataRightsSection';
+
 // the calling window, call caps and recording live in Settings → Calls
 type Draft = Pick<PublicAccount, 'name' | 'timezone' | 'country' | 'defaultLanguage'> & {
   settings: Pick<PublicAccount['settings'], 'aiDisclosureEnabled'>;
@@ -63,83 +65,88 @@ function AccountForm({ account, canEdit }: { account: PublicAccount; canEdit: bo
     set({ settings: { ...draft.settings, ...patch } });
 
   return (
-    <Paper variant="outlined" sx={{ p: 3 }}>
-      <Stack spacing={3}>
-        {!canEdit && (
-          <Alert severity="info">Only the owner and admins can change these settings.</Alert>
-        )}
-        {save.error && <Alert severity="error">{getErrorMessage(save.error)}</Alert>}
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Business name"
-              value={draft.name}
-              disabled={!canEdit}
-              onChange={(e) => set({ name: e.target.value })}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Autocomplete
-              options={zones}
-              value={draft.timezone}
-              disabled={!canEdit}
-              disableClearable
-              onChange={(_e, v) => set({ timezone: v })}
-              renderInput={(params) => <TextField {...params} label="Timezone" />}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Country (ISO code)"
-              value={draft.country}
-              disabled={!canEdit}
-              onChange={(e) => set({ country: e.target.value.toUpperCase().slice(0, 2) })}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              select
-              label="Default call language"
-              value={draft.defaultLanguage}
-              disabled={!canEdit}
-              onChange={(e) => set({ defaultLanguage: e.target.value as Draft['defaultLanguage'] })}
-            >
-              <MenuItem value="hinglish">Hinglish</MenuItem>
-              <MenuItem value="hi">Hindi</MenuItem>
-              <MenuItem value="en">English</MenuItem>
-            </TextField>
-          </Grid>
-        </Grid>
-        <Stack>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={draft.settings.aiDisclosureEnabled}
+    <Stack spacing={3}>
+      <Paper variant="outlined" sx={{ p: 3 }}>
+        <Stack spacing={3}>
+          {!canEdit && (
+            <Alert severity="info">Only the owner and admins can change these settings.</Alert>
+          )}
+          {save.error && <Alert severity="error">{getErrorMessage(save.error)}</Alert>}
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Business name"
+                value={draft.name}
                 disabled={!canEdit}
-                onChange={(e) => setSettings({ aiDisclosureEnabled: e.target.checked })}
+                onChange={(e) => set({ name: e.target.value })}
               />
-            }
-            label="Tell callers they are speaking with an AI assistant"
-          />
-        </Stack>
-        {canEdit && (
-          <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-            <Button disabled={!dirty} onClick={() => setDraft(draftOf(account))}>
-              Discard
-            </Button>
-            <Button
-              variant="contained"
-              disabled={!dirty || save.isPending}
-              onClick={() => save.mutate(draft)}
-            >
-              Save changes
-            </Button>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Autocomplete
+                options={zones}
+                value={draft.timezone}
+                disabled={!canEdit}
+                disableClearable
+                onChange={(_e, v) => set({ timezone: v })}
+                renderInput={(params) => <TextField {...params} label="Timezone" />}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Country (ISO code)"
+                value={draft.country}
+                disabled={!canEdit}
+                onChange={(e) => set({ country: e.target.value.toUpperCase().slice(0, 2) })}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                select
+                label="Default call language"
+                value={draft.defaultLanguage}
+                disabled={!canEdit}
+                onChange={(e) =>
+                  set({ defaultLanguage: e.target.value as Draft['defaultLanguage'] })
+                }
+              >
+                <MenuItem value="hinglish">Hinglish</MenuItem>
+                <MenuItem value="hi">Hindi</MenuItem>
+                <MenuItem value="en">English</MenuItem>
+              </TextField>
+            </Grid>
+          </Grid>
+          <Stack>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={draft.settings.aiDisclosureEnabled}
+                  disabled={!canEdit}
+                  onChange={(e) => setSettings({ aiDisclosureEnabled: e.target.checked })}
+                />
+              }
+              label="Tell callers they are speaking with an AI assistant"
+            />
           </Stack>
-        )}
-      </Stack>
-    </Paper>
+          {canEdit && (
+            <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+              <Button disabled={!dirty} onClick={() => setDraft(draftOf(account))}>
+                Discard
+              </Button>
+              <Button
+                variant="contained"
+                disabled={!dirty || save.isPending}
+                onClick={() => save.mutate(draft)}
+              >
+                Save changes
+              </Button>
+            </Stack>
+          )}
+        </Stack>
+      </Paper>
+      <DataRightsSection />
+    </Stack>
   );
 }

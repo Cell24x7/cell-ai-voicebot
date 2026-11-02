@@ -35,6 +35,8 @@ const CITY: CustomField = {
   required: false,
   defaultValue: null,
   order: 0,
+  sensitive: false,
+  sensitiveJob: null,
   createdAt: '2026-10-30T05:00:00.000Z',
   updatedAt: '2026-10-30T05:00:00.000Z',
 };

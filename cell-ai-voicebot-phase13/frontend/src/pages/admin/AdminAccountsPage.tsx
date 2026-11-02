@@ -11,6 +11,7 @@ import { DataTable, type Column } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { RelativeTime } from '@/components/RelativeTime';
 import { StatusChip } from '@/components/StatusChip';
+import { AccountDeletionsCard } from '@/features/admin/AccountDeletionsCard';
 import { CreateAccountDialog } from '@/features/admin/CreateAccountDialog';
 import { adminKeys } from '@/features/admin/keys';
 import { adminApi, type AdminAccountsQuery } from '@/services/api/admin';
@@ -97,6 +98,7 @@ export function AdminAccountsPage() {
           <MenuItem value="suspended">Suspended</MenuItem>
         </TextField>
       </Stack>
+      <AccountDeletionsCard />
       <DataTable
         aria-label="Accounts"
         columns={columns}

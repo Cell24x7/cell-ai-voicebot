@@ -86,7 +86,7 @@ const TRI_LABELS: Record<string, [string, string, string]> = {
 export function SegmentBuilder({
   value,
   onChange,
-  fields,
+  fields: allFields,
   serverErrors = {},
 }: {
   value: BuilderState;
@@ -97,6 +97,8 @@ export function SegmentBuilder({
 }) {
   const lists = useListOptions();
   const tags = useContactTags();
+  // a field marked sensitive can't be filtered on
+  const fields = allFields.filter((f) => !f.sensitive);
   const problems = checkConditions(value.conditions, fields);
   const set = (patch: Partial<BuilderState>) => onChange({ ...value, ...patch });
   const setRow = (i: number, patch: Partial<ConditionDraft>) =>

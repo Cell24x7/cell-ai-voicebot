@@ -224,6 +224,13 @@ export function SendTemplateDialog({
       void client.invalidateQueries({ queryKey: inboxKeys.lists });
       void client.invalidateQueries({ queryKey: walletKeys.wallet });
       enqueueSnackbar('Template sent', { variant: 'success' });
+      if (
+        (result.message as { warnings?: string[] } | undefined)?.warnings?.includes('no_consent')
+      ) {
+        enqueueSnackbar('This contact has no recorded consent for marketing.', {
+          variant: 'warning',
+        });
+      }
       onSent?.(result);
       onClose();
     },

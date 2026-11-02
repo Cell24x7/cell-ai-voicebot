@@ -20,7 +20,7 @@ export const customFieldsApi = {
     ),
   create: (body: CustomFieldInput) =>
     unwrap(apiClient.post<SuccessEnvelope<CustomField>>('/custom-fields', body)),
-  update: (id: string, body: Partial<Omit<CustomFieldInput, 'key'>>) =>
+  update: (id: string, body: Partial<Omit<CustomFieldInput, 'key'>> & { sensitive?: boolean }) =>
     unwrap(apiClient.patch<SuccessEnvelope<CustomField>>(`/custom-fields/${id}`, body)),
   reorder: (ids: string[]) =>
     unwrap(apiClient.put<SuccessEnvelope<CustomField[]>>('/custom-fields/order', { ids })),

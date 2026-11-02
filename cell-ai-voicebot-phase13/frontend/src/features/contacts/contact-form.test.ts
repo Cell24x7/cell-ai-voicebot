@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Contact, CustomField } from '@/services/api/types';
+import { SENSITIVE_MASK } from '@/utils/format';
 
 import { buildContactSchema, contactDefaults, toContactInput } from './contact-form';
 
@@ -12,6 +13,8 @@ const f = (key: string, type: CustomField['type'], required = false): CustomFiel
   required,
   defaultValue: null,
   order: 1,
+  sensitive: false,
+  sensitiveJob: null,
   createdAt: 'x',
   updatedAt: 'x',
 });
@@ -105,5 +108,42 @@ describe('edit mode', () => {
     expect(body).not.toHaveProperty('consent');
     const changed = toContactInput({ ...values, consentSource: '' }, FIELDS, contact);
     expect(changed.consent).toBeNull();
+  });
+});
+
+describe('fields marked sensitive', () => {
+  const sensitive = {
+    id: 's',
+    key: 'pan',
+    label: 'PAN',
+    type: 'date',
+    required: true,
+    defaultValue: null,
+    order: 1,
+    sensitive: true,
+    sensitiveJob: null,
+    createdAt: 'x',
+    updatedAt: 'x',
+  } as CustomField;
+  const hidden = {
+    variables: { pan: SENSITIVE_MASK },
+    tags: [],
+    listIds: [],
+  } as unknown as Contact;
+
+  it('keeps the mask and sends no change', () => {
+    const values = contactDefaults([sensitive], hidden);
+    expect(values.variables.pan).toBe(SENSITIVE_MASK);
+    expect(toContactInput(values, [sensitive], hidden).variables).toEqual({});
+    const emptied = { ...values, variables: { pan: '' } };
+    expect(toContactInput(emptied, [sensitive], hidden).variables).toEqual({});
+  });
+
+  it('sends a newly typed value, and skips the type check of the mask', () => {
+    const values = contactDefaults([sensitive], hidden);
+    const typed = { ...values, variables: { pan: 'new' } };
+    expect(toContactInput(typed, [sensitive], hidden).variables).toEqual({ pan: 'new' });
+    const schema = buildContactSchema([sensitive]);
+    expect(schema.shape.variables.safeParse({ pan: SENSITIVE_MASK }).success).toBe(true);
   });
 });

@@ -3,6 +3,7 @@ import type { FieldType } from '@/services/api/types';
 /** Problem reason codes → words (same texts as the server's error report). */
 const REASONS: Record<string, string> = {
   phone_missing: 'Phone is missing',
+  suppressed: 'This number was erased or opted out',
   phone_invalid: 'Phone is not valid',
   phone_lost_digits: 'Phone lost digits in Excel — format the column as Text',
   email_invalid: 'E-mail is not valid',

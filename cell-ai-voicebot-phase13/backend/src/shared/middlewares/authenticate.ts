@@ -26,10 +26,14 @@ export const bearerToken = (header: string | undefined): string | undefined => {
  * `X-API-Key` and no session is authenticated by the key instead — with no
  * permissions, so only routes guarded by `access({ scope })` let it through.
  */
-export const authenticate =
-  ({ apiKeys = false }: { apiKeys?: boolean } = {}): RequestHandler =>
-  async (req, _res, next) => {
-    if (apiKeys && isApiKeyRequest(req)) {
+const guard = (handler: RequestHandler): RequestHandler =>
+  Object.assign(handler, { isAuthGuard: true });
+
+export const authenticate = (
+  options: { apiKeys?: boolean; allowSuspended?: boolean } = {},
+): RequestHandler =>
+  guard(async (req, _res, next) => {
+    if (options.apiKeys && isApiKeyRequest(req)) {
       const key = await resolveApiKey(req);
       req.auth = apiKeyContext(key);
       req.log = req.log.child({ accountId: key.accountId, apiKeyId: key.id });
@@ -67,7 +71,13 @@ export const authenticate =
     if (!role || !account) throw new UnauthenticatedError();
 
     const superadmin = user.platformRole === 'superadmin' && !claims.imp;
-    if (account.status === 'suspended' && !superadmin && !READ_METHODS.has(req.method)) {
+    if (account.status === 'deleted') throw new UnauthenticatedError();
+    if (
+      account.status === 'suspended' &&
+      !superadmin &&
+      !READ_METHODS.has(req.method) &&
+      !options.allowSuspended
+    ) {
       throw new AppError('AUTH_ACCOUNT_SUSPENDED');
     }
 
@@ -95,4 +105,4 @@ export const authenticate =
     };
     req.log = req.log.child({ accountId: claims.acc, userId: claims.sub });
     next();
-  };
+  });

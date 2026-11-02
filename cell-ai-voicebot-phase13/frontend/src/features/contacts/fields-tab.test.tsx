@@ -29,6 +29,8 @@ const field = (id: string, extra: Partial<CustomField>): CustomField => ({
   required: false,
   defaultValue: null,
   order: 1,
+  sensitive: false,
+  sensitiveJob: null,
   usageCount: 0,
   createdAt: 'x',
   updatedAt: 'x',
@@ -54,6 +56,72 @@ const rowOf = async (label: string) =>
   (await within(await screen.findByRole('table', { name: 'Fields' })).findByText(label)).closest(
     'tr',
   ) as HTMLElement;
+
+describe('Fields tab: sensitive', () => {
+  it('asks first, then marks the field and says so', async () => {
+    signInAs('owner');
+    vi.mocked(customFieldsApi.update).mockResolvedValue({
+      ...(FIELDS[2] as CustomField),
+      sensitive: true,
+    });
+    renderWithProviders({ route: '/contacts/fields' });
+    await userEvent.click(await screen.findByRole('switch', { name: 'Branch is sensitive' }));
+    expect(await screen.findByText(/values are encrypted and hidden in lists/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Mark sensitive' }));
+    await waitFor(() =>
+      expect(customFieldsApi.update).toHaveBeenCalledWith('f3', { sensitive: true }),
+    );
+    expect(await screen.findByText('Branch is now sensitive')).toBeInTheDocument();
+  });
+
+  it('asks before removing it, and reports a refusal', async () => {
+    signInAs('owner');
+    vi.mocked(customFieldsApi.list).mockResolvedValue([
+      field('f9', { label: 'PAN', sensitive: true }),
+    ]);
+    vi.mocked(customFieldsApi.update).mockResolvedValueOnce({
+      ...field('f9', { label: 'PAN' }),
+    });
+    renderWithProviders({ route: '/contacts/fields' });
+    await userEvent.click(await screen.findByRole('switch', { name: 'PAN is sensitive' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove' }));
+    expect(await screen.findByText('PAN is no longer sensitive')).toBeInTheDocument();
+    vi.mocked(customFieldsApi.update).mockRejectedValueOnce(
+      new ApiError({
+        status: 422,
+        code: 'VALIDATION_FAILED',
+        kind: 'http',
+        message: 'Remove the default value first',
+      }),
+    );
+    await userEvent.click(await screen.findByRole('switch', { name: 'PAN is sensitive' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove' }));
+    expect(await screen.findByText('Remove the default value first')).toBeInTheDocument();
+  });
+
+  it('shows progress while values move; a viewer sees Yes or No', async () => {
+    signInAs('owner');
+    vi.mocked(customFieldsApi.list).mockResolvedValue([
+      field('f9', {
+        label: 'PAN',
+        sensitive: true,
+        sensitiveJob: { status: 'running', done: 5, total: 9 },
+      }),
+    ]);
+    const { unmount } = renderWithProviders({ route: '/contacts/fields' });
+    expect(await screen.findByText('Updating 5 of 9…')).toBeInTheDocument();
+    unmount();
+    signInAs('viewer');
+    vi.mocked(customFieldsApi.list).mockResolvedValue([
+      field('f9', { label: 'PAN', sensitive: true }),
+      field('f8', { label: 'City' }),
+    ]);
+    renderWithProviders({ route: '/contacts/fields' });
+    const row = await rowOf('PAN');
+    expect(within(row).getByText('Yes')).toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
+});
 
 describe('Fields tab', () => {
   it('shows fields with type, default and usage', async () => {

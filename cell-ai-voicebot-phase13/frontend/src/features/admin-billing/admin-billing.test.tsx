@@ -78,6 +78,7 @@ const DETAIL: AdminAccountDetail = {
   account: { ...base.account, id: 'acc1', name: 'Demo Finance' },
   owner: base.user as AdminAccountDetail['owner'],
   usersCount: 3,
+  apiLimits: null,
   usersByStatus: { active: 3, invited: 0, disabled: 0 },
   retention: fakeRetention(),
   limits: { maxConcurrentCalls: 10, dialsPerMinute: 60 },

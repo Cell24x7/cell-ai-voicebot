@@ -2,6 +2,8 @@ import { apiClient, unwrap } from './client';
 import type {
   Contact,
   ContactFilter,
+  EraseJob,
+  EraseResult,
   ListEnvelope,
   OffsetPageMeta,
   SuccessEnvelope,
@@ -60,6 +62,21 @@ export const contactsApi = {
   update: (id: string, body: ContactInput) =>
     unwrap(apiClient.patch<SuccessEnvelope<Contact>>(`/contacts/${id}`, body)),
   remove: (id: string) => apiClient.delete(`/contacts/${id}`).then(() => undefined),
+  erase: (id: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<EraseResult>>(`/contacts/${id}/erase`, {
+        confirm: 'ERASE',
+      }),
+    ),
+  bulkErase: (ids: string[]) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<EraseJob>>('/contacts/bulk-erase', {
+        ids,
+        confirm: 'ERASE',
+      }),
+    ),
+  eraseJob: (id: string) =>
+    unwrap(apiClient.get<SuccessEnvelope<EraseJob>>(`/contacts/erase-jobs/${id}`)),
   tags: () =>
     unwrap(apiClient.get<SuccessEnvelope<{ tag: string; count: number }[]>>('/contact-tags')),
   bulk: async (body: BulkRequest) =>

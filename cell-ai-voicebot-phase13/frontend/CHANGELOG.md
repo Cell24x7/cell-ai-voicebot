@@ -4,8 +4,20 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- A contact page no longer shows the mask for a sensitive value right after saving.
+
 ### Added
 
+- **Phase 16 · Batch 3 — compliance and hardening** — 2026-11-02
+  - Settings → Compliance, two-step sign-in in Settings → Security, API key limits on the superadmin account page.
+
+- **Phase 16 · Batch 2 (T16.4–T16.6) — data rights** — 2026-11-02
+  - Sensitive switch in Contact fields, Erase permanently on contacts, and Your data in Settings → Account (export, delete, grace banner). Superadmin list of accounts waiting to be deleted.
+
+- **Phase 16 · Batch 1 (T16.2) — dependency fixes** — 2026-11-01
+  - `npm audit --omit=dev` reports 0 (follow-redirects, zod, fast-uri, seroval).
 - **Superadmin Add account: password instead of invitation** — 2026-11-01
   - The superadmin sets the owner's password when creating an account; the owner is active at once and no e-mail is sent.
   - `POST /api/v1/admin/accounts/:id/owner-password` replaces `resend-owner-invite`: it sets a new password and ends the owner's sessions. An owner invited earlier becomes active.

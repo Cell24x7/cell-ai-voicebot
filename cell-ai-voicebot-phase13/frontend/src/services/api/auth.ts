@@ -32,6 +32,22 @@ export const authApi = {
     unwrap(apiClient.post<SuccessEnvelope<Message>>('/auth/verify-email/resend', { email })),
   login: (body: { email: string; password: string }) =>
     unwrap(apiClient.post<SuccessEnvelope<AuthSession>>('/auth/login', body)),
+  mfaStatus: () =>
+    unwrap(
+      apiClient.get<SuccessEnvelope<{ enabled: boolean; enforced: boolean }>>('/auth/mfa/status'),
+    ),
+  mfaSetup: () =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<{ secret: string; otpauthUrl: string }>>('/auth/mfa/setup'),
+    ),
+  mfaConfirm: (code: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<{ recoveryCodes: string[] }>>('/auth/mfa/confirm', { code }),
+    ),
+  mfaVerify: (code: string) =>
+    unwrap(apiClient.post<SuccessEnvelope<{ verified: true }>>('/auth/mfa/verify', { code })),
+  mfaDisable: (body: { password: string; code: string }) =>
+    unwrap(apiClient.post<SuccessEnvelope<{ disabled: true }>>('/auth/mfa/disable', body)),
   refresh: () => unwrap(apiClient.post<SuccessEnvelope<AuthSession>>('/auth/refresh')),
   logout: () => apiClient.post('/auth/logout').then(() => undefined),
   logoutAll: () => apiClient.post('/auth/logout-all').then(() => undefined),

@@ -13,6 +13,8 @@ import {
 } from '../../db/models/contact.model';
 import { DndEntryModel } from '../../db/models/dnd-entry.model';
 import { SegmentModel } from '../../db/models/segment.model';
+import { stringEq } from '../../db/partial-match';
+import { requireAuth } from '../../shared/auth/auth-context';
 import { tenantFilter, toObjectId } from '../../shared/auth/tenant';
 import {
   ConflictError,
@@ -22,6 +24,8 @@ import {
 } from '../../shared/errors/app-error';
 import type { SortField } from '../../shared/validation/schemas';
 import { auditRequest } from '../audit/audit.service';
+import { readContactVariables, sealContactVariables, SENSITIVE_MASK } from '../privacy/sensitive';
+import { isBlockedForOutreach, suppressedPhones } from '../privacy/suppression';
 
 import type {
   CONTACT_SORT_FIELDS,
@@ -78,7 +82,7 @@ export const toPublicContact = (c: ContactDoc): PublicContact => ({
   name: c.name ?? null,
   email: c.email ?? null,
   externalId: c.externalId ?? null,
-  variables: variablesObject(c.variables),
+  variables: readContactVariables(c, { purpose: 'list' }),
   tags: [...c.tags],
   listIds: c.listIds.map((id) => id.toString()),
   dnd: c.dnd,
@@ -206,9 +210,15 @@ const listNames = async (accountId: Types.ObjectId, ids: Types.ObjectId[]) => {
 };
 
 export const getContact = async (req: Request, id: string): Promise<PublicContact> => {
+  const auth = requireAuth(req);
   const contact = await findLive(req, id);
   return {
     ...toPublicContact(contact),
+    variables: readContactVariables(contact, {
+      purpose: 'view',
+      // API keys never get them; on the contact page they follow `contacts.export`
+      reveal: auth.kind === 'user' && auth.permissions.has('contacts.export'),
+    }),
     lists: await listNames(contact.accountId, contact.listIds),
   };
 };
@@ -285,6 +295,7 @@ const normalizeInput = (
         delete merged[key];
         continue;
       }
+      if (raw === SENSITIVE_MASK) continue; // a form sent back the mask: no change
       const parsed = parseFieldValue(field.type, raw, { country: ctx.country });
       if (!parsed.ok) {
         errors.push({
@@ -304,7 +315,10 @@ const normalizeInput = (
         errors.push({ path: `variables.${key}`, message: 'Required' });
       }
     }
-    variables = checked.variables;
+    variables = sealContactVariables(
+      checked.variables,
+      new Set(ctx.fields.filter((f) => f.sensitive).map((f) => f.key)),
+    ) as Record<string, VariableValue>;
   }
 
   if (errors.length) throw new ValidationError(errors);
@@ -333,7 +347,11 @@ const assertNoDuplicates = async (
     if (dup) throw duplicateError('phone', dup._id.toString());
   }
   if (externalId) {
-    const dup = await ContactModel.findOne({ accountId, externalId, ...notSelf })
+    const dup = await ContactModel.findOne({
+      accountId,
+      externalId: stringEq(externalId),
+      ...notSelf,
+    })
       .select({ _id: 1 })
       .lean();
     if (dup) throw duplicateError('externalId', dup._id.toString());
@@ -346,7 +364,9 @@ export const isPhoneOnDnd = async (
   phones: readonly string[],
 ): Promise<boolean> =>
   phones.length > 0 &&
-  Boolean(await DndEntryModel.exists({ accountId, phoneE164: { $in: [...new Set(phones)] } }));
+  (Boolean(await DndEntryModel.exists({ accountId, phoneE164: { $in: [...new Set(phones)] } })) ||
+    // an opt-out or DND of an erased person lives on as a suppression
+    (await isBlockedForOutreach(accountId, phones)));
 
 const isOnDnd = (accountId: Types.ObjectId, phoneE164: string): Promise<boolean> =>
   isPhoneOnDnd(accountId, [phoneE164]);
@@ -369,6 +389,14 @@ export const createContact = async (
   const input = normalizeInput(ctx, body);
   const phoneE164 = input.phoneE164 as string;
   const externalId = (input.set.externalId as string | null | undefined) ?? null;
+  // a person can be added back by hand after a plain erase; never by an API key or after an opt-out
+  const suppression = (await suppressedPhones(ctx.accountId, [phoneE164])).get(phoneE164);
+  if (suppression && (suppression !== 'erased' || requireAuth(req).kind === 'api_key')) {
+    throw new ConflictError(
+      'CONFLICT_INVALID_STATE',
+      "This number was erased or opted out, so it can't be added again.",
+    );
+  }
   await assertNoDuplicates(ctx.accountId, { phoneE164, externalId });
   const listIds = await assertOwnLists(ctx.accountId, body.listIds ?? []);
   const fields = {

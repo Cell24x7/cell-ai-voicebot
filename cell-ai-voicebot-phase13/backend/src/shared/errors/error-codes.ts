@@ -238,6 +238,25 @@ export const ERROR_CODES = {
     status: 422,
     message: 'You already have the most webhooks allowed. Remove one first.',
   },
+  CONTACT_ERASE_BLOCKED: {
+    status: 409,
+    message: 'This contact is on a live call. Try again when the call ends.',
+  },
+  ACCOUNT_EXPORT_IN_PROGRESS: {
+    status: 409,
+    message: 'An export is already running. Wait for it to finish.',
+  },
+  ACCOUNT_DELETE_BLOCKED: {
+    status: 409,
+    message: 'Money is on hold for a live call or send. Try again when it finishes.',
+  },
+  REAUTH_FAILED: { status: 422, message: 'That password is not correct.' },
+  MFA_REQUIRED: { status: 403, message: 'Enter your two-step code to continue.' },
+  MFA_INVALID: { status: 422, message: 'That code is not correct.' },
+  SENSITIVE_FIELD_NOT_ALLOWED: {
+    status: 422,
+    message: "A field marked sensitive can't be searched or filtered.",
+  },
 } as const satisfies Record<string, { status: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

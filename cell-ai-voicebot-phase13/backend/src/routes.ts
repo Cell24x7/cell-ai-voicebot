@@ -14,6 +14,7 @@ import type { FunctionsDeps } from './modules/ai-agents/functions.service';
 import { createApiKeysRouter } from './modules/api-keys/api-keys.routes';
 import { createAuditRouter } from './modules/audit/audit.routes';
 import { createAuthRouter, type AuthRouterDeps } from './modules/auth/auth.routes';
+import { createMfaRouter } from './modules/auth/mfa.routes';
 import { createBillingRouter } from './modules/billing/billing.routes';
 import { createInvoicesRouter } from './modules/billing/invoices.routes';
 import type { CallManager } from './modules/calls/call.service';
@@ -23,11 +24,16 @@ import {
   createCampaignsRouter,
   type CampaignsRouterDeps,
 } from './modules/campaigns/campaigns.routes';
+import {
+  createAdminComplianceRouter,
+  createComplianceRouter,
+} from './modules/compliance/compliance.routes';
 import { createContactExportsRouter } from './modules/contact-exports/contact-exports.routes';
 import { createContactImportsRouter } from './modules/contact-imports/contact-imports.routes';
 import { createContactListsRouter } from './modules/contact-lists/contact-lists.routes';
 import { createContactTagsRouter, createContactsRouter } from './modules/contacts/contacts.routes';
 import type { ContactJobs } from './modules/contacts/jobs';
+import { unavailableContactJobs } from './modules/contacts/jobs';
 import { createCustomFieldsRouter } from './modules/custom-fields/custom-fields.routes';
 import { createDevJobsRouter } from './modules/dev-jobs/dev-jobs.routes';
 import { createDndRouter, createOptOutRouter } from './modules/dnd/dnd.routes';
@@ -51,6 +57,10 @@ import { createMockApisRouter } from './modules/mock-apis/mock.routes';
 import { createNotificationsRouter } from './modules/notifications/notifications.routes';
 import { createWebhooksRouter } from './modules/payments/webhooks.routes';
 import { createAfterCallRouter, createOutcomeRulesRouter } from './modules/post-call/rules.routes';
+import {
+  createAccountPrivacyRouter,
+  createContactEraseRouter,
+} from './modules/privacy/privacy.routes';
 import { createMessagesRouter } from './modules/public-api/messages.routes';
 import { createRbacRouter } from './modules/rbac/rbac.routes';
 import { createWsTicketsRouter } from './modules/realtime-tickets/tickets.routes';
@@ -174,6 +184,8 @@ export const createApiRouter = ({
   env: Pick<
     Env,
     | 'APP_URL'
+    | 'API_DOCS_ENABLED'
+    | 'MFA_ENFORCED_FOR_ADMINS'
     | 'FRONTEND_URL'
     | 'CORS_ORIGINS'
     | 'NODE_ENV'
@@ -219,7 +231,17 @@ export const createApiRouter = ({
       createInboxSettingsRouter({ retentionDays: whatsapp.ctx.env.INBOX_RETENTION_DAYS }),
     );
   }
+  router.use(
+    '/account',
+    createAccountPrivacyRouter({
+      storage: contacts.storage,
+      jobs: contacts.jobs ?? unavailableContactJobs,
+    }),
+  );
   router.use('/account', createAccountInsightsRouter());
+  router.use('/auth/mfa', createMfaRouter());
+  router.use('/account', createComplianceRouter());
+  router.use('/admin', createAdminComplianceRouter());
   router.use('/account', createRetentionRouter());
   router.use('/account', createAccountRouter());
   router.use('/inbox', createChatSummaryRouter({ jobs: ai.jobs ?? unavailableAiJobs }));
@@ -240,14 +262,26 @@ export const createApiRouter = ({
     : undefined;
   router.use(
     '/admin',
-    createAdminRouter({ env, provider: ai.provider, whatsapp: whatsappRuntime }),
+    createAdminRouter({
+      env,
+      provider: ai.provider,
+      whatsapp: whatsappRuntime,
+      storage: contacts.storage,
+    }),
   );
   router.use('/ws', createWsTicketsRouter());
-  router.get('/openapi.json', createOpenApiHandler(env.APP_URL));
+  router.get('/openapi.json', createOpenApiHandler(env.APP_URL, env.API_DOCS_ENABLED));
   router.get('/openapi.public.json', createPublicOpenApiHandler(env.APP_URL));
   router.use('/system', createSystemRouter());
   router.use('/rbac', createRbacRouter());
   router.use('/contacts', createOptOutRouter());
+  router.use(
+    '/contacts',
+    createContactEraseRouter({
+      storage: contacts.storage,
+      jobs: contacts.jobs ?? unavailableContactJobs,
+    }),
+  );
   router.use('/contacts', createContactsRouter({ jobs: contacts.jobs }));
   router.use(
     '/contact-exports',

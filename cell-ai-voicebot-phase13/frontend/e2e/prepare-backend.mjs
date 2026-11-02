@@ -28,6 +28,17 @@ run('docker', [
 ]);
 run('docker', ['exec', 'cav-redis', 'redis-cli', '-n', E2E_REDIS_DB, 'FLUSHDB']);
 run('npm', ['run', '--silent', 'db:migrate']);
+// specs dial at any time of day; the production ceiling has its own tests in the backend
+run('docker', [
+  'exec',
+  'cav-mongo',
+  'mongosh',
+  '--port',
+  '27018',
+  '--quiet',
+  '--eval',
+  `db.getSiblingDB('${E2E_DB}').platformSettings.updateOne({ key: 'callingWindowCeiling' }, { $set: { value: { start: '00:00', end: '23:59' } } }, { upsert: true })`,
+]);
 run(
   'npm',
   [

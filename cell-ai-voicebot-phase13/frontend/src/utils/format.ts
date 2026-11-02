@@ -33,12 +33,16 @@ export const formatDateOnly = (iso: string): string => {
 export const formatNumber = (n: number): string => numberFormat.format(n);
 
 /** A stored variable value for display (currency micros, date-only, numbers en-IN). */
+/** What the API shows instead of a value in a field marked sensitive. */
+export const SENSITIVE_MASK = '••••';
+
 export const formatFieldValue = (
   type: FieldType,
   value: string | number | null | undefined,
   formatPhone: (e164: string) => string = (p) => p,
 ): string => {
   if (value === null || value === undefined || value === '') return '—';
+  if (value === SENSITIVE_MASK) return value;
   switch (type) {
     case 'currency':
       return typeof value === 'number' ? formatCurrencyMicros(value) : String(value);

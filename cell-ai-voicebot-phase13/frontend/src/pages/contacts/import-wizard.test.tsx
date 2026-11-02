@@ -43,6 +43,8 @@ const FIELDS: CustomField[] = [
     required: true,
     defaultValue: null,
     order: 1,
+    sensitive: false,
+    sensitiveJob: null,
     createdAt: 'x',
     updatedAt: 'x',
   },

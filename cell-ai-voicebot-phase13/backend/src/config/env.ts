@@ -51,6 +51,12 @@ const RawEnvSchema = z.object({
   LOG_LEVEL: LogLevelSchema.optional(),
   TRUST_PROXY: optionalString,
   API_DOCS_ENABLED: z.enum(['true', 'false'], { message: 'must be true or false' }).optional(),
+  /** nginx sends Strict-Transport-Security, so the API must not (one owner, no double header). */
+  HSTS_BY_PROXY: z.enum(['true', 'false'], { message: 'must be true or false' }).optional(),
+  /** Big superadmin actions need a fresh two-step code. Turn on after setup. */
+  MFA_ENFORCED_FOR_ADMINS: z
+    .enum(['true', 'false'], { message: 'must be true or false' })
+    .optional(),
 
   MONGODB_URI: z
     .string()
@@ -71,6 +77,10 @@ const RawEnvSchema = z.object({
   JWT_ACCESS_TTL: z.string().regex(DURATION, 'must look like 15m, 30d, 3600s').default('15m'),
   JWT_REFRESH_TTL: z.string().regex(DURATION, 'must look like 15m, 30d, 3600s').default('30d'),
   ENCRYPTION_KEY: optionalString,
+  /** Previous keys during a rotation (comma list, each base64 of 32 bytes); opened, never written. */
+  ENCRYPTION_KEYS_OLD: optionalString,
+  /** Phone hash of erased and opted-out people. Never rotated: a new key loses every record. */
+  SUPPRESSION_HMAC_KEY: optionalString,
   /** Cookie domain for the refresh cookie (e.g. `.example.com`); empty = host-only. */
   AUTH_COOKIE_DOMAIN: optionalString,
   /** DEV ONLY — password for `npm run db:seed` users (random when empty). */
@@ -251,6 +261,8 @@ export type Env = Readonly<
     | 'SMTP_SECURE'
     | 'MAIL_FROM'
     | 'API_DOCS_ENABLED'
+    | 'HSTS_BY_PROXY'
+    | 'MFA_ENFORCED_FOR_ADMINS'
     | 'PAYMENT_PROVIDER'
     | 'FAKE_PAYMENT_SECRET'
     | 'BILLING_SELLER_NAME'
@@ -289,6 +301,8 @@ export type Env = Readonly<
     SMTP_SECURE: boolean;
     MAIL_FROM: string;
     API_DOCS_ENABLED: boolean;
+    HSTS_BY_PROXY: boolean;
+    MFA_ENFORCED_FOR_ADMINS: boolean;
     PAYMENT_PROVIDER: 'fake' | 'razorpay';
     /** Only for the fake provider (never set in production). */
     FAKE_PAYMENT_SECRET: string | undefined;
@@ -444,6 +458,22 @@ export const loadEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
       'ENCRYPTION_KEY',
       'required in production, base64 of exactly 32 bytes',
       key !== undefined && BASE64.test(key) && Buffer.from(key, 'base64').length === 32,
+    );
+  }
+
+  for (const old of (raw.ENCRYPTION_KEYS_OLD ?? '').split(',').filter((k) => k.trim() !== '')) {
+    check(
+      'ENCRYPTION_KEYS_OLD',
+      'each key must be base64 of exactly 32 bytes',
+      BASE64.test(old.trim()) && Buffer.from(old.trim(), 'base64').length === 32,
+    );
+  }
+  if (raw.SUPPRESSION_HMAC_KEY !== undefined) {
+    check(
+      'SUPPRESSION_HMAC_KEY',
+      'must be base64 of at least 32 bytes',
+      BASE64.test(raw.SUPPRESSION_HMAC_KEY) &&
+        Buffer.from(raw.SUPPRESSION_HMAC_KEY, 'base64').length >= 32,
     );
   }
 
@@ -716,6 +746,8 @@ export const loadEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
     MAIL_FROM: raw.MAIL_FROM ?? DEV_MAIL_FROM,
     API_DOCS_ENABLED:
       raw.API_DOCS_ENABLED !== undefined ? raw.API_DOCS_ENABLED === 'true' : !production,
+    HSTS_BY_PROXY: raw.HSTS_BY_PROXY === 'true',
+    MFA_ENFORCED_FOR_ADMINS: raw.MFA_ENFORCED_FOR_ADMINS === 'true',
     PAYMENT_PROVIDER: paymentProvider,
     FAKE_PAYMENT_SECRET:
       paymentProvider === 'fake'

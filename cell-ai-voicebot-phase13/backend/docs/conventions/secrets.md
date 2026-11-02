@@ -1,5 +1,7 @@
 # Secrets & Environment Variables Policy
 
+Rotation steps for every secret: [secret-rotation.md](../ops/secret-rotation.md). What is encrypted, what isn't, and why: [ADR 0047](../adr/0047-encryption-key-rotation.md). A new sealed field must be added to `src/shared/crypto/sealed-registry.ts`; a test fails otherwise.
+
 ## Naming
 
 - Env vars use `UPPER_SNAKE_CASE`.

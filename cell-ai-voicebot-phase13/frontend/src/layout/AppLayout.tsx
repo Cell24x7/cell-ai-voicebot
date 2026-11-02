@@ -3,6 +3,7 @@ import Toolbar from '@mui/material/Toolbar';
 import { lazy, Suspense, useState } from 'react';
 import { Outlet } from 'react-router';
 
+import { MfaPrompt } from '@/features/settings/MfaSection';
 import { useWalletLiveUpdates } from '@/features/wallet/useWalletLiveUpdates';
 
 import { Banners } from './Banners';
@@ -28,6 +29,7 @@ export function AppLayout() {
       >
         <Toolbar />
         <Banners />
+        <MfaPrompt />
         <Outlet />
       </Box>
       <Suspense fallback={null}>

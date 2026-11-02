@@ -15,6 +15,7 @@ vi.mock('@/services/api/admin', () => ({
     accounts: vi.fn(),
     createAccount: vi.fn(),
     setOwnerPassword: vi.fn(),
+    setApiLimits: vi.fn(),
     account: vi.fn(),
     suspend: vi.fn(),
     enable: vi.fn(),
@@ -49,6 +50,7 @@ const detail = (overrides: Partial<AdminAccountDetail['account']> = {}): AdminAc
   owner: base.user as AdminAccountDetail['owner'],
   usersCount: 3,
   retention: fakeRetention(),
+  apiLimits: null,
   usersByStatus: { active: 2, invited: 1, disabled: 0 },
   limits: { maxConcurrentCalls: 10, dialsPerMinute: 60 },
   activeCampaigns: 1,
@@ -184,6 +186,37 @@ describe('Add account (superadmin)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Set password' }));
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+});
+
+describe('API key limits (superadmin)', () => {
+  it('saves valid limits, clears them, and refuses out-of-range values', async () => {
+    signInAs('superadmin');
+    api.account.mockResolvedValue({
+      ...detail(),
+      apiLimits: { readsPerMinute: 700, writesPerMinute: 70 },
+    });
+    api.setApiLimits.mockResolvedValue({});
+    renderWithProviders({ route: '/admin/accounts/acc1' });
+    const reads = await screen.findByLabelText(/^Reads/);
+    const writes = screen.getByLabelText(/^Writes/);
+    expect(reads).toHaveValue('700');
+    const save = screen.getByRole('button', { name: 'Save API limits' });
+    await userEvent.clear(writes);
+    await userEvent.type(writes, '601');
+    expect(save).toBeDisabled();
+    await userEvent.clear(writes);
+    await userEvent.type(writes, '100');
+    await userEvent.click(save);
+    expect(api.setApiLimits).toHaveBeenLastCalledWith('acc1', {
+      readsPerMinute: 700,
+      writesPerMinute: 100,
+    });
+    expect(await screen.findByText(/API limits saved/)).toBeInTheDocument();
+    await userEvent.clear(reads);
+    await userEvent.clear(writes);
+    await userEvent.click(save);
+    expect(api.setApiLimits).toHaveBeenLastCalledWith('acc1', null);
   });
 });
 

@@ -259,6 +259,7 @@ describe('SettingsPage', () => {
       'Calls',
       'Inbox',
       'AI & outcomes',
+      'Compliance',
       'Data retention',
       'Notifications',
       'Billing details',
@@ -278,6 +279,7 @@ describe('SettingsPage', () => {
       'Calls',
       'Inbox',
       'AI & outcomes',
+      'Compliance',
       'Data retention',
     ]);
   });

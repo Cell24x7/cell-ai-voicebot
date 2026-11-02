@@ -3,7 +3,18 @@ import mongoose, { Schema, type Model, type Types } from 'mongoose';
 import { CALL_LIMITS, CALL_LINES, INBOX_LIMITS, INSIGHTS_LIMITS } from '../../config/limits';
 import { basePlugin } from '../plugins/base';
 
-export type AccountStatus = 'active' | 'suspended';
+export type AccountStatus = 'active' | 'suspended' | 'deleted';
+
+/** An owner asked to delete the account; a job purges it after the grace (Phase 16). */
+export interface AccountDeletion {
+  status: 'scheduled' | 'purging' | 'purged';
+  requestedAt: Date;
+  requestedBy: Types.ObjectId | null;
+  scheduledFor: Date;
+  purgedAt: Date | null;
+  /** Webhooks this request turned off; they come back on cancel. */
+  pausedWebhookIds?: Types.ObjectId[];
+}
 export type AccountLanguage = 'hi' | 'en' | 'hinglish';
 
 export interface CallingWindow {
@@ -106,6 +117,8 @@ export interface AccountSettings {
   /** Said at the start of every recorded call (Phase 7). */
   recordingNotice: string;
   aiDisclosureEnabled: boolean;
+  /** Marketing template without recorded consent: refuse (true) or warn (false, default). */
+  requireOptInForMarketing?: boolean;
   inbox: AccountInboxSettings;
   /** Phase 11 — absent on accounts created before migration 0012. */
   templates?: AccountTemplateSettings;
@@ -170,6 +183,9 @@ export interface AccountDoc {
   /** Superadmin upper limit for this account (Phase 14); `null` = the platform default. */
   retentionCap?: AccountRetentionCap | null;
   billing?: (BillingProfile & { updatedAt: Date }) | null;
+  deletion?: AccountDeletion | null;
+  /** Requests per minute for this account's API keys; `null` = the default. */
+  apiLimits?: { readsPerMinute: number; writesPerMinute: number } | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -275,8 +291,15 @@ export const DEFAULT_ACCOUNT_WHATSAPP: AccountWhatsApp = { metaPayer: 'platform'
 const schema = new Schema<AccountDoc>({
   name: { type: String, required: true, trim: true, maxlength: 80 },
   slug: { type: String, required: true, lowercase: true, trim: true, maxlength: 60 },
-  status: { type: String, enum: ['active', 'suspended'], default: 'active', required: true },
+  status: {
+    type: String,
+    enum: ['active', 'suspended', 'deleted'],
+    default: 'active',
+    required: true,
+  },
   suspendedAt: { type: Date, default: null },
+  deletion: { type: Schema.Types.Mixed, default: null },
+  apiLimits: { type: Schema.Types.Mixed, default: null },
   suspendReason: { type: String, default: null, maxlength: 200 },
   ownerId: { type: Schema.Types.ObjectId, default: null },
   isPlatform: { type: Boolean, default: false },
@@ -316,6 +339,7 @@ const schema = new Schema<AccountDoc>({
       maxlength: CALL_LIMITS.recordingNoticeMaxChars,
     },
     aiDisclosureEnabled: { type: Boolean, default: true },
+    requireOptInForMarketing: { type: Boolean, default: false },
     inbox: {
       sendReadReceipts: { type: Boolean, default: DEFAULT_INBOX_SETTINGS.sendReadReceipts },
       optOutKeywords: {

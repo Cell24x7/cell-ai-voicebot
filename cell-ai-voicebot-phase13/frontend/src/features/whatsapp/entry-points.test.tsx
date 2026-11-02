@@ -58,6 +58,7 @@ const detail = (over: Partial<AdminAccountDetail> = {}): AdminAccountDetail => (
   account: { ...base.account, id: 'acc1' },
   owner: base.user as AdminAccountDetail['owner'],
   usersCount: 1,
+  apiLimits: null,
   usersByStatus: { active: 1, invited: 0, disabled: 0 },
   retention: fakeRetention(),
   limits: { maxConcurrentCalls: 10, dialsPerMinute: 60 },

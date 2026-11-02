@@ -25,7 +25,7 @@ import {
 import { ContactModel, type ContactDoc } from '../../db/models/contact.model';
 import { requireAuth } from '../../shared/auth/auth-context';
 import { tenantFilter, toObjectId } from '../../shared/auth/tenant';
-import { seal, secretHint } from '../../shared/crypto/secret-box';
+import { seal, secretHint, type SecretKey } from '../../shared/crypto/secret-box';
 import {
   AppError,
   ConflictError,
@@ -35,13 +35,14 @@ import {
 } from '../../shared/errors/app-error';
 import { outgoingPolicy, urlBlockReason, type GuardPolicy } from '../../shared/net/url-guard';
 import { auditRequest } from '../audit/audit.service';
+import { readContactVariables } from '../privacy/sensitive';
 
 import type { CreateFunctionBody, TestFunctionBody, UpdateFunctionBody } from './agents.schema';
 import { findAgent, toAgentView } from './agents.service';
 
 export interface FunctionsDeps {
   env: Pick<Env, 'NODE_ENV' | 'AI_FUNCTIONS_ALLOW_PRIVATE_HOSTS' | 'APP_URL'>;
-  secretKey: Buffer;
+  secretKey: SecretKey;
   /** Test hooks for the executor (resolver / dial / extra ports). */
   http?: Omit<HttpToolOptions, 'policy'> & { extraPorts?: number[] };
 }
@@ -164,7 +165,7 @@ const validateFunction = (
 const storeHeaders = (
   input: HeaderInput[],
   existing: FunctionHeader[],
-  key: Buffer,
+  key: SecretKey,
 ): FunctionHeader[] =>
   input.map((h, i) => {
     if (h.secret) {
@@ -347,7 +348,7 @@ type ContactFields = Pick<ContactDoc, 'phoneE164' | 'name' | 'externalId' | 'var
 export const contactTemplateValues = (contact: ContactFields | null): Record<string, unknown> =>
   contact
     ? {
-        ...((contact.variables ?? {}) as unknown as Record<string, unknown>),
+        ...readContactVariables(contact, { purpose: 'function' }),
         phone: contact.phoneE164,
         name: contact.name ?? '',
         externalId: contact.externalId ?? '',

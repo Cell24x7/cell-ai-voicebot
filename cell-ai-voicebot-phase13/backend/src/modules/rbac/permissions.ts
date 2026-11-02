@@ -17,6 +17,9 @@ export const PERMISSION_INFO = {
   'contacts.write': { group: 'Contacts', description: 'Create, edit and delete contacts' },
   'contacts.import': { group: 'Contacts', description: 'Import contacts from files' },
   'contacts.export': { group: 'Contacts', description: 'Export contacts' },
+  'contacts.erase': { group: 'Contacts', description: 'Erase contacts permanently' },
+  'account.export': { group: 'Account', description: 'Export all account data' },
+  'account.delete': { group: 'Account', description: 'Delete the account' },
   'dnd.manage': {
     group: 'Contacts',
     description: 'Remove numbers from the do-not-call list and undo opt-outs',

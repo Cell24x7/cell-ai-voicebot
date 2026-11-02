@@ -157,6 +157,21 @@ export const AUDIT_ACTIONS = [
   'outcome_rule.deleted',
   'sheet_import.created',
   'sheet_import.deleted',
+  'keys.resealed',
+  'custom_field.sensitive_changed',
+  'contact.erased',
+  'contacts.bulk_erased',
+  'account.export_requested',
+  'account.export_downloaded',
+  'account.delete_requested',
+  'account.delete_canceled',
+  'account.purged',
+  'compliance.exported',
+  'compliance.ceiling_changed',
+  'account.api_limits_changed',
+  'mfa.enabled',
+  'mfa.disabled',
+  'mfa.recovery_used',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

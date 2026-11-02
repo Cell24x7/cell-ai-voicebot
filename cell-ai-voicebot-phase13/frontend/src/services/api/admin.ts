@@ -30,6 +30,38 @@ export interface CreateAccountInput {
 export const adminApi = {
   createAccount: (body: CreateAccountInput) =>
     unwrap(apiClient.post<SuccessEnvelope<PublicAccount>>('/admin/accounts', body)),
+  accountDeletions: () =>
+    unwrap(
+      apiClient.get<
+        SuccessEnvelope<
+          {
+            id: string;
+            name: string;
+            status: 'scheduled' | 'purging' | 'purged';
+            requestedAt: string | null;
+            scheduledFor: string | null;
+            balanceMicros: number;
+          }[]
+        >
+      >('/admin/account-deletions'),
+    ),
+  cancelDeletion: (id: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<{ canceled: true }>>(`/admin/accounts/${id}/deletion/cancel`),
+    ),
+  runDeletion: (id: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<{ status: 'purged' | 'waiting'; contacts: number }>>(
+        `/admin/accounts/${id}/deletion/run`,
+      ),
+    ),
+  setApiLimits: (
+    id: string,
+    apiLimits: { readsPerMinute: number; writesPerMinute: number } | null,
+  ) =>
+    unwrap(
+      apiClient.patch<SuccessEnvelope<unknown>>(`/admin/accounts/${id}/api-limits`, { apiLimits }),
+    ),
   setOwnerPassword: async (id: string, password: string) => {
     await apiClient.post(`/admin/accounts/${id}/owner-password`, { password });
   },

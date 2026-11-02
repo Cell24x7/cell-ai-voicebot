@@ -3,6 +3,7 @@ import ArrowUpward from '@mui/icons-material/ArrowUpward';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { enqueueSnackbar } from 'notistack';
@@ -70,6 +71,33 @@ export function FieldsTab() {
     onError: (err) => enqueueSnackbar(getErrorMessage(err), { variant: 'error' }),
   });
 
+  const setSensitive = useMutation({
+    mutationFn: ({ id, sensitive }: { id: string; sensitive: boolean }) =>
+      customFieldsApi.update(id, { sensitive }),
+    meta: { silent: true },
+    onSuccess: (updated) => {
+      enqueueSnackbar(
+        updated.sensitive
+          ? `${updated.label} is now sensitive`
+          : `${updated.label} is no longer sensitive`,
+        { variant: 'success' },
+      );
+      refresh();
+      void queryClient.invalidateQueries({ queryKey: contactKeys.all });
+    },
+    onError: (err) => enqueueSnackbar(getErrorMessage(err), { variant: 'error' }),
+  });
+  const askSensitive = (f: CustomField, sensitive: boolean) =>
+    void confirm({
+      title: sensitive
+        ? `Mark "${f.label}" sensitive?`
+        : `Stop treating "${f.label}" as sensitive?`,
+      message: sensitive
+        ? "Its values are encrypted and hidden in lists. Calls and templates still use the real value. It can't be searched or used in segments, and segments that use it stop matching."
+        : 'Its values are decrypted in the database and shown in lists again.',
+      confirmText: sensitive ? 'Mark sensitive' : 'Remove',
+    }).then((ok) => ok && setSensitive.mutate({ id: f.id, sensitive }));
+
   const move = (index: number, by: -1 | 1) => {
     const ids = rows.map((f) => f.id);
     const target = index + by;
@@ -131,6 +159,28 @@ export function FieldsTab() {
       header: 'Default',
       render: (f) =>
         f.defaultValue === null ? '—' : formatFieldValue(f.type, f.defaultValue, formatPhone),
+    },
+    {
+      key: 'sensitive',
+      header: 'Sensitive',
+      render: (f) =>
+        f.sensitiveJob?.status === 'running' ? (
+          <Typography variant="body2" color="text.secondary">
+            Updating {formatNumber(f.sensitiveJob.done)} of {formatNumber(f.sensitiveJob.total)}…
+          </Typography>
+        ) : write ? (
+          <Switch
+            size="small"
+            checked={f.sensitive}
+            disabled={setSensitive.isPending}
+            slotProps={{ input: { 'aria-label': `${f.label} is sensitive` } }}
+            onChange={(e) => askSensitive(f, e.target.checked)}
+          />
+        ) : f.sensitive ? (
+          'Yes'
+        ) : (
+          'No'
+        ),
     },
     {
       key: 'usage',

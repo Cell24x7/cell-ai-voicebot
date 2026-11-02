@@ -3,6 +3,7 @@ import type { Types } from 'mongoose';
 import { AccountModel, type CallingWindow } from '../../db/models/account.model';
 import { CallInsightModel, type CallInsightDoc } from '../../db/models/call-insight.model';
 import { CallModel, type CallDoc } from '../../db/models/call.model';
+import { ContactModel } from '../../db/models/contact.model';
 import {
   OutcomeRuleModel,
   type OutcomeRuleDoc,
@@ -15,6 +16,8 @@ import {
 import { getLogger } from '../../shared/logger';
 import { formatInr } from '../../shared/money';
 import { contactVariables } from '../ai-agents/variables';
+import { addDndEntries } from '../dnd/dnd.service';
+import { sealTextValues, sensitiveKeys } from '../privacy/sensitive';
 
 import { channelFor, schedulePostCall, variablesFor } from './collect';
 import { scheduledAtFor } from './timing';
@@ -64,6 +67,30 @@ export const ruleMatches = async (
   return true;
 };
 
+/** The disposition a flow or AI sets when a customer says "don't call me". */
+export const DO_NOT_CALL_DISPOSITION = 'do_not_call';
+
+/** "Don't call me" on a call puts the number on the do-not-call list. */
+export const applyVoiceOptOut = async (
+  call: Pick<CallDoc, 'accountId' | 'contactId' | 'disposition'>,
+): Promise<boolean> => {
+  if (call.disposition !== DO_NOT_CALL_DISPOSITION || !call.contactId) return false;
+  const contact = await ContactModel.findOne({
+    _id: call.contactId,
+    accountId: call.accountId,
+  })
+    .select({ phoneE164: 1 })
+    .lean<{ phoneE164: string }>();
+  if (!contact) return false;
+  await addDndEntries(
+    call.accountId,
+    [{ phoneE164: contact.phoneE164, reason: 'Asked on a call' }],
+    'voice',
+    null,
+  );
+  return true;
+};
+
 /** Values for the template's variables, in order, from the rule's mapping. */
 export const ruleValues = async (
   params: RuleParam[],
@@ -78,11 +105,15 @@ export const ruleValues = async (
       ? (await contactVariables(call.accountId, call.contactId, contactKeys).catch(() => null))
           ?.values
       : undefined;
+  const sensitive = contactKeys.length ? await sensitiveKeys(call.accountId) : new Set<string>();
+  // a queued row holds sealed text for a sensitive field; the send job opens it
+  const stored = (k: string, value: string): string =>
+    sealTextValues({ [k]: value }, sensitive)[k] ?? '';
   const key = insight?.output?.keyInfo;
   return params.map((p) => {
     if (p.from === 'text') return p.value ?? '';
     const k = p.key ?? '';
-    if (p.from === 'contact') return contact?.[k] ?? '';
+    if (p.from === 'contact') return stored(k, contact?.[k] ?? '');
     if (p.from === 'call') {
       if (k === 'disposition') return call.disposition ?? '';
       if (k === 'duration_sec') return String(call.durationSec);
@@ -110,6 +141,7 @@ export const evaluateOutcomeRules = async (
   try {
     const call = await CallModel.findById(callId).lean<CallDoc>();
     if (!call?.timestamps.endedAt) return 0;
+    await applyVoiceOptOut(call);
     const rules = await OutcomeRuleModel.find({ accountId: call.accountId, active: true })
       .sort({ order: 1, createdAt: 1 })
       .lean<OutcomeRuleDoc[]>();

@@ -11,6 +11,7 @@ import { AccountTab } from '@/features/settings/AccountTab';
 import { ApiKeysTab } from '@/features/settings/ApiKeysTab';
 import { AuditTab } from '@/features/settings/AuditTab';
 import { BillingTab } from '@/features/settings/BillingTab';
+import { ComplianceTab } from '@/features/settings/ComplianceTab';
 import { ProfileTab } from '@/features/settings/ProfileTab';
 import { SecurityTab } from '@/features/settings/SecurityTab';
 import { useHasWallet } from '@/features/wallet/queries';
@@ -42,6 +43,7 @@ const TABS = [
   { key: 'calls', label: 'Calls', Component: CallsTab, permission: 'account.read' },
   { key: 'inbox', label: 'Inbox', Component: InboxSettingsTab, permission: 'account.read' },
   { key: 'ai', label: 'AI & outcomes', Component: InsightsSettingsTab, permission: 'account.read' },
+  { key: 'compliance', label: 'Compliance', Component: ComplianceTab, permission: 'account.read' },
   {
     key: 'retention',
     label: 'Data retention',

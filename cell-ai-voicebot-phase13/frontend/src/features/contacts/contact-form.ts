@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import type { ContactInput, VariablesInput } from '@/services/api/contacts';
 import type { Contact, CustomField } from '@/services/api/types';
-import { fieldInputValue } from '@/utils/format';
+import { fieldInputValue, SENSITIVE_MASK } from '@/utils/format';
 import { isValidPhone } from '@/utils/phone';
 
 const MONEY = /^-?\d+(\.\d{1,2})?$/;
@@ -44,7 +44,11 @@ export const buildContactSchema = (fields: CustomField[]) =>
     tags: z.array(z.string()).max(20, 'At most 20 tags'),
     listIds: z.array(z.string()).max(50),
     consentSource: z.string().trim().max(120),
-    variables: z.object(Object.fromEntries(fields.map((f) => [f.key, fieldSchema(f)]))),
+    variables: z.object(
+      Object.fromEntries(
+        fields.map((f) => [f.key, f.sensitive ? z.string().trim().max(1000) : fieldSchema(f)]),
+      ),
+    ),
   });
 
 export type ContactFormValues = z.infer<ReturnType<typeof buildContactSchema>>;
@@ -58,7 +62,10 @@ export const contactDefaults = (fields: CustomField[], contact?: Contact): Conta
   listIds: contact?.listIds ?? [],
   consentSource: contact?.consent?.source ?? '',
   variables: Object.fromEntries(
-    fields.map((f) => [f.key, fieldInputValue(f.type, contact?.variables[f.key])]),
+    fields.map((f) => {
+      const value = contact?.variables[f.key];
+      return [f.key, value === SENSITIVE_MASK ? SENSITIVE_MASK : fieldInputValue(f.type, value)];
+    }),
   ),
 });
 
@@ -75,6 +82,8 @@ export const toContactInput = (
   for (const f of fields) {
     // Sent as text — the server parses every type (no float rounding on rupees).
     const raw = (values.variables[f.key] ?? '').trim();
+    // a hidden value stays as it is unless something new is typed
+    if (contact?.variables[f.key] === SENSITIVE_MASK && (!raw || raw === SENSITIVE_MASK)) continue;
     if (raw) variables[f.key] = raw;
     else if (contact && contact.variables[f.key] !== undefined) variables[f.key] = null;
   }

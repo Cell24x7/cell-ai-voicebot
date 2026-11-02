@@ -1,4 +1,4 @@
-import { ACCOUNT_LIMIT_RANGES } from '../../config/limits';
+import { PUBLIC_API_LIMITS, ACCOUNT_LIMIT_RANGES } from '../../config/limits';
 import { META_PAYERS, WA_CHANNEL_STATUSES, WA_MODES } from '../../db/models/whatsapp-channel.model';
 import { OffsetPageMetaSchema } from '../../shared/openapi/common.schemas';
 import { registry } from '../../shared/openapi/registry';
@@ -38,6 +38,15 @@ export const CreateAccountBody = z.strictObject({
 });
 /** A superadmin sets the owner's password; the owner's sessions end. */
 export const SetOwnerPasswordBody = z.strictObject({ password: z.string().min(1).max(200) });
+/** Requests a minute for this account's API keys; `null` = the default (600 / 60). */
+export const ApiLimitsBody = z.strictObject({
+  apiLimits: z
+    .object({
+      readsPerMinute: z.number().int().min(1).max(PUBLIC_API_LIMITS.readsPerMinuteMax),
+      writesPerMinute: z.number().int().min(1).max(PUBLIC_API_LIMITS.writesPerMinuteMax),
+    })
+    .nullable(),
+});
 export const SuspendBody = z.strictObject({ reason: z.string().trim().min(3).max(200) });
 export const AccountCampaignParams = z.strictObject({
   id: ObjectIdSchema,
@@ -80,6 +89,7 @@ export const AdminAccountDetailSchema = registry.register(
     account: PublicAccountSchema,
     owner: PublicUserSchema.nullable(),
     usersCount: z.number().int(),
+    apiLimits: z.object({ readsPerMinute: z.number(), writesPerMinute: z.number() }).nullable(),
     usersByStatus: z.object({ invited: z.number(), active: z.number(), disabled: z.number() }),
     limits: AccountLimitsSchema,
     retention: RetentionSchema,
@@ -290,4 +300,68 @@ registry.registerPath({
     404: errors[404],
     409: errors[409],
   },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/v1/admin/account-deletions',
+  tags,
+  summary: 'Accounts waiting for deletion, with wallet balance (superadmin)',
+  security: bearer,
+  responses: {
+    200: ok(
+      z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          status: z.enum(['scheduled', 'purging', 'purged']),
+          requestedAt: z.string().nullable(),
+          scheduledFor: z.string().nullable(),
+          balanceMicros: z.number(),
+        }),
+      ),
+    ),
+    401: errors[401],
+    403: errors[403],
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/v1/admin/accounts/{id}/deletion/cancel',
+  tags,
+  summary: 'Cancel a scheduled account deletion (superadmin)',
+  security: bearer,
+  request: { params: AccountIdParams },
+  responses: {
+    200: ok(z.object({ canceled: z.literal(true) })),
+    403: errors[403],
+    404: errors[404],
+    409: errors[409],
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/v1/admin/accounts/{id}/deletion/run',
+  tags,
+  summary: 'Purge an account now, only after its waiting period (superadmin)',
+  security: bearer,
+  request: { params: AccountIdParams },
+  responses: {
+    200: ok(z.object({ status: z.enum(['purged', 'waiting']), contacts: z.number() })),
+    403: errors[403],
+    404: errors[404],
+    409: errors[409],
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/api/v1/admin/accounts/{id}/api-limits',
+  tags,
+  summary: "Set this account's API key limits per minute; null = default (superadmin)",
+  security: bearer,
+  request: { params: AccountIdParams, ...json(ApiLimitsBody) },
+  responses: { 200: ok(ApiLimitsBody), 403: errors[403], 404: errors[404], 422: errors[422] },
 });

@@ -42,6 +42,36 @@ export function LimitsCard({ detail }: { detail: AdminAccountDetail }) {
     dialsPerMinute: String(detail.limits.dialsPerMinute),
   });
   const refresh = () => void queryClient.invalidateQueries({ queryKey: adminKeys.account(id) });
+  const [apiDraft, setApiDraft] = useState({
+    reads: detail.apiLimits ? String(detail.apiLimits.readsPerMinute) : '',
+    writes: detail.apiLimits ? String(detail.apiLimits.writesPerMinute) : '',
+  });
+  const reads = Number(apiDraft.reads);
+  const writes = Number(apiDraft.writes);
+  const apiEmpty = !apiDraft.reads && !apiDraft.writes;
+  const apiBad =
+    !apiEmpty &&
+    !(
+      Number.isInteger(reads) &&
+      reads >= 1 &&
+      reads <= 6000 &&
+      Number.isInteger(writes) &&
+      writes >= 1 &&
+      writes <= 600
+    );
+  const saveApi = useMutation({
+    mutationFn: () =>
+      adminApi.setApiLimits(
+        id,
+        apiEmpty ? null : { readsPerMinute: reads, writesPerMinute: writes },
+      ),
+    meta: { silent: true },
+    onSuccess: () => {
+      enqueueSnackbar('API limits saved. They apply within 30 seconds.', { variant: 'success' });
+      refresh();
+    },
+    onError: (e) => enqueueSnackbar(getErrorMessage(e), { variant: 'error' }),
+  });
   const save = useMutation({
     mutationFn: () =>
       adminApi.setLimits(id, {
@@ -115,6 +145,26 @@ export function LimitsCard({ detail }: { detail: AdminAccountDetail }) {
           <Typography variant="body2">
             Active campaigns (scheduled, running or paused): {detail.activeCampaigns}
           </Typography>
+          <Typography variant="subtitle2">API key limits per minute</Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
+              label="Reads (default 600, up to 6,000)"
+              value={apiDraft.reads}
+              onChange={(e) => setApiDraft({ ...apiDraft, reads: e.target.value })}
+              fullWidth
+            />
+            <TextField
+              label="Writes (default 60, up to 600)"
+              value={apiDraft.writes}
+              onChange={(e) => setApiDraft({ ...apiDraft, writes: e.target.value })}
+              fullWidth
+            />
+          </Stack>
+          <div>
+            <Button disabled={apiBad || saveApi.isPending} onClick={() => saveApi.mutate()}>
+              Save API limits
+            </Button>
+          </div>
           <div>
             <Button
               color="error"

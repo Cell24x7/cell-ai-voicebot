@@ -16,10 +16,12 @@ import { enqueueSnackbar } from 'notistack';
 import { useState, type ReactNode } from 'react';
 
 import { useConfirm } from '@/components/confirm-context';
+import { useCan, useSession } from '@/features/auth/hooks';
 import { contactsApi, type BulkAction, type BulkRequest } from '@/services/api/contacts';
 import { getErrorMessage } from '@/services/api/errors';
 import type { ContactFilter } from '@/services/api/types';
 
+import { EraseContactsDialog } from './EraseContactsDialog';
 import { contactKeys, dndKeys, listKeys } from './keys';
 import { useContactTags, useListOptions } from './queries';
 
@@ -55,6 +57,10 @@ export function BulkActionsBar({
 }) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const can = useCan();
+  const session = useSession();
+  const canErase = can('contacts.erase') && !session?.impersonation;
+  const [erasing, setErasing] = useState(false);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [picker, setPicker] = useState<Picker | null>(null);
   const [tags, setTags] = useState<string[]>([]);
@@ -153,6 +159,17 @@ export function BulkActionsBar({
         <MenuItem onClick={() => void choose('delete')} sx={{ color: 'error.main' }}>
           Delete
         </MenuItem>
+        {canErase && !allMatching && (
+          <MenuItem
+            onClick={() => {
+              setAnchor(null);
+              setErasing(true);
+            }}
+            sx={{ color: 'error.main' }}
+          >
+            Erase permanently
+          </MenuItem>
+        )}
       </Menu>
       <Dialog
         open={Boolean(picker)}
@@ -206,6 +223,19 @@ export function BulkActionsBar({
           </Button>
         </DialogActions>
       </Dialog>
+      {erasing && (
+        <EraseContactsDialog
+          ids={selectedIds}
+          label={`${selectedIds.length} contacts`}
+          onClose={() => setErasing(false)}
+          onDone={() => {
+            for (const key of [contactKeys.all, listKeys.all, dndKeys.all]) {
+              void queryClient.invalidateQueries({ queryKey: key });
+            }
+            onClear();
+          }}
+        />
+      )}
     </Paper>
   );
 }

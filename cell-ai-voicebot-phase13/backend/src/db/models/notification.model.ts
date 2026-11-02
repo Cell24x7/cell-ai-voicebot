@@ -39,6 +39,9 @@ export const NOTIFICATION_TYPES = [
   'analytics.reconcile_mismatch',
   // Phase 15
   'webhook.endpoint_disabled',
+  'contacts.erase_completed',
+  'account.export_ready',
+  'account.delete_scheduled',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

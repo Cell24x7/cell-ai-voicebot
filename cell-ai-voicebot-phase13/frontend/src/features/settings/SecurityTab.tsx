@@ -21,6 +21,7 @@ import { getErrorMessage, toApiError } from '@/services/api/errors';
 import type { Session } from '@/services/api/types';
 
 import { settingsKeys } from './keys';
+import { MfaSection } from './MfaSection';
 
 function ChangePassword() {
   const [current, setCurrent] = useState('');
@@ -183,6 +184,7 @@ export function SecurityTab() {
           <ChangePassword />
         )}
         {!session?.impersonation && <Sessions />}
+        <MfaSection />
       </Stack>
     </Paper>
   );

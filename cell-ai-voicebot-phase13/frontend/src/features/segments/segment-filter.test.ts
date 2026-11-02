@@ -24,6 +24,8 @@ const field = (key: string, type: FieldType): CustomField => ({
   required: false,
   defaultValue: null,
   order: 1,
+  sensitive: false,
+  sensitiveJob: null,
   createdAt: 'x',
   updatedAt: 'x',
 });

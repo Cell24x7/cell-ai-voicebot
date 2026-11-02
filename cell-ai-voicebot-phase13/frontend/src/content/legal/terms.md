@@ -52,6 +52,8 @@ We aim to keep the Service available and secure but do not promise that it will 
 
 Our [Privacy Policy](/privacy) explains how we process personal data. For your contacts' data we act as your processor and follow your instructions. You keep ownership of your data; you give us the rights we need to provide the Service.
 
+An account owner can export all account data and can erase a contact permanently. Erasure can't be undone. An owner can delete the account: it is deleted after 7 days unless canceled, and invoices and payment records are kept as the law requires.
+
 ## 10. Suspension and ending
 
 You can stop using the Service at any time and ask us to close your account. We may suspend or close an account that breaks these terms or the law, or that has not paid. After closing we delete your data as described in the Privacy Policy, except what the law requires us to keep.

@@ -16,6 +16,11 @@ export interface ContactJobData {
     payload: Record<string, unknown>;
   };
   'field.delete_values': { accountId: string; key: string };
+  /** Phase 16: seal or open a field's values after its setting changed. */
+  'contacts.sensitive_field': { accountId: string; fieldId: string };
+  /** Phase 16: erase a list of contacts (ids are on the job row). */
+  'contacts.erase': { accountId: string; eraseJobId: string };
+  'account.export': { accountId: string; accountExportId: string };
   'list.delete_members': { accountId: string; listId: string };
   /** Phase 15: one run of a scheduled Google-Sheet import. */
   'sheets.import': { accountId: string; sheetImportId: string; runKey: string };
@@ -30,6 +35,9 @@ export const CONTACT_JOB_NAMES = [
   'records.export',
   'bulk.run',
   'field.delete_values',
+  'contacts.sensitive_field',
+  'contacts.erase',
+  'account.export',
   'list.delete_members',
   'sheets.import',
 ] as const satisfies readonly ContactJobName[];
@@ -39,7 +47,11 @@ export const isContactJobName = (value: string): value is ContactJobName =>
 
 /** Enqueues contact jobs — the API depends on this interface, not on BullMQ. */
 export interface ContactJobs {
-  enqueue<N extends ContactJobName>(name: N, data: ContactJobData[N]): Promise<void>;
+  enqueue<N extends ContactJobName>(
+    name: N,
+    data: ContactJobData[N],
+    options?: { delay?: number },
+  ): Promise<void>;
 }
 
 const JOB_OPTIONS: JobsOptions = {
@@ -50,13 +62,13 @@ const JOB_OPTIONS: JobsOptions = {
 };
 
 export const queueContactJobs = (queue: Queue): ContactJobs => ({
-  async enqueue(name, data) {
+  async enqueue(name, data, options) {
     // sheet runs: one job per run (`sheet-<id>-<runKey>`, ids never contain `:`)
     const jobId =
       name === 'sheets.import'
         ? `sheet-${(data as ContactJobData['sheets.import']).sheetImportId}-${(data as ContactJobData['sheets.import']).runKey}`
         : undefined;
-    await queue.add(name, data, { ...JOB_OPTIONS, ...(jobId ? { jobId } : {}) });
+    await queue.add(name, data, { ...JOB_OPTIONS, ...(jobId ? { jobId } : {}), ...options });
   },
 });
 
