@@ -11,6 +11,7 @@ import ForumOutlined from '@mui/icons-material/ForumOutlined';
 import GroupOutlined from '@mui/icons-material/GroupOutlined';
 import InsightsOutlined from '@mui/icons-material/InsightsOutlined';
 import MenuBookOutlined from '@mui/icons-material/MenuBookOutlined';
+import MonitorHeartOutlined from '@mui/icons-material/MonitorHeartOutlined';
 import PhoneInTalkOutlined from '@mui/icons-material/PhoneInTalkOutlined';
 import ReceiptLongOutlined from '@mui/icons-material/ReceiptLongOutlined';
 import RequestQuoteOutlined from '@mui/icons-material/RequestQuoteOutlined';
@@ -160,10 +161,18 @@ export const NAV_ITEMS: NavItem[] = [
     platformOnly: true,
     phase: 11,
   },
+  {
+    key: 'admin-system',
+    label: 'System',
+    path: '/admin/system',
+    icon: MonitorHeartOutlined,
+    platformOnly: true,
+    phase: 17,
+  },
 ];
 
 /** The phase currently shipped — items of later phases are hidden. */
-export const LIVE_PHASE = 15;
+export const LIVE_PHASE = 17;
 
 export const visibleNavItems = (
   can: (permission: string) => boolean,

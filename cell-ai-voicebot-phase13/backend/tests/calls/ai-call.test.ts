@@ -199,15 +199,37 @@ const ended = async (c: Live, maxMs = 120_000) => {
   }
   return callOf(c.callId);
 };
-const say = (c: Live, text: string) => c.leg.receiveControl({ type: 'call.say_text', text });
+/**
+ * Says `text`, moves the clock until the call has written it down (the bot may still be finishing
+ * its line), then waits in real time with the clock stopped until the bot answers. Moving the clock
+ * while the AI was still thinking let the silence prompts fire first on a loaded machine.
+ */
+const say = async (c: Live, text: string) => {
+  c.leg.receiveControl({ type: 'call.say_text', text });
+  const said = async () => {
+    const all = await lines(c.callId);
+    const at = all.findIndex((l) => !l.startsWith('bot:') && l.endsWith(`:${text}`));
+    return { at, all };
+  };
+  if (!(await pumpUntil(c.clock, c.leg, async () => (await said()).at !== -1))) {
+    throw new Error(`"${text}" was never written down`);
+  }
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const { at, all } = await said();
+    if (all.slice(at + 1).some((l) => l.startsWith('bot:'))) return;
+    if ((await callOf(c.callId)).status !== 'in_progress') return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+};
 
 describe('agent-only calls — live AI on the fake voice pipeline', () => {
   it('opening line → "maine payment kar diya" → payment API → paid reply → "bye" → closing line, call ends', async () => {
     const c = await startCall(paid);
     await heard(c, OPENING);
-    say(c, 'maine payment kar diya');
+    await say(c, 'maine payment kar diya');
     await heard(c, 'Dhanyavaad! Hamare record mein');
-    say(c, 'theek hai bye');
+    await say(c, 'theek hai bye');
     const call = await ended(c);
     expect(call).toMatchObject({ status: 'completed', endReason: 'agent_end_call' });
     const all = await lines(c.callId);
@@ -238,9 +260,9 @@ describe('agent-only calls — live AI on the fake voice pipeline', () => {
   it('unpaid: "kal tak de dunga" → promise tomorrow (IST) saved → Promise to pay', async () => {
     const c = await startCall(unpaid);
     await heard(c, 'Ravi Kumar ji');
-    say(c, 'abhi nahi hua, kal tak de dunga');
+    await say(c, 'abhi nahi hua, kal tak de dunga');
     await pumpUntil(c.clock, c.leg, async () => (await lines(c.callId)).length >= 5);
-    say(c, 'bye');
+    await say(c, 'bye');
     const call = await ended(c);
     const tomorrow = addDays(ymdInZone(new Date(), 'Asia/Kolkata'), 1);
     expect(call.disposition).toBe('promise_to_pay');
@@ -257,7 +279,7 @@ describe('agent-only calls — live AI on the fake voice pipeline', () => {
   it('"insaan se baat karni hai" → transfer prompt in the browser → connected ends the call transferred', async () => {
     const c = await startCall(paid);
     await heard(c, OPENING);
-    say(c, 'mujhe insaan se baat karni hai');
+    await say(c, 'mujhe insaan se baat karni hai');
     await pumpUntil(c.clock, c.leg, () =>
       Promise.resolve(c.json.some((m) => m.type === 'call.transfer')),
     );
@@ -273,7 +295,7 @@ describe('agent-only calls — live AI on the fake voice pipeline', () => {
   it('English words get an English reply and the call language is en', async () => {
     const c = await startCall(paid);
     await heard(c, OPENING);
-    say(c, 'I have paid, the payment is done');
+    await say(c, 'I have paid, the payment is done');
     await heard(c, 'Thank you! Our records show');
     c.leg.receiveControl({ type: 'call.hangup' });
     const call = await ended(c);
@@ -291,10 +313,10 @@ describe('agent-only calls — live AI on the fake voice pipeline', () => {
     try {
       const c = await startCall(paid);
       await heard(c, OPENING);
-      say(c, 'maine payment kar diya');
+      await say(c, 'maine payment kar diya');
       await heard(c, 'Maaf kijiye, abhi check nahi ho pa raha.');
       expect((await callOf(c.callId)).status).toBe('in_progress');
-      say(c, 'bye');
+      await say(c, 'bye');
       await ended(c);
     } finally {
       await AiAgentModel.updateOne(
@@ -313,7 +335,7 @@ describe('agent-only calls — live AI on the fake voice pipeline', () => {
     await heard(c, CALL_LINES.recordingNotice);
     await pumpUntil(c.clock, c.leg, () => Promise.resolve(c.leg.playing), 10_000);
     await pumpUntil(c.clock, c.leg, () => Promise.resolve(true), 1000);
-    say(c, 'maine payment kar diya');
+    await say(c, 'maine payment kar diya');
     await heard(c, 'Dhanyavaad! Hamare record mein');
     const opening = await TranscriptTurnModel.findOne({ callId: c.callId, text: OPENING }).lean();
     expect(opening?.interrupted).toBe(true);
@@ -344,7 +366,7 @@ describe('agent-only calls — live AI on the fake voice pipeline', () => {
       testPhone: '+919000400012',
     });
     await heard(c, 'Namaste Typed Name ji');
-    say(c, 'maine payment kar diya');
+    await say(c, 'maine payment kar diya');
     await heard(c, 'Dhanyavaad! Hamare record mein');
     c.leg.receiveControl({ type: 'call.hangup' });
     await ended(c);
@@ -383,7 +405,7 @@ describe('flow calls with a live AI step', () => {
     await heard(c, LOAN_TEXTS.menu);
     c.leg.receiveControl({ type: 'call.dtmf', digit: '3' });
     await heard(c, 'Ravi Kumar ji'); // the agent's opening line (said by the flow step)
-    say(c, 'abhi nahi, kal tak de dunga');
+    await say(c, 'abhi nahi, kal tak de dunga');
     const tomorrow = addDays(ymdInZone(new Date(), 'Asia/Kolkata'), 1);
     const [y, m, d] = tomorrow.split('-');
     const months = [

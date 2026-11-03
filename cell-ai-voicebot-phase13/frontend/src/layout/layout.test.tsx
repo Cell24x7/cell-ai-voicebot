@@ -49,8 +49,9 @@ describe('nav config', () => {
       'admin-billing',
       'admin-whatsapp',
       'admin-whatsapp-billing',
+      'admin-system',
     ]);
-    expect(visibleNavItems(() => true, false, 99)).toHaveLength(NAV_ITEMS.length - 4);
+    expect(visibleNavItems(() => true, false, 99)).toHaveLength(NAV_ITEMS.length - 5);
     // Phase 3 builds did not show the wallet
     expect(visibleNavItems(() => true, false, 3).map((i) => i.key)).not.toContain('wallet');
     // Phase 4 builds hid AI agents and knowledge

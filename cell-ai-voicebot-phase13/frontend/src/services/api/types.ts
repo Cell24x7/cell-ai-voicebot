@@ -205,6 +205,7 @@ export type WhatsAppSyncStatus = NonNullable<WhatsAppChannel['coexistence']>['co
 export type WhatsAppMetaPayer = WhatsAppChannel['billing']['metaPayer'];
 export type WhatsAppConnectStep = NonNullable<NonNullable<WhatsAppChannel['statusReason']>['step']>;
 export type WhatsAppAdminStatus = Schemas['WhatsAppAdminStatus'];
+export type SystemStatus = Schemas['SystemStatus'];
 export type MetaWebhookEventRow = Schemas['MetaWebhookEventRow'];
 export type MetaWebhookReceipt = Schemas['MetaWebhookReceipt'];
 export type AdminWhatsAppChannelRow = AdminAccountDetail['whatsappChannels'][number];

@@ -4380,6 +4380,64 @@ export interface paths {
     };
     trace?: never;
   };
+  '/api/v1/admin/system': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Production health for superadmins: build, database, Redis, queues, backups (Phase 17) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['SystemStatus'];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/agents': {
     parameters: {
       query?: never;
@@ -30199,7 +30257,9 @@ export interface components {
         | 'account.api_limits_changed'
         | 'mfa.enabled'
         | 'mfa.disabled'
-        | 'mfa.recovery_used';
+        | 'mfa.recovery_used'
+        | 'ops.release_recorded'
+        | 'ops.restore_drill_recorded';
       actor: {
         /** @enum {string} */
         type: 'user' | 'api_key' | 'system';
@@ -30324,6 +30384,49 @@ export interface components {
         connectedAt: string | null;
       }[];
       recentAudit: components['schemas']['AuditEntry'][];
+    };
+    SystemStatus: {
+      commit: string;
+      builtAt: string;
+      env: string;
+      uptimeSec: number;
+      mongo: {
+        ok: boolean;
+        primary: boolean;
+        version: string | null;
+      };
+      redis: {
+        ok: boolean;
+        usedMemoryMb: number | null;
+      };
+      /** @description -1 when a queue could not be read */
+      queues: {
+        [key: string]: {
+          waiting: number;
+          active: number;
+          delayed: number;
+          failed: number;
+        };
+      };
+      lastBackup: {
+        at: string;
+        ok: boolean;
+        bytes: number;
+      } | null;
+      lastRestoreDrill: {
+        at: string;
+        rtoMinutes: number;
+      } | null;
+      lastRelease: {
+        at: string;
+        tag: string;
+        backend: string;
+        frontend: string;
+      } | null;
+      certificate: {
+        daysLeft: number;
+      } | null;
+      superadminsWithoutMfa: number;
     };
     AgentFunction: {
       id: string;

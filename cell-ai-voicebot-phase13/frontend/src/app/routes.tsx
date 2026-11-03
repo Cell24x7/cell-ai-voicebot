@@ -423,6 +423,12 @@ export const routes: RouteObject[] = [
                     .AdminWhatsAppBillingPage,
                 }),
               },
+              {
+                path: 'system',
+                lazy: async () => ({
+                  Component: (await import('@/pages/admin/AdminSystemPage')).AdminSystemPage,
+                }),
+              },
             ],
           },
         ],

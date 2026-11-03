@@ -10,6 +10,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Phase 17 — production** — 2026-11-03
+  - Admin → System page (build, MongoDB, Redis, queues, backups, certificate, superadmins without 2FA).
+  - The build carries its commit (`VITE_GIT_SHA`, `version.json`).
+
 - **Phase 16 · Batch 3 — compliance and hardening** — 2026-11-02
   - Settings → Compliance, two-step sign-in in Settings → Security, API key limits on the superadmin account page.
 

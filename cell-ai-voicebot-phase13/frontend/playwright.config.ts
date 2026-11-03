@@ -91,7 +91,8 @@ export default defineConfig({
       url: BACKEND_HEALTH_URL,
       reuseExistingServer: false,
       timeout: 180_000,
-      stdout: backendLogs ? 'pipe' : 'ignore',
+      // always shown, so a fatal line is never lost (LOG_LEVEL is warn without E2E_BACKEND_LOGS)
+      stdout: 'pipe',
       stderr: 'pipe',
       // Real env vars win over the backend's .env file.
       env: {
