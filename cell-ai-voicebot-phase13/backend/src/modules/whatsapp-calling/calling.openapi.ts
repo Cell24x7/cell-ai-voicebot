@@ -4,6 +4,8 @@ import { z } from '../../shared/openapi/zod';
 import { CallSchema } from '../calls/calls.schema';
 
 import {
+  BulkPermissionBody,
+  BulkRunParams,
   CallingParams,
   CallingSettingsSchema,
   CallPermissionSchema,
@@ -15,6 +17,7 @@ import {
   CallTransferBody,
 } from './calling-api.schema';
 import { CallAvailabilityBody, CallingSettingsPatch } from './calling.schema';
+import { READINESS_KEYS } from './readiness';
 
 const tags = ['WhatsApp calling'];
 const publicTags = [...tags, PUBLIC_API_TAG];
@@ -47,6 +50,29 @@ registry.registerPath({
   request: { params: CallingParams, body: body(CallingSettingsPatch) },
   responses: { 200: ok(CallingSettingsSchema), ...failures },
 });
+export const CallingReadinessSchema = registry.register(
+  'WhatsAppCallingReadiness',
+  z.object({
+    ready: z.boolean().openapi({ description: 'No blocking item is false' }),
+    items: z.array(
+      z.object({
+        key: z.enum(READINESS_KEYS),
+        ok: z.boolean().nullable().openapi({ description: 'null = could not tell' }),
+        detail: z.string(),
+        fix: z.string().nullable(),
+      }),
+    ),
+  }),
+);
+registry.registerPath({
+  method: 'get',
+  path: `${settingsPath}/readiness`,
+  tags,
+  security: bearer,
+  summary: 'What calling on this number needs and what to fix (whatsapp.read)',
+  request: { params: CallingParams },
+  responses: { 200: ok(CallingReadinessSchema), ...failures },
+});
 registry.registerPath({
   method: 'post',
   path: `${settingsPath}/sync`,
@@ -76,6 +102,56 @@ registry.registerPath({
     201: ok(z.object({ messageId: z.string(), kind: z.enum(['interactive', 'template']) })),
     ...failures,
   },
+});
+const BulkRunSchema = registry.register(
+  'WhatsAppCallPermissionRun',
+  z.object({
+    id: z.string(),
+    channelId: z.string(),
+    templateId: z.string(),
+    status: z.enum(['queued', 'running', 'done', 'stopped']),
+    total: z.number().int(),
+    sent: z.number().int(),
+    skipped: z.record(
+      z.enum([
+        'dnd',
+        'opted_out',
+        'suppressed',
+        'no_whatsapp',
+        'already_allowed',
+        'meta_limit',
+        'declined_recently',
+        'wallet_empty',
+      ]),
+      z.number().int(),
+    ),
+    failed: z.number().int(),
+    startedAt: z.string().nullable(),
+    finishedAt: z.string().nullable(),
+    createdAt: z.string(),
+  }),
+);
+registry.registerPath({
+  method: 'post',
+  path: '/api/v1/whatsapp/call-permissions/bulk',
+  tags,
+  security: bearer,
+  summary:
+    'Ask up to 5,000 contacts for call permission with an approved template (inbox.reply + contacts.read; 5/hour/user; Idempotency-Key)',
+  request: {
+    headers: z.object({ 'idempotency-key': z.string() }),
+    body: body(BulkPermissionBody),
+  },
+  responses: { 202: ok(z.object({ runId: z.string() })), ...failures },
+});
+registry.registerPath({
+  method: 'get',
+  path: '/api/v1/whatsapp/call-permissions/bulk/{runId}',
+  tags,
+  security: bearer,
+  summary: 'A bulk call permission run: status and counts by reason (calls.read)',
+  request: { params: BulkRunParams },
+  responses: { 200: ok(BulkRunSchema), ...failures },
 });
 registry.registerPath({
   method: 'post',

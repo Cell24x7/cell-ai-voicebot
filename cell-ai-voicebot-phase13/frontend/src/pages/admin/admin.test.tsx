@@ -16,6 +16,8 @@ vi.mock('@/services/api/admin', () => ({
     createAccount: vi.fn(),
     setOwnerPassword: vi.fn(),
     setApiLimits: vi.fn(),
+    setVoiceLine: vi.fn(),
+    setSipSettings: vi.fn(),
     account: vi.fn(),
     suspend: vi.fn(),
     enable: vi.fn(),
@@ -26,6 +28,10 @@ vi.mock('@/services/api/admin', () => ({
     pauseCampaigns: vi.fn(),
     resumeCampaign: vi.fn(),
   },
+}));
+vi.mock('@/services/api/phone-numbers', async (original) => ({
+  ...(await original<object>()),
+  phoneNumbersApi: { list: vi.fn(() => Promise.resolve([])) },
 }));
 vi.mock('@/services/api/auth', () => ({
   authApi: { refresh: vi.fn(() => Promise.reject(new Error('x'))), me: vi.fn() },
@@ -51,6 +57,8 @@ const detail = (overrides: Partial<AdminAccountDetail['account']> = {}): AdminAc
   usersCount: 3,
   retention: fakeRetention(),
   apiLimits: null,
+  voiceLine: 'dryrun',
+  sipSettings: { pulseSec: null, spendMinutesPerHour: null },
   usersByStatus: { active: 2, invited: 1, disabled: 0 },
   limits: { maxConcurrentCalls: 10, dialsPerMinute: 60 },
   activeCampaigns: 1,
@@ -217,6 +225,42 @@ describe('API key limits (superadmin)', () => {
     await userEvent.clear(writes);
     await userEvent.click(save);
     expect(api.setApiLimits).toHaveBeenLastCalledWith('acc1', null);
+  });
+});
+
+describe('Phone line (superadmin, Phase 18)', () => {
+  it('moves the account to the phone line after a confirm and saves the SIP settings', async () => {
+    signInAs('superadmin');
+    api.account.mockResolvedValue(detail());
+    api.setVoiceLine.mockResolvedValue({ voiceLine: 'sip' });
+    api.setSipSettings.mockResolvedValue({});
+    renderWithProviders({ route: '/admin/accounts/acc1' });
+    expect(await screen.findByText(/Test line: calls are simulated/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Move to the phone line' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Move' }));
+    await waitFor(() => expect(api.setVoiceLine).toHaveBeenCalledWith('acc1', 'sip'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const pulse = screen.getByLabelText('Billing pulse (seconds)');
+    await userEvent.type(pulse, '90');
+    expect(screen.getByText('1 to 60')).toBeInTheDocument();
+    await userEvent.clear(pulse);
+    await userEvent.type(pulse, '30');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.setSipSettings).toHaveBeenCalledWith('acc1', {
+        pulseSec: 30,
+        spendMinutesPerHour: null,
+      }),
+    );
+  });
+
+  it('warns when an account on the phone line has no number', async () => {
+    signInAs('superadmin');
+    api.account.mockResolvedValue({ ...detail(), voiceLine: 'sip' });
+    renderWithProviders({ route: '/admin/accounts/acc1' });
+    expect(await screen.findByText(/No number given to this account/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Move to the test line' })).toBeInTheDocument();
   });
 });
 

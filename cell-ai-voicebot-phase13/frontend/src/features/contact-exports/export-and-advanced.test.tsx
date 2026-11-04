@@ -75,6 +75,7 @@ const contact = (i: number): Contact => ({
   lastCalledAt: null,
   callCount: 0,
   lastDisposition: null,
+  waCallPermission: 'none',
   whatsapp: null,
   createdAt: '2026-10-08T00:00:00Z',
   updatedAt: '2026-10-08T00:00:00Z',

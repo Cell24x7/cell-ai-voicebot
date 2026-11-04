@@ -429,6 +429,13 @@ export const routes: RouteObject[] = [
                   Component: (await import('@/pages/admin/AdminSystemPage')).AdminSystemPage,
                 }),
               },
+              {
+                path: 'phone-numbers',
+                lazy: async () => ({
+                  Component: (await import('@/pages/admin/AdminPhoneNumbersPage'))
+                    .AdminPhoneNumbersPage,
+                }),
+              },
             ],
           },
         ],

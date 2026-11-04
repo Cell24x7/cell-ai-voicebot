@@ -89,6 +89,7 @@ test('an impersonating superadmin reads templates only', async ({ browser }) => 
 test('Create call permission template → In review → Approved', async () => {
   await openTemplates(page);
   await page.getByRole('button', { name: 'Create call permission template' }).click();
+  await page.getByRole('menuitem', { name: 'English' }).click();
   const d = page.getByRole('dialog', { name: 'Create call permission template' });
   await expect(d.getByRole('figure', { name: 'Template preview' })).toContainText(
     'Allow calls from this business?',

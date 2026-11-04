@@ -13,8 +13,10 @@ import { useState } from 'react';
 import { getErrorMessage, toApiError } from '@/services/api/errors';
 
 import { CALL_ERROR_TEXT } from '../labels';
-import { useCallingSettings, useRequestCallPermission } from '../queries';
+import { useCallingSettings, usePermissionTemplates, useRequestCallPermission } from '../queries';
 import { CALLING_FORM_LIMITS } from '../settings/form';
+
+import { PermissionTemplateSelect } from './PermissionTemplates';
 
 const errorText = (err: unknown) => {
   const e = toApiError(err);
@@ -46,6 +48,9 @@ export function RequestPermissionDialog({
   const [body, setBody] = useState<string | null>(null);
   const text = body ?? fallback;
   const tooLong = text.trim().length > CALLING_FORM_LIMITS.requestBodyMax;
+  const { approved } = usePermissionTemplates(windowOpen ? '' : channelId);
+  const [templateId, setTemplateId] = useState('');
+  const chosen = approved.find((t) => t.id === templateId) ?? approved[0] ?? null;
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Ask to allow calls</DialogTitle>
@@ -62,10 +67,17 @@ export function RequestPermissionDialog({
               onChange={(e) => setBody(e.target.value)}
             />
           ) : (
-            <Typography variant="body2">
-              The 24-hour chat window is closed, so the approved call permission template is sent.
-              It is charged like a utility template.
-            </Typography>
+            <>
+              <Typography variant="body2">
+                The 24-hour chat window is closed, so an approved call permission template is sent.
+                It is charged like a utility template.
+              </Typography>
+              <PermissionTemplateSelect
+                channelId={channelId}
+                value={chosen?.id ?? ''}
+                onChange={setTemplateId}
+              />
+            </>
           )}
           <Typography variant="body2" color="text.secondary">
             The customer sees Allow / Don&apos;t allow buttons in WhatsApp. One request a day and
@@ -78,7 +90,7 @@ export function RequestPermissionDialog({
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="contained"
-          disabled={request.isPending || (windowOpen && (!text.trim() || tooLong))}
+          disabled={request.isPending || (windowOpen ? !text.trim() || tooLong : !chosen)}
           onClick={() =>
             request.mutate(
               {
@@ -87,6 +99,7 @@ export function RequestPermissionDialog({
                 ...(windowOpen && body !== null && body.trim() !== fallback
                   ? { body: body.trim() }
                   : {}),
+                ...(!windowOpen && chosen ? { templateId: chosen.id } : {}),
               },
               {
                 onSuccess: () => {

@@ -27,6 +27,7 @@ import { useCampaigns } from '@/features/campaigns/queries';
 import { SENTIMENT_LABELS, sentimentColor, type SentimentLabel } from '@/features/insights/labels';
 import { outcomeLabel, useDispositions } from '@/features/insights/queries';
 import { RecordExportButton } from '@/features/reports/RecordExportButton';
+import { NewWhatsAppCallDialog } from '@/features/whatsapp-calling/panel/NewWhatsAppCallDialog';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import type { ListCallsQuery } from '@/services/api/calls';
 import { recordExportsApi } from '@/services/api/record-exports';
@@ -217,6 +218,7 @@ export function CallsPage() {
     },
   ];
 
+  const [waCall, setWaCall] = useState(false);
   return (
     <>
       <PageHeader
@@ -250,6 +252,11 @@ export function CallsPage() {
                   })
                 }
               />
+            )}
+            {canTrigger && can('whatsapp.read') && (
+              <Button variant="outlined" onClick={() => setWaCall(true)}>
+                New WhatsApp call
+              </Button>
             )}
             {canTrigger && (
               <Button
@@ -516,6 +523,7 @@ export function CallsPage() {
           }
         />
       </Stack>
+      <NewWhatsAppCallDialog open={waCall} onClose={() => setWaCall(false)} />
     </>
   );
 }

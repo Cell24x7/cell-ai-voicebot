@@ -17,6 +17,8 @@ import { ExportDialog } from '@/features/contact-exports/ExportDialog';
 import { useCanExport } from '@/features/contact-exports/useExportJob';
 import { segmentKeys } from '@/features/contacts/keys';
 import { useCustomFields, useSegments } from '@/features/contacts/queries';
+import { LazyBulkCallPermission } from '@/features/whatsapp-calling/panel/LazyBulkCallPermission';
+import { useCanRequestPermissionBulk } from '@/features/whatsapp-calling/permissions';
 import { getErrorMessage } from '@/services/api/errors';
 import { segmentsApi } from '@/services/api/segments';
 import type { Segment } from '@/services/api/types';
@@ -36,6 +38,8 @@ export function SegmentsTab() {
   const fields = useCustomFields();
   const [editing, setEditing] = useState<Segment | 'new' | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [asking, setAsking] = useState<Segment | null>(null);
+  const canAskCalls = useCanRequestPermissionBulk();
   const remove = useMutation({
     mutationFn: (id: string) => segmentsApi.remove(id),
     meta: { silent: true },
@@ -87,6 +91,11 @@ export function SegmentsTab() {
           {canCampaign && (
             <Button size="small" component={RouterLink} to={`/campaigns/new?segmentId=${s.id}`}>
               Create campaign
+            </Button>
+          )}
+          {canAskCalls && (
+            <Button size="small" onClick={() => setAsking(s)}>
+              Ask for call permission
             </Button>
           )}
           {canExport && (
@@ -149,6 +158,13 @@ export function SegmentsTab() {
         />
       )}
       {exporting && <ExportDialog open onClose={() => setExporting(null)} segmentId={exporting} />}
+      {asking && (
+        <LazyBulkCallPermission
+          target={{ segmentId: asking.id }}
+          count={asking.contactCount === undefined ? null : Math.min(asking.contactCount, 5_000)}
+          onClose={() => setAsking(null)}
+        />
+      )}
     </>
   );
 }

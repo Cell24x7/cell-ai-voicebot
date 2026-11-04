@@ -135,6 +135,8 @@ export const REQUEST_STATE_LABELS: Record<
 /** Call / permission errors per code (the server message is the fallback). */
 export const CALL_ERROR_TEXT: Record<string, string> = {
   WHATSAPP_CALLING_DISABLED: 'Calling is off on this number.',
+  CALLING_SETTINGS_NOT_APPLIED:
+    'WhatsApp did not apply the change. Refresh and check the number before trying again.',
   WHATSAPP_CALLING_UNAVAILABLE: 'Calling is not available on this number.',
   WHATSAPP_CALLING_RESTRICTED: 'WhatsApp paused calls from this number for a while.',
   WHATSAPP_CALL_PERMISSION_MISSING: 'The customer has not allowed calls.',

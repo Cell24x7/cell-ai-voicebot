@@ -31,7 +31,7 @@ export const END_REASON_LABELS: Record<CallEndReason, string> = {
   wallet_empty: 'Wallet ran out',
   ai_failed: 'AI unavailable',
   engine_error: 'Flow error',
-  media_timeout: 'No audio from the browser',
+  media_timeout: 'No audio on the line',
   media_error: 'Audio connection error',
   server_shutdown: 'Server restarted',
   canceled: 'Not connected',
@@ -48,6 +48,8 @@ export const END_REASON_LABELS: Record<CallEndReason, string> = {
   calling_restricted: 'Calling paused by WhatsApp',
   no_agent_available: 'Nobody answered',
   outside_call_hours: 'Outside call hours',
+  // Phase 18 — phone line
+  machine: 'Answering machine',
 };
 
 /** Disposition key → label (unknown keys shown as they are). */

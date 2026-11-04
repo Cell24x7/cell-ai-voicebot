@@ -25,6 +25,8 @@ const BROKEN: readonly CallEndReason[] = ['engine_error', 'media_error', 'server
 export const finalStatus = (reason: CallEndReason, answered: boolean): CallStatus => {
   if (!answered) {
     if (reason === 'busy' || reason === 'no_answer') return reason;
+    // an answering machine took the call: for retries it counts as not answered
+    if (reason === 'machine') return 'no_answer';
     return reason === 'canceled' || reason === 'customer_hangup' || reason === 'campaign_canceled'
       ? 'canceled'
       : 'failed';
@@ -41,8 +43,10 @@ const BY_CAUSE: Record<HangupCause, CallEndReason> = {
   limit: 'limit',
   busy: 'busy',
   no_answer: 'no_answer',
-  rejected: 'busy',
+  // a person declined the call (SIP 603): not retried (Phase 18)
+  rejected: 'rejected_by_customer',
   invalid_number: 'invalid_number',
+  machine: 'machine',
 };
 
 export const endReasonFor = (cause: HangupCause | undefined): CallEndReason =>

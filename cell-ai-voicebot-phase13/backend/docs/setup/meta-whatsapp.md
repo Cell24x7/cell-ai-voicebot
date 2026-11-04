@@ -130,6 +130,18 @@ With the real app and a test number, from two phones (Android + iPhone):
 - **Media network:** media nodes need public UDP `WA_MEDIA_PORT_MIN–WA_MEDIA_PORT_MAX` (default 40000–40999) open inbound / outbound, `WA_MEDIA_PUBLIC_IP` set when the node is behind NAT, and `WA_STUN_URLS` reachable; `WA_MEDIA_MAX_CALLS` caps calls per process.
 - **Prices:** import Meta's INR calling rate card (**Admin → WhatsApp billing → Calling rates**, CSV `Market, Currency, Per minute`); until then the placeholder card (IN ₹0.3885 / min, OTHER ₹1 / min) applies.
 
+### Readiness (Phase 18B)
+
+**Number → Calling** shows a checklist from `GET /whatsapp/channels/:id/calling/readiness`: Cloud API number, messaging limit (Meta needs **2,000 a day**), business verification, the app subscribed to the **`calls`** webhook field (read with the app token, cached 1 h), `whatsapp_business_messaging` on the number, calling status at WhatsApp, restrictions, the last call event we received, call audio on this server (`WA_MEDIA_ENABLED`, `WA_MEDIA_PUBLIC_IP` in production, the port range) and Meta's calling prices. Each failing item shows its fix. Calling can't be switched on while the Cloud API, messaging limit, `calls` webhook or call audio item fails; "unknown" never blocks. After a switch, WhatsApp is read back: a change it didn't apply shows "WhatsApp did not apply the change".
+
+### Watching call audio (Phase 18B)
+
+**Admin → System → WhatsApp calls** shows call audio on / off, whether `WA_MEDIA_PUBLIC_IP` is set, the port range, live WhatsApp calls, the last setup time and the last failed setup. Healthwatch alerts (and bells superadmins) on `wa-media-no-public-ip` (production, audio on, no public IP) and `wa-call-setup-failing` (3 or more failed setups in 15 minutes).
+
+### Asking many customers (Phase 18B)
+
+From **Contacts** (selection, a list or a segment) → **Ask for WhatsApp call permission**: pick the number and an **approved** call permission template; the run (`POST /whatsapp/call-permissions/bulk`, up to 5,000 contacts, 5 runs an hour per user) always sends the template (the 24 h window is never assumed). It skips contacts that are suppressed, DND, opted out, blocked us, already allowed, declined in the last 7 days, or at Meta's limit (1 request a day, 2 a week; Meta's 138009 / 138017 count as answers, not failures). Each request is charged like a template message; an empty wallet stops the run and the rest are counted as `wallet_empty`. Progress and the result by reason show in the dialog and in the bell.
+
 ### Real-device checklist
 
 1. Request call permission to a real phone inside the 24 h window → the customer taps Allow → the contact panel shows "Can call · 7 days"; outside the window the approved template goes out.

@@ -1122,3 +1122,19 @@ Call `dispositionSource: flow | agent | user | ai | null`, `insights { status, r
 ## Phase 17
 
 - **`platformSettings` key `opsStatus`:** `{ lastBackup: { at, ok, bytes }, lastRestoreDrill: { at, rtoMinutes }, lastRelease: { at, tag, backend, frontend }, storageMigration: { lastKey, copied, bytes } }`. Written only by the ops commands; no personal data. No migration: it is a new row in an existing collection.
+
+## Phase 18 — SIP line
+
+- `accounts.voiceLine` (`dryrun` | `sip`, default `dryrun`) and `accounts.sipSettings` (`pulseSec`, `spendMinutesPerHour`, `null` = default); migration `0019-sip-lines`.
+- `phoneNumbers` (platform pool of caller IDs): `number` (E.164, unique), `kind` (`1600` / `landline` / `mobile` / `other`), `accountId` (null = in the pool), `purpose` (`outbound`; `inbound` from Phase 19), `label`, `dltPrincipalEntityId`, `status`; indexes `{number}` unique, `{accountId, status}`.
+- `calls`: `callerId`, `callerNumberId`, `sip` (`codec`, `sipQ850`, `dialStatus`, `amd`, `amdCause`, `amdMs`, `packetsIn`, `packetsOut`, `lossPct`, `jitterMs`, `firstAudioMs`), `trunkCostPaise`; end reason `machine`; a declined phone call ends `rejected_by_customer`.
+- `campaigns.phoneLine`: `callerNumberId`, `amd` (`off` / `hangup` / `leave_message`), `voicemailText`; campaign contact skip reasons `rejected`, `number_not_allowed`.
+- Redis: `sip:channels` (channel leases), `sip:cps:<second>`, `sip:spend:<accountId>:<hour>` (+ `:notice`), `health:bell:<issue>:<hour>`.
+
+## Phase 18B — WhatsApp calling go-live
+
+- `whatsappChannels.calling.lastCallsWebhookAt` (Date | null): set on every `calls` webhook for the number (readiness). No migration: absent = null.
+- Redis: `wa:readiness:calls-webhook` (1 h), `wa:readiness:scope:<channelId>` (1 h).
+- `contacts.waCallPermission` (`allowed` | `asked` | `declined` | `none`, default `none`): best WhatsApp call permission over the account's numbers, rewritten on every permission change (request, reply, revoke, expiry sweep). Filter / segment key `whatsappCallPermission` (eq / neq); `none` also matches contacts saved before the field.
+- `callPermissionRuns` (migration `0020-call-permission-runs`): one bulk call permission request — `accountId`, `channelId`, `templateId`, `variables`, `target` (`contacts` count / `list` id / `segment` id), `contactIds` (≤ 5,000, resolved at start), `cursor`, `status` (`queued` / `running` / `done` / `stopped`), `total`, `sent`, `failed`, `skipped` by reason (`dnd`, `opted_out`, `suppressed`, `no_whatsapp`, `already_allowed`, `meta_limit`, `declined_recently`, `wallet_empty`), `createdBy`, `startedAt`, `finishedAt`. Index `{ accountId: 1, createdAt: -1 }`. Ids and counters only (erase: keep). The migration also backfills `contacts.waCallPermission` from the permission rows.
+- Job `call-permission-bulk` (queue `whatsapp`, job id `call-permission-bulk-<runId>`): batches of 50, saves the cursor and counters after each batch, a retry resumes there; the per-contact message `clientId` is a UUID from `cpb:<runId>:<contactId>`. Realtime `call_permission_bulk.progress`; bell `whatsapp.call_permission_bulk_done` to the requester.

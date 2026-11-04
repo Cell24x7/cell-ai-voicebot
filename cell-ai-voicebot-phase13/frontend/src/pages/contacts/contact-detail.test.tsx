@@ -102,6 +102,7 @@ const CONTACT: Contact = {
   lastCalledAt: null,
   callCount: 0,
   lastDisposition: null,
+  waCallPermission: 'none',
   whatsapp: null,
   createdAt: '2026-10-08T06:30:00Z',
   updatedAt: '2026-10-08T06:30:00Z',

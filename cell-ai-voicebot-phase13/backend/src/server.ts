@@ -40,6 +40,8 @@ import { startWhatsAppWorker } from './core/queues/workers/whatsapp.worker';
 import { createRealtime, setRealtime } from './core/realtime';
 import { createStorage } from './core/storage';
 import { createMediaServer } from './core/telephony/media-server';
+import { createSipLine } from './core/telephony/sip';
+import { SipSpendGuard } from './core/telephony/sip/guard';
 import { AiVoiceController } from './core/voice/ai-session';
 import { createVoiceProviders } from './core/voice/providers';
 import { TtsCache } from './core/voice/tts-cache';
@@ -203,10 +205,27 @@ export const startServer = async (options: StartServerOptions = {}): Promise<Run
       http: { policy: outgoingPolicy(env) },
     }),
   });
+  // Phase 18: the SIP line (ARI + RTP) of this process, only when the install has a trunk
+  const sipLine =
+    env.TELEPHONY_PROVIDER === 'sip'
+      ? createSipLine(env, { logger, redis, role: env.WORKERS_ENABLED ? 'worker' : 'api' })
+      : undefined;
   const callManager = new CallManager({
     logger,
     registry: callRegistry,
     dryRun,
+    ...(sipLine ? { sip: sipLine.provider } : {}),
+    ...(sipLine
+      ? {
+          sipSpend: {
+            guard: new SipSpendGuard(redis),
+            defaultMinutesPerHour: env.SIP_SPEND_MINUTES_PER_HOUR,
+          },
+        }
+      : {}),
+    ...(env.SIP_TRUNK_COST_PAISE_PER_MIN !== undefined
+      ? { sipTrunkCostPaisePerMin: env.SIP_TRUNK_COST_PAISE_PER_MIN }
+      : {}),
     tts: callTts,
     storage,
     recordingDir: env.CALL_RECORDING_TMP_DIR,
@@ -266,6 +285,7 @@ export const startServer = async (options: StartServerOptions = {}): Promise<Run
             templateJobs: whatsapp.templateJobs,
           },
           bus: callBus,
+          jobs: whatsapp.callingJobs,
           calls: {
             logger,
             registry: callRegistry,
@@ -425,6 +445,10 @@ export const startServer = async (options: StartServerOptions = {}): Promise<Run
     },
     5,
   );
+  if (sipLine) {
+    sipLine.provider.setLiveCheck((callId) => callRegistry.isLive(callId));
+    lifecycle.onShutdown('sip-line', () => sipLine.close(), 6);
+  }
   lifecycle.onShutdown(
     'ws',
     async () => {

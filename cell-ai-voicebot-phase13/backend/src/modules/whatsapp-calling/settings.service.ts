@@ -40,6 +40,7 @@ import { withCallErrors } from './errors';
 import { callingView, type CallingView } from './json';
 import { CALLING_NOTIFICATIONS } from './notification-types';
 import { programProblems } from './program';
+import { blockingProblem, createCallingReadiness } from './readiness';
 
 /**
  * WhatsApp calling settings of a number (PHASE_12_PROMPT T12.5): ours (routing, ring
@@ -100,8 +101,35 @@ const ourStatus = (meta: string | null, unavailable: boolean, fallback: WaCallin
 const mergeRestrictions = (meta: MetaCallingSettings): WaCallingRestriction[] =>
   meta.restrictions.map((r) => ({ type: r.type, reason: r.reason, expiresAt: r.expiresAt }));
 
+const NOT_APPLIED = 'WhatsApp did not apply the last change';
+
+/** Fields of the write that WhatsApp's read-back doesn't show (T18B.1); empty = applied. */
+export const readBackMismatch = (
+  sent: MetaCallingSettingsUpdate,
+  now: Pick<WaCalling, 'status' | 'callIconVisibility' | 'callHours'>,
+  unavailable: boolean,
+): string[] => {
+  const off: string[] = [];
+  if (sent.status && !unavailable) {
+    const want = sent.status === 'ENABLED' ? 'enabled' : 'disabled';
+    if (now.status !== want) off.push('status');
+  }
+  if (sent.callIconVisibility && sent.callIconVisibility !== now.callIconVisibility) {
+    off.push('callIconVisibility');
+  }
+  if (sent.callHours && (sent.callHours.status === 'ENABLED') !== now.callHours.enabled) {
+    off.push('callHours');
+  }
+  return off;
+};
+
 export const createCallingSettings = (deps: CallingDeps) => {
   const { ctx } = deps;
+  const readinessCheck = createCallingReadiness({ ctx, token: deps.token });
+
+  /** The readiness checklist of a number (T18B.2). */
+  const readiness = async (accountId: Types.ObjectId, channelId: string) =>
+    readinessCheck.read(await load(accountId, channelId));
 
   const getCalling = async (accountId: Types.ObjectId, channelId: string): Promise<CallingView> =>
     callingView(await load(accountId, channelId), nowOf(ctx));
@@ -256,6 +284,14 @@ export const createCallingSettings = (deps: CallingDeps) => {
       ]);
     }
     await validate(channel, patch, now);
+    if (patch.status === 'enabled' && calling.status !== 'enabled') {
+      const blocking = blockingProblem((await readinessCheck.read(channel)).items);
+      if (blocking) {
+        throw new ValidationError([
+          { path: `readiness.${blocking.key}`, message: blocking.fix ?? blocking.detail },
+        ]);
+      }
+    }
     const forMeta = metaUpdate(calling, patch);
     if (forMeta) {
       const { token } = await deps.token(channel._id);
@@ -288,7 +324,24 @@ export const createCallingSettings = (deps: CallingDeps) => {
         : null;
     }
     if (forMeta) set['calling.lastError'] = null;
-    const updated = await save(channel._id, set);
+    let updated = await save(channel._id, set);
+    if (forMeta) {
+      // WhatsApp may answer success and not apply it: store what it reports and compare
+      updated = await syncCalling(updated, { throwOnError: true });
+      const notApplied = readBackMismatch(forMeta, callingOf(updated), unavailableReason !== null);
+      if (notApplied.length) {
+        await save(channel._id, { 'calling.lastError': NOT_APPLIED });
+        getLogger().warn(
+          { channelId: channel._id.toString(), fields: notApplied },
+          'whatsapp calling: settings not applied by WhatsApp',
+        );
+        throw new AppError(
+          'CALLING_SETTINGS_NOT_APPLIED',
+          undefined,
+          notApplied.map((path) => ({ path, message: 'Not applied by WhatsApp' })),
+        );
+      }
+    }
     const fields = Object.keys(patch).flatMap((k) =>
       k === 'inbound' ? Object.keys(patch.inbound ?? {}).map((f) => `inbound.${f}`) : [k],
     );
@@ -420,6 +473,7 @@ export const createCallingSettings = (deps: CallingDeps) => {
 
   return {
     getCalling,
+    readiness,
     updateCalling,
     syncCalling,
     syncNow,

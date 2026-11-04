@@ -5,6 +5,7 @@ import CampaignOutlined from '@mui/icons-material/CampaignOutlined';
 import ChatOutlined from '@mui/icons-material/ChatOutlined';
 import ContactsOutlined from '@mui/icons-material/ContactsOutlined';
 import DashboardOutlined from '@mui/icons-material/DashboardOutlined';
+import DialpadOutlined from '@mui/icons-material/DialpadOutlined';
 import DomainOutlined from '@mui/icons-material/DomainOutlined';
 import ExtensionOutlined from '@mui/icons-material/ExtensionOutlined';
 import ForumOutlined from '@mui/icons-material/ForumOutlined';
@@ -169,10 +170,18 @@ export const NAV_ITEMS: NavItem[] = [
     platformOnly: true,
     phase: 17,
   },
+  {
+    key: 'admin-phone-numbers',
+    label: 'Phone numbers',
+    path: '/admin/phone-numbers',
+    icon: DialpadOutlined,
+    platformOnly: true,
+    phase: 18,
+  },
 ];
 
 /** The phase currently shipped — items of later phases are hidden. */
-export const LIVE_PHASE = 17;
+export const LIVE_PHASE = 18;
 
 export const visibleNavItems = (
   can: (permission: string) => boolean,

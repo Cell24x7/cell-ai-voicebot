@@ -62,6 +62,19 @@ export const adminApi = {
     unwrap(
       apiClient.patch<SuccessEnvelope<unknown>>(`/admin/accounts/${id}/api-limits`, { apiLimits }),
     ),
+  /** Phase 18: the phone line of the account's campaigns and calls (`dryrun` = test line). */
+  setVoiceLine: (id: string, voiceLine: 'dryrun' | 'sip') =>
+    unwrap(
+      apiClient.patch<SuccessEnvelope<{ voiceLine: 'dryrun' | 'sip' }>>(
+        `/admin/accounts/${id}/voice-line`,
+        { voiceLine },
+      ),
+    ),
+  setSipSettings: (
+    id: string,
+    body: { pulseSec: number | null; spendMinutesPerHour: number | null },
+  ) =>
+    unwrap(apiClient.patch<SuccessEnvelope<unknown>>(`/admin/accounts/${id}/sip-settings`, body)),
   setOwnerPassword: async (id: string, password: string) => {
     await apiClient.post(`/admin/accounts/${id}/owner-password`, { password });
   },

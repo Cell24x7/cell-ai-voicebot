@@ -321,6 +321,38 @@ describe('/calls campaign entry points', () => {
     expect(await screen.findByText('Simulated call')).toBeInTheDocument();
     expect(screen.queryByText('Web test call')).not.toBeInTheDocument();
   });
+
+  it('a phone call shows its caller ID, the line result and the audio quality (Phase 18)', async () => {
+    signInAs('viewer');
+    api.get.mockResolvedValue(
+      fakeCall({
+        provider: 'sip',
+        isTest: false,
+        endReason: 'machine',
+        callerId: '+911600123456',
+        sip: {
+          codec: 'ulaw',
+          sipQ850: 17,
+          dialStatus: 'BUSY',
+          amd: 'MACHINE',
+          amdCause: 'LONGGREETING',
+          amdMs: 3200,
+          packetsIn: 10,
+          packetsOut: 10,
+          lossPct: 0.5,
+          jitterMs: 8,
+          firstAudioMs: 40,
+        },
+      }),
+    );
+    renderWithProviders({ route: '/calls/c1' });
+    expect(await screen.findByText('Phone')).toBeInTheDocument();
+    expect(screen.getByText('+911600123456')).toBeInTheDocument();
+    expect(screen.getByText('Busy (cause 17)')).toBeInTheDocument();
+    expect(screen.getByText('Answering machine')).toBeInTheDocument();
+    expect(screen.getByText('G.711 μ-law · loss 0.5% · jitter 8 ms')).toBeInTheDocument();
+    expect(screen.getByText('Machine (3200 ms)')).toBeInTheDocument();
+  });
 });
 
 describe('/calls/:id detail', () => {

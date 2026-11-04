@@ -11,6 +11,7 @@ import { enqueueSnackbar } from 'notistack';
 
 import { useConfirm } from '@/components/confirm-context';
 import { RelativeTime } from '@/components/RelativeTime';
+import { CallingReadyChip } from '@/features/whatsapp-calling/settings/CallingReadiness';
 import { toApiError } from '@/services/api/errors';
 import type { WhatsAppChannel } from '@/services/api/types';
 
@@ -185,6 +186,7 @@ export function ChannelCard({
             label={QUALITY_LABELS[channel.qualityRating]}
           />
           <Chip size="small" variant="outlined" label={MODE_LABELS[channel.mode]} />
+          {status === 'connected' && <CallingReadyChip channelId={channel.id} />}
         </Stack>
         <Typography sx={{ mt: 1 }}>
           {channel.displayPhoneNumber ?? 'No phone number yet'}

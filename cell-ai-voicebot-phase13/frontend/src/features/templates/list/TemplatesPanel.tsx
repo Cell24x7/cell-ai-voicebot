@@ -4,14 +4,15 @@ import Sync from '@mui/icons-material/Sync';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
+import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { enqueueSnackbar } from 'notistack';
-import { lazy, Suspense, useState } from 'react';
-import { Link as RouterLink } from 'react-router';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { Link as RouterLink, useSearchParams } from 'react-router';
 
 import { DataTable, type Column } from '@/components/DataTable';
 import { EmptyState } from '@/components/EmptyState';
@@ -79,7 +80,26 @@ export function TemplatesPanel() {
   const [search, setSearch] = useState('');
   const q = useDebouncedValue(search.trim(), 300);
   const [details, setDetails] = useState<string | null>(null);
-  const [builder, setBuilder] = useState<BuilderOpen>(null);
+  // Phase 18B: `?create=call_permission[&lang=hi]` (Calling section / permission dialogs)
+  const [params, setParams] = useSearchParams();
+  const createParam = params.get('create');
+  const [builder, setBuilder] = useState<BuilderOpen>(() =>
+    createParam === 'call_permission' && canManage
+      ? { template: null, initial: callPermissionState(params.get('lang') ?? 'en') }
+      : null,
+  );
+  const [presetAnchor, setPresetAnchor] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!createParam) return;
+    setParams(
+      (p) => {
+        p.delete('create');
+        p.delete('lang');
+        return p;
+      },
+      { replace: true },
+    );
+  }, [createParam, setParams]);
 
   const numbers = (channels.data?.items ?? []).filter((c) => c.status !== 'disconnected');
   const target = channelId || numbers[0]?.id || '';
@@ -205,10 +225,32 @@ export function TemplatesPanel() {
                 </Button>
                 <Button
                   startIcon={<PhoneInTalkOutlined />}
-                  onClick={() => setBuilder({ template: null, initial: callPermissionState() })}
+                  onClick={(e) => setPresetAnchor(e.currentTarget)}
                 >
                   Create call permission template
                 </Button>
+                <Menu
+                  anchorEl={presetAnchor}
+                  open={Boolean(presetAnchor)}
+                  onClose={() => setPresetAnchor(null)}
+                >
+                  {(
+                    [
+                      ['en', 'English'],
+                      ['hi', 'Hinglish (Hindi)'],
+                    ] as const
+                  ).map(([lang, label]) => (
+                    <MenuItem
+                      key={lang}
+                      onClick={() => {
+                        setPresetAnchor(null);
+                        setBuilder({ template: null, initial: callPermissionState(lang) });
+                      }}
+                    >
+                      {label}
+                    </MenuItem>
+                  ))}
+                </Menu>
                 <Button
                   variant="contained"
                   startIcon={<Add />}

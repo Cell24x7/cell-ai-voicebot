@@ -25,6 +25,7 @@ import { AppError } from '../../shared/errors/app-error';
 import type { Logger } from '../../shared/logger';
 import type { CallManager } from '../calls/call.service';
 import type { CallEndedSummary } from '../calls/session';
+import { resolveCallerId } from '../phone-numbers/phone-numbers.service';
 
 import { accountFacts, pauseCampaignDoc, pinnedProblems, setStatus } from './campaigns.service';
 import { decideDial, loadContactFacts } from './dial-guard';
@@ -65,6 +66,12 @@ export const moveStats = (from: CampaignContactStatus, to: CampaignContactStatus
  * "Dispatcher"): running campaigns by priority (round robin inside one), the
  * calling window, money, then slot + rate + claim + dial guard + dial.
  */
+/** The campaign's caller number; a number disabled since the start falls back to the account's first. */
+const callerFor = (campaign: CampaignDoc) =>
+  resolveCallerId(campaign.accountId, campaign.phoneLine?.callerNumberId ?? null).catch(() =>
+    resolveCallerId(campaign.accountId, null),
+  );
+
 export class CampaignDispatcher {
   private readonly clock: Clock;
   private readonly loops = new Map<string, unknown>();
@@ -347,9 +354,18 @@ export class CampaignDispatcher {
     // the call's number: every dial counts here, also the ones a shutdown gave back
     const attempt = Math.max(cc.dials ?? 0, cc.attempts) + 1;
     try {
+      const live = campaign.mode === 'live';
+      const caller = live ? await callerFor(campaign) : null;
       const out = await this.deps.calls.startOutboundCall({
         accountId: campaign.accountId.toString(),
-        provider: campaign.mode === 'live' ? 'sip' : 'dryrun',
+        provider: live ? 'sip' : 'dryrun',
+        ...(live
+          ? {
+              callerId: caller?.number ?? null,
+              amd: campaign.phoneLine?.amd ?? 'off',
+              voicemailText: campaign.phoneLine?.voicemailText ?? null,
+            }
+          : {}),
         to: cc.phoneE164,
         contactId: cc.contactId.toString(),
         source: {
@@ -403,11 +419,20 @@ export class CampaignDispatcher {
       }
       return 'dialed';
     } catch (err) {
-      await this.settleContact(campaign, cc, cc.status, {});
       const code = err instanceof AppError ? err.code : null;
+      if (code === 'NUMBER_NOT_ALLOWED') {
+        // the phone line never dials it (toll-fraud guard): skipped for good
+        await this.settleContact(campaign, cc, 'skipped', { skipReason: 'number_not_allowed' });
+        return 'handled';
+      }
+      await this.settleContact(campaign, cc, cc.status, {});
       if (code === 'WALLET_INSUFFICIENT_BALANCE') {
         await pauseCampaignDoc(campaign, 'wallet_empty', null).catch(() => undefined);
-      } else if (code !== 'CALL_LIMIT_REACHED' && code !== 'CALL_CAPACITY') {
+      } else if (
+        code !== 'CALL_LIMIT_REACHED' &&
+        code !== 'CALL_CAPACITY' &&
+        code !== 'LINE_BUSY'
+      ) {
         this.deps.logger.error(
           { err, campaignId: campaign._id.toString() },
           'campaign: dial failed',

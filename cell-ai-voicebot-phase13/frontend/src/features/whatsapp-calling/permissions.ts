@@ -30,3 +30,11 @@ export const useCanRequestPermission = (): boolean => {
   const can = usePermission('inbox.reply');
   return useActing() && can;
 };
+
+/** Phase 18B: ask many contacts at once (`inbox.reply` + `contacts.read` + `whatsapp.read`). */
+export const useCanRequestPermissionBulk = (): boolean => {
+  const reply = usePermission('inbox.reply');
+  const contacts = usePermission('contacts.read');
+  const whatsapp = usePermission('whatsapp.read');
+  return useActing() && reply && contacts && whatsapp;
+};

@@ -16,6 +16,7 @@ import {
   type AccountLimits,
   type CallCaps,
   type CallingWindow,
+  type AccountVoiceLine,
 } from '../../db/models/account.model';
 import { AiAgentModel } from '../../db/models/ai-agent.model';
 import { CampaignContactModel, CLAIMABLE_STATUSES } from '../../db/models/campaign-contact.model';
@@ -28,6 +29,8 @@ import {
   type CampaignDoc,
   type CampaignStatus,
   type PauseReason,
+  defaultPhoneLine,
+  type CampaignPhoneLine,
 } from '../../db/models/campaign.model';
 import { ContactListModel } from '../../db/models/contact-list.model';
 import { ContactModel } from '../../db/models/contact.model';
@@ -49,6 +52,8 @@ import type { Logger } from '../../shared/logger';
 import { escapeRegex } from '../../shared/utils/regex';
 import { accountVariables } from '../ai-agents/variables';
 import { auditRequest } from '../audit/audit.service';
+import { effectiveLine } from '../calls/line';
+import { resolveCallerId } from '../phone-numbers/phone-numbers.service';
 
 import { audienceQuery, previewAudience, toAudience, usedFields } from './audience';
 import { loadNames, toCampaignListItem, toCampaignView, toContactRow } from './campaign-json';
@@ -114,13 +119,16 @@ export interface AccountFacts {
   limits: AccountLimits;
   caps: CallCaps;
   status: 'active' | 'suspended';
+  /** Phase 18: the line this account's calls use (`effectiveLine`). */
+  line: 'sip' | 'dryrun';
 }
 
 export const accountFacts = async (accountId: Types.ObjectId): Promise<AccountFacts> => {
   const account = await AccountModel.findById(accountId)
-    .select({ timezone: 1, settings: 1, limits: 1, status: 1 })
+    .select({ timezone: 1, settings: 1, limits: 1, status: 1, voiceLine: 1 })
     .lean<{
       timezone?: string;
+      voiceLine?: AccountVoiceLine;
       status?: 'active' | 'suspended';
       settings?: { callingWindow?: CallingWindow; callCaps?: Partial<CallCaps> };
       limits?: Partial<AccountLimits>;
@@ -131,6 +139,7 @@ export const accountFacts = async (accountId: Types.ObjectId): Promise<AccountFa
     limits: { ...DEFAULT_ACCOUNT_LIMITS, ...account?.limits },
     caps: { ...DEFAULT_ACCOUNT_SETTINGS.callCaps, ...account?.settings?.callCaps },
     status: account?.status ?? 'active',
+    line: effectiveLine(account, getEnv()),
   };
 };
 
@@ -220,10 +229,10 @@ const liveRefused = () =>
     [
       {
         path: 'mode',
-        message: 'Phone calls need a phone line (SIP) — available with phone numbers',
+        message: 'This account is on the test line; a superadmin can switch it to the phone line',
       },
     ],
-    'Live campaigns need a phone line.',
+    'Live campaigns need the phone line.',
   );
 
 // ── settings ─────────────────────────────────────────────────────────────────
@@ -244,6 +253,7 @@ type CampaignSettings = Pick<
   | 'followUps'
   | 'pacing'
   | 'autoResume'
+  | 'phoneLine'
   | 'dryRun'
 >;
 
@@ -286,8 +296,26 @@ export const defaultSettings = (
     priority: CAMPAIGN_LIMITS.defaults.priority,
   },
   autoResume: true,
+  phoneLine: defaultPhoneLine(),
   dryRun: base.mode === 'dry_run' ? defaultDryRun() : null,
 });
+
+const mergePhoneLine = (
+  current: CampaignPhoneLine,
+  input: SettingsInput['phoneLine'],
+): CampaignPhoneLine => {
+  if (!input) return current;
+  return {
+    callerNumberId:
+      input.callerNumberId === undefined
+        ? current.callerNumberId
+        : input.callerNumberId === null
+          ? null
+          : new Types.ObjectId(input.callerNumberId),
+    amd: input.amd ?? current.amd,
+    voicemailText: input.voicemailText === undefined ? current.voicemailText : input.voicemailText,
+  };
+};
 
 const date = (v: string | null | undefined, fallback: Date | null): Date | null =>
   v === undefined ? fallback : v === null ? null : new Date(v);
@@ -333,6 +361,7 @@ export const mergeSettings = (
     },
     pacing: { ...current.pacing, ...input.pacing },
     autoResume: input.autoResume ?? current.autoResume,
+    phoneLine: mergePhoneLine(current.phoneLine ?? defaultPhoneLine(), input.phoneLine),
     dryRun:
       mode !== 'dry_run'
         ? null
@@ -354,7 +383,7 @@ export const validateSettings = async (
   account: AccountFacts,
   now: Date,
 ): Promise<void> => {
-  if (s.mode === 'live') throw liveRefused();
+  if (s.mode === 'live' && account.line !== 'sip') throw liveRefused();
   const details: ErrorDetail[] = [];
   if (!intersect(s.window, account.window)) {
     details.push({
@@ -364,6 +393,21 @@ export const validateSettings = async (
   }
   if (new Set(s.retry.retryOn).size !== s.retry.retryOn.length) {
     details.push({ path: 'retry.retryOn', message: 'Each result once' });
+  }
+  const line = s.phoneLine ?? defaultPhoneLine();
+  if (line.amd === 'leave_message' && !line.voicemailText) {
+    details.push({
+      path: 'phoneLine.voicemailText',
+      message: 'Write the message for answering machines',
+    });
+  }
+  if (line.callerNumberId) {
+    await resolveCallerId(accountId, line.callerNumberId).catch(() =>
+      details.push({
+        path: 'phoneLine.callerNumberId',
+        message: "Not one of this account's active numbers",
+      }),
+    );
   }
   if (s.pacing.concurrency > account.limits.maxConcurrentCalls) {
     details.push({
@@ -678,6 +722,7 @@ export const duplicateCampaign = async (req: Request, id: string) => {
       followUps: source.followUps,
       pacing: source.pacing,
       autoResume: source.autoResume,
+      phoneLine: source.phoneLine ?? defaultPhoneLine(),
       dryRun: source.dryRun,
       status: 'draft',
       stats: emptyCampaignStats(),
@@ -941,8 +986,8 @@ export const startCampaign = async (req: Request, id: string) => {
       `A ${campaign.status} campaign can't be started.`,
     );
   }
-  if (campaign.mode === 'live') throw liveRefused();
   const account = await accountFacts(accountId);
+  if (campaign.mode === 'live' && account.line !== 'sip') throw liveRefused();
   if (account.status === 'suspended') {
     throw notRunnable([{ path: 'account', message: 'The account is suspended' }]);
   }

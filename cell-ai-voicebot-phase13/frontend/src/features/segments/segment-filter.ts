@@ -72,8 +72,19 @@ export interface BuilderState {
   listIds: string[];
   dnd: Tri;
   optedOut: Tri;
+  /** Phase 18B: WhatsApp call permission (`whatsappCallPermission` condition), '' = any. */
+  waCall: WaCallFilter;
   rest: Pick<ContactFilter, 'q' | 'createdFrom' | 'createdTo'>;
 }
+
+export const WA_CALL_KEY = 'whatsappCallPermission';
+export type WaCallFilter = '' | 'allowed' | 'asked' | 'declined' | 'none';
+export const WA_CALL_LABELS: Record<Exclude<WaCallFilter, ''>, string> = {
+  allowed: 'Allowed',
+  asked: 'Asked, waiting',
+  declined: 'Declined or expired',
+  none: 'Never asked',
+};
 
 export const emptyCondition = (): ConditionDraft => ({ key: '', op: '', value: '', value2: '' });
 
@@ -81,17 +92,21 @@ const tri = (v: boolean | undefined): Tri => (v === undefined ? '' : v ? 'true' 
 const text = (v: string | number | undefined): string => (v === undefined ? '' : String(v));
 
 export const fromFilter = (filter: ContactFilter = {}): BuilderState => ({
-  conditions: (filter.conditions ?? []).map((c) => ({
-    key: c.key,
-    op: c.op,
-    value: text(c.value),
-    value2: text(c.value2),
-  })),
+  conditions: (filter.conditions ?? [])
+    .filter((c) => c.key !== WA_CALL_KEY)
+    .map((c) => ({
+      key: c.key,
+      op: c.op,
+      value: text(c.value),
+      value2: text(c.value2),
+    })),
   tagsMode: filter.tags?.mode ?? 'any',
   tags: filter.tags?.values ?? [],
   listIds: filter.listIds ?? [],
   dnd: tri(filter.dnd),
   optedOut: tri(filter.optedOut),
+  waCall: (filter.conditions?.find((c) => c.key === WA_CALL_KEY && c.op === 'eq')?.value ??
+    '') as WaCallFilter,
   rest: {
     ...(filter.q ? { q: filter.q } : {}),
     ...(filter.createdFrom ? { createdFrom: filter.createdFrom } : {}),
@@ -181,7 +196,14 @@ export const toContactFilter = (state: BuilderState, fields: CustomField[]): Con
     ...(state.tags.length ? { tags: { mode: state.tagsMode, values: state.tags } } : {}),
     ...(state.dnd ? { dnd: state.dnd === 'true' } : {}),
     ...(state.optedOut ? { optedOut: state.optedOut === 'true' } : {}),
-    ...(conditions.length ? { conditions } : {}),
+    ...(conditions.length || state.waCall
+      ? {
+          conditions: [
+            ...conditions,
+            ...(state.waCall ? [{ key: WA_CALL_KEY, op: 'eq' as const, value: state.waCall }] : []),
+          ],
+        }
+      : {}),
   };
 };
 
@@ -199,6 +221,13 @@ export const filterSize = (filter: ContactFilter): number =>
 export const describeFilter = (filter: ContactFilter, fields: CustomField[]): string => {
   const parts: string[] = [];
   for (const c of filter.conditions ?? []) {
+    if (c.key === WA_CALL_KEY) {
+      const v = text(c.value) as Exclude<WaCallFilter, ''>;
+      parts.push(
+        `WhatsApp calls ${c.op === 'neq' ? 'not ' : ''}${(WA_CALL_LABELS[v] ?? v).toLowerCase()}`,
+      );
+      continue;
+    }
     const label = fields.find((f) => f.key === c.key)?.label ?? c.key;
     const op =
       c.op === 'within_next_days'

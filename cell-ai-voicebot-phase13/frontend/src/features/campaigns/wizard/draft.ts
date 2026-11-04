@@ -36,6 +36,8 @@ export const LIMITS = {
 } as const;
 
 /** Everything the wizard edits (one object, saved as create / update bodies). */
+export type AmdMode = 'off' | 'hangup' | 'leave_message';
+
 export interface WizardDraft {
   name: string;
   mode: 'dry_run' | 'live';
@@ -59,6 +61,8 @@ export interface WizardDraft {
   };
   pacing: { concurrency: number; dialsPerMinute: number; priority: 'high' | 'normal' | 'low' };
   autoResume: boolean;
+  /** Phase 18: caller number and answering machines (live campaigns). */
+  phoneLine: { callerNumberId: string | null; amd: AmdMode; voicemailText: string };
   dryRun: {
     mix: Record<DryRunOutcome, number>;
     scenarios: Record<ScenarioKey, number>;
@@ -108,6 +112,7 @@ export const emptyDraft = (account: { timezone: string; window: CampaignWindow }
   },
   pacing: { concurrency: 5, dialsPerMinute: 30, priority: 'normal' },
   autoResume: true,
+  phoneLine: { callerNumberId: null, amd: 'off', voicemailText: '' },
   dryRun: { mix: { ...DEFAULT_MIX }, scenarios: { ...DEFAULT_SCENARIOS }, speed: 10 },
 });
 
@@ -142,6 +147,11 @@ export const draftFromCampaign = (c: Campaign): WizardDraft => ({
   followUps: { ...c.followUps, promiseCheck: { ...c.followUps.promiseCheck } },
   pacing: { ...c.pacing },
   autoResume: c.autoResume,
+  phoneLine: {
+    callerNumberId: c.phoneLine.callerNumberId,
+    amd: c.phoneLine.amd,
+    voicemailText: c.phoneLine.voicemailText ?? '',
+  },
   dryRun: c.dryRun
     ? {
         mix: { ...DEFAULT_MIX, ...(c.dryRun.mix as Record<DryRunOutcome, number>) },
@@ -175,6 +185,12 @@ const settingsOf = (d: WizardDraft): CampaignSettingsInput => ({
   followUps: d.followUps,
   pacing: d.pacing,
   autoResume: d.autoResume,
+  phoneLine: {
+    callerNumberId: d.phoneLine.callerNumberId,
+    amd: d.phoneLine.amd,
+    voicemailText:
+      d.phoneLine.amd === 'leave_message' ? d.phoneLine.voicemailText.trim() || null : null,
+  },
   dryRun: d.mode === 'dry_run' ? d.dryRun : null,
 });
 
@@ -252,7 +268,12 @@ export const stepProblems = (step: StepIndex, d: WizardDraft, now = new Date()):
     if (d.name.trim().length > LIMITS.nameMax)
       p.push(`At most ${String(LIMITS.nameMax)} characters`);
     if (!d.flowId) p.push('Choose a published flow');
-    if (d.mode === 'live') p.push('Live calls need a phone line (coming with phone numbers)');
+    if (
+      d.mode === 'live' &&
+      d.phoneLine.amd === 'leave_message' &&
+      !d.phoneLine.voicemailText.trim()
+    )
+      p.push('Write the message for answering machines');
     return p;
   }
   if (step === 1) return audienceProblems(d);

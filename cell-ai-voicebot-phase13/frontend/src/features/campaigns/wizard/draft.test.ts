@@ -132,10 +132,10 @@ describe('wizard draft', () => {
 
   it('step problems: every rule', () => {
     expect(stepProblems(0, valid())).toEqual([]);
+    // Phase 18: live is allowed (the server refuses it for an account on the test line)
     expect(stepProblems(0, { ...valid(), name: ' ', flowId: '', mode: 'live' })).toEqual([
       'Give the campaign a name',
       'Choose a published flow',
-      'Live calls need a phone line (coming with phone numbers)',
     ]);
     expect(stepProblems(0, { ...valid(), name: 'x'.repeat(121) })).toEqual([
       'At most 120 characters',

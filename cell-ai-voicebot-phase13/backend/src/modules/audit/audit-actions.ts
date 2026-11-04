@@ -174,6 +174,15 @@ export const AUDIT_ACTIONS = [
   'mfa.recovery_used',
   'ops.release_recorded',
   'ops.restore_drill_recorded',
+  // Phase 18: SIP line
+  'account.voice_line_changed',
+  'account.sip_settings_changed',
+  'phone_number.created',
+  'phone_number.updated',
+  'phone_number.assigned',
+  'phone_number.released',
+  // Phase 18B: WhatsApp calling go-live
+  'whatsapp.call_permission_bulk_requested',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

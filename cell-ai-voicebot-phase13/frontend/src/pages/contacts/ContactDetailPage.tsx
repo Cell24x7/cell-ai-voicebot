@@ -49,6 +49,10 @@ const ContactTemplateButton = lazy(async () => ({
 const CallNowDialog = lazy(async () => ({
   default: (await import('@/features/calls/CallNowDialog')).CallNowDialog,
 }));
+const ContactCallingCard = lazy(async () => ({
+  default: (await import('@/features/whatsapp-calling/panel/ContactCallingCard'))
+    .ContactCallingCard,
+}));
 const ContactCallsCard = lazy(async () => ({
   default: (await import('@/features/calls/ContactCallsCard')).ContactCallsCard,
 }));
@@ -426,6 +430,11 @@ export function ContactDetailPage() {
             {can('calls.read') && (
               <Suspense fallback={<Skeleton variant="rounded" height={120} />}>
                 <ContactCallsCard contact={c} />
+              </Suspense>
+            )}
+            {can('calls.read') && can('whatsapp.read') && (
+              <Suspense fallback={null}>
+                <ContactCallingCard contact={c} />
               </Suspense>
             )}
           </Stack>

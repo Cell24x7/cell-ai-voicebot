@@ -31,6 +31,7 @@ export const fakeCampaign = (overrides: Partial<Campaign> = {}): Campaign => ({
   name: 'October recovery',
   mode: 'dry_run',
   status: 'running',
+  phoneLine: { callerNumberId: null, amd: 'off', voicemailText: null },
   pauseReason: null,
   waitingUntil: null,
   flow: { id: 'f1', name: 'Loan recovery', version: 2 },

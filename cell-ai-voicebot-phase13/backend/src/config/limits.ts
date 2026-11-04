@@ -238,6 +238,17 @@ export const FLOW_LIMITS = {
 } as const;
 
 /** Phase 7 voice calls (PHASE_7_PLAN §1l, PHASE_7_PROMPT §1). */
+/** SIP line rules kept as data (Phase 18): carrier and regulator rules change. */
+export const SIP_LIMITS = {
+  /** 1600-series numbers for BFSI service calls: a hint on the phone numbers page. */
+  series1600: /^\+911600\d{6}$/,
+  /** Numbers the phone line may dial (toll-fraud guard, T18.14). */
+  mobile: /^\+91[6-9]\d{9}$/,
+  landline: /^\+91[1-9]\d{9}$/,
+  /** Toll-free, premium, short and service codes behind +91 — never dialed. */
+  blockedPrefixes: ['+911600', '+911800', '+911860', '+911900', '+91140'],
+} as const;
+
 export const CALL_LIMITS = {
   frameMs: 20,
   /** Web call leg: PCM16 mono 24 kHz. */
@@ -250,6 +261,8 @@ export const CALL_LIMITS = {
   recordingSampleRate: 8_000,
   concurrentPerAccount: 3,
   concurrentPerProcess: 20,
+  /** A hangup waits this long for a running AI turn's decisions (Phase 18, T18.12). */
+  turnGraceMs: 3000,
   webCallsPerMinutePerUser: 10,
   readyTimeoutSec: 15,
   dropGraceSec: 5,

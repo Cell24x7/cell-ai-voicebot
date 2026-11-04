@@ -310,15 +310,28 @@ export const fromTemplate = (t: WhatsAppTemplate): BuilderState => {
   };
 };
 
-/** The call permission template's starting point (backend `CALL_PERMISSION_BODY`). */
-export const CALL_PERMISSION_BODY =
-  'Kya hum aapko WhatsApp par call kar sakte hain? Aapke loan / account ke baare mein baat karni hai.';
+/** The call permission template's starting points (Phase 18B: English + Hinglish presets). */
+export const CALL_PERMISSION_BODIES = {
+  en: 'Can we call you on WhatsApp about your account?',
+  // backend `CALL_PERMISSION_BODY`
+  hi: 'Kya hum aapko WhatsApp par call kar sakte hain? Aapke loan / account ke baare mein baat karni hai.',
+} as const;
+/** The Hinglish preset (kept for older callers). */
+export const CALL_PERMISSION_BODY = CALL_PERMISSION_BODIES.hi;
+
+/** The preset text for a language: Hindi → Hinglish, everything else → English. */
+export const callPermissionBody = (language: string): string =>
+  language.toLowerCase().startsWith('hi') ? CALL_PERMISSION_BODIES.hi : CALL_PERMISSION_BODIES.en;
+
+/** True while the body is still one of the presets (a language switch may swap it). */
+export const isCallPermissionPreset = (body: string): boolean =>
+  (Object.values(CALL_PERMISSION_BODIES) as string[]).includes(body.trim());
 
 export const callPermissionState = (language = 'en'): BuilderState =>
   emptyState({
     name: `call_permission_${language.toLowerCase()}`,
     language,
     category: 'UTILITY',
-    body: CALL_PERMISSION_BODY,
+    body: callPermissionBody(language),
     purpose: 'call_permission',
   });

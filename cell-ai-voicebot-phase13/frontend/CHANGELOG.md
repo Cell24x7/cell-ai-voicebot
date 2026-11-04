@@ -10,6 +10,17 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Phase 18B — WhatsApp calling go-live** — 2026-11-04
+  - Number → Calling: readiness checklist with fixes, switch blocked while something blocks it, "Turning on…" and a clear error when WhatsApp didn't apply the change; "Calling: not ready" chip on numbers.
+  - Contacts: "WhatsApp calls" column and segment rule; WhatsApp calling card on the contact page; "New WhatsApp call" on the calls page.
+  - "Ask for WhatsApp call permission" for selected contacts, a list or a segment, with estimate, progress and results by reason.
+  - Call permission template presets (English / Hinglish), status and rejection reason in the dialogs; Admin → System "WhatsApp calls".
+
+- **Phase 18 — phone line** — 2026-11-03
+  - Admin → Phone numbers; the Phone line card on an account (test line / phone line, pulse, minutes per hour).
+  - Live campaigns for accounts on the phone line: caller number, answering machines, voicemail text.
+  - Call detail shows caller ID, the line result and the phone audio; System page SIP card.
+
 - **Phase 17 — production** — 2026-11-03
   - Admin → System page (build, MongoDB, Redis, queues, backups, certificate, superadmins without 2FA).
   - The build carries its commit (`VITE_GIT_SHA`, `version.json`).

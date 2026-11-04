@@ -79,6 +79,8 @@ const DETAIL: AdminAccountDetail = {
   owner: base.user as AdminAccountDetail['owner'],
   usersCount: 3,
   apiLimits: null,
+  voiceLine: 'dryrun',
+  sipSettings: { pulseSec: null, spendMinutesPerHour: null },
   usersByStatus: { active: 3, invited: 0, disabled: 0 },
   retention: fakeRetention(),
   limits: { maxConcurrentCalls: 10, dialsPerMinute: 60 },

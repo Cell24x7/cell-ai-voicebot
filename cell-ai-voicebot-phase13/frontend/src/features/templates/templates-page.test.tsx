@@ -718,7 +718,7 @@ describe('Template builder', () => {
       expect(api.callPermission).toHaveBeenCalledWith({
         channelId: 'wa1',
         language: 'hi',
-        body: callPermissionState().body,
+        body: callPermissionState('hi').body,
         submit: true,
       }),
     );
@@ -740,9 +740,32 @@ describe('Template builder', () => {
     expect(await screen.findByRole('dialog', { name: 'Create template' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await userEvent.click(screen.getByRole('button', { name: 'Create call permission template' }));
-    expect(
-      await screen.findByRole('dialog', { name: 'Create call permission template' }),
-    ).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Hinglish (Hindi)' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Create call permission template' });
+    expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveValue('call_permission_hi');
+    expect(within(dialog).getByText(/Category: Utility/)).toBeInTheDocument();
+  });
+
+  it('presets: English by default, a language switch swaps an untouched preset (T18B.5)', async () => {
+    expect(callPermissionState().body).toBe('Can we call you on WhatsApp about your account?');
+    expect(callPermissionState('hi').body).toMatch(/^Kya hum aapko WhatsApp par call/);
+    const { dialog } = renderBuilder({ initial: callPermissionState('en') });
+    const d = within(dialog);
+    expect(d.getByRole('figure', { name: 'Template preview' })).toHaveTextContent(
+      'Can we call you on WhatsApp',
+    );
+    await userEvent.click(d.getByRole('combobox', { name: 'Language' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Hindi (hi)' }));
+    expect(d.getByRole('figure', { name: 'Template preview' })).toHaveTextContent(
+      'Kya hum aapko WhatsApp par call',
+    );
+  });
+
+  it('?create=call_permission opens the guided builder (Calling section / dialogs link)', async () => {
+    signInAs('owner');
+    renderWithProviders({ route: '/whatsapp/templates?create=call_permission&lang=hi' });
+    const dialog = await screen.findByRole('dialog', { name: 'Create call permission template' });
+    expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveValue('call_permission_hi');
   });
 
   it('is full screen on a phone', () => {

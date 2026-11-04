@@ -292,6 +292,9 @@ type Created<P extends keyof paths, M extends keyof paths[P]> = paths[P][M] exte
 
 /** WhatsApp calling (Phase 12). */
 export type WhatsAppCallingSettings = Schemas['WhatsAppCallingSettings'];
+export type WhatsAppCallingReadiness = Schemas['WhatsAppCallingReadiness'];
+export type WhatsAppCallPermissionRun = Schemas['WhatsAppCallPermissionRun'];
+export type CallPermissionSkipReason = keyof WhatsAppCallPermissionRun['skipped'];
 export type WhatsAppCallingSettingsPatch = Schemas['WhatsAppCallingSettingsPatch'];
 export type WhatsAppCallHours = WhatsAppCallingSettings['callHours'];
 export type WhatsAppCallHoursEntry = WhatsAppCallHours['weekly'][number];
@@ -333,3 +336,6 @@ export type OutcomeRule = Schemas['OutcomeRule'];
 export type AfterCallMessage = Schemas['AfterCallMessage'];
 export type SheetImport = Schemas['SheetImport'];
 export type SheetPreview = Schemas['SheetPreview'];
+
+// Phase 18: SIP line
+export type PhoneNumber = Schemas['PhoneNumber'];

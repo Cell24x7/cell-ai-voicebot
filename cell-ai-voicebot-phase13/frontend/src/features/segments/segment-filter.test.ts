@@ -194,4 +194,23 @@ describe('segment filter helpers', () => {
       'conditions.1.value2': 'Bad',
     });
   });
+
+  it('WhatsApp calls filter: a condition of its own, round trip and summary (Phase 18B)', () => {
+    const state = { ...fromFilter({}), waCall: 'allowed' as const };
+    const filter = toContactFilter(state, FIELDS);
+    expect(filter.conditions).toEqual([
+      { key: 'whatsappCallPermission', op: 'eq', value: 'allowed' },
+    ]);
+    const back = fromFilter(filter);
+    expect(back.waCall).toBe('allowed');
+    expect(back.conditions).toEqual([]);
+    expect(describeFilter(filter, FIELDS)).toBe('WhatsApp calls allowed');
+    expect(
+      describeFilter(
+        { conditions: [{ key: 'whatsappCallPermission', op: 'neq', value: 'none' }] },
+        FIELDS,
+      ),
+    ).toBe('WhatsApp calls not never asked');
+    expect(toContactFilter(fromFilter({}), FIELDS)).toEqual({});
+  });
 });

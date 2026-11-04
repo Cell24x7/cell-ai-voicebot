@@ -4297,6 +4297,164 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/accounts/{id}/voice-line': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Move this account to the phone line (sip) or back to the test line (superadmin) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            voiceLine: 'dryrun' | 'sip';
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                /** @enum {string} */
+                voiceLine: 'dryrun' | 'sip';
+              };
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/admin/accounts/{id}/sip-settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Set this account's SIP billing pulse and spend guard; null = default (superadmin) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            pulseSec: number | null;
+            spendMinutesPerHour: number | null;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                pulseSec: number | null;
+                spendMinutesPerHour: number | null;
+              };
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
   '/api/v1/admin/accounts/{id}/api-limits': {
     parameters: {
       query?: never;
@@ -8049,6 +8207,12 @@ export interface paths {
               excludeActiveCampaigns?: boolean;
               skipIfMissing?: string[];
             };
+            phoneLine?: {
+              callerNumberId?: string | null;
+              /** @enum {string} */
+              amd?: 'off' | 'hangup' | 'leave_message';
+              voicemailText?: string | null;
+            };
             schedule?: {
               /** Format: date-time */
               startAt?: string | null;
@@ -8533,6 +8697,12 @@ export interface paths {
               contactIds?: string[];
               excludeActiveCampaigns?: boolean;
               skipIfMissing?: string[];
+            };
+            phoneLine?: {
+              callerNumberId?: string | null;
+              /** @enum {string} */
+              amd?: 'off' | 'hangup' | 'leave_message';
+              voicemailText?: string | null;
             };
             schedule?: {
               /** Format: date-time */
@@ -9420,7 +9590,9 @@ export interface paths {
             | 'in_active_campaign'
             | 'missing_values'
             | 'cap_reached'
-            | 'campaign_ended';
+            | 'campaign_ended'
+            | 'rejected'
+            | 'number_not_allowed';
           q?: string;
         };
         header?: never;
@@ -12309,6 +12481,434 @@ export interface paths {
         };
       };
     };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/phone-numbers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Caller-ID numbers on the trunk, all accounts (superadmin) */
+    get: {
+      parameters: {
+        query?: {
+          accountId?: string;
+          status?: 'active' | 'disabled';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['PhoneNumber'][];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Add a number to the pool (superadmin) — 409 PHONE_NUMBER_EXISTS */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            number: string;
+            /** @enum {string} */
+            kind: '1600' | 'landline' | 'mobile' | 'other';
+            /** @default  */
+            label?: string;
+            /** @default null */
+            dltPrincipalEntityId?: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['PhoneNumber'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/phone-numbers/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Change label, kind, DLT id or status (superadmin) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            kind?: '1600' | 'landline' | 'mobile' | 'other';
+            label?: string;
+            dltPrincipalEntityId?: string | null;
+            /** @enum {string} */
+            status?: 'active' | 'disabled';
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['PhoneNumber'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/admin/phone-numbers/{id}/assign': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Give the number to an account (superadmin) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            accountId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['PhoneNumber'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/phone-numbers/{id}/release': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Take the number back into the pool (superadmin) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['PhoneNumber'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/phone-line': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** This account's phone line (sip / dryrun) and active numbers (account.read) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['PhoneLine'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/phone-numbers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** This account's active caller-ID numbers (account.read) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['PhoneNumber'][];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
     post?: never;
     delete?: never;
     options?: never;
@@ -26360,6 +26960,109 @@ export interface paths {
     };
     trace?: never;
   };
+  '/api/v1/whatsapp/channels/{id}/calling/readiness': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What calling on this number needs and what to fix (whatsapp.read) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCallingReadiness'];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp calling or media capacity unavailable */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/whatsapp/channels/{id}/calling/sync': {
     parameters: {
       query?: never;
@@ -26591,6 +27294,7 @@ export interface paths {
             channelId: string;
             contactId: string;
             body?: string;
+            templateId?: string;
           };
         };
       };
@@ -26675,6 +27379,229 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp/call-permissions/bulk': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Ask up to 5,000 contacts for call permission with an approved template (inbox.reply + contacts.read; 5/hour/user; Idempotency-Key) */
+    post: {
+      parameters: {
+        query?: never;
+        header: {
+          'idempotency-key': string;
+        };
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            channelId: string;
+            target: {
+              contactIds?: string[];
+              listId?: string;
+              segmentId?: string;
+            };
+            templateId: string;
+            variables?: {
+              [key: string]: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                runId: string;
+              };
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp calling or media capacity unavailable */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp/call-permissions/bulk/{runId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A bulk call permission run: status and counts by reason (calls.read) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCallPermissionRun'];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp calling or media capacity unavailable */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -30259,7 +31186,14 @@ export interface components {
         | 'mfa.disabled'
         | 'mfa.recovery_used'
         | 'ops.release_recorded'
-        | 'ops.restore_drill_recorded';
+        | 'ops.restore_drill_recorded'
+        | 'account.voice_line_changed'
+        | 'account.sip_settings_changed'
+        | 'phone_number.created'
+        | 'phone_number.updated'
+        | 'phone_number.assigned'
+        | 'phone_number.released'
+        | 'whatsapp.call_permission_bulk_requested';
       actor: {
         /** @enum {string} */
         type: 'user' | 'api_key' | 'system';
@@ -30334,6 +31268,12 @@ export interface components {
         readsPerMinute: number;
         writesPerMinute: number;
       } | null;
+      /** @enum {string} */
+      voiceLine: 'dryrun' | 'sip';
+      sipSettings: {
+        pulseSec: number | null;
+        spendMinutesPerHour: number | null;
+      };
       usersByStatus: {
         invited: number;
         active: number;
@@ -30427,6 +31367,31 @@ export interface components {
         daysLeft: number;
       } | null;
       superadminsWithoutMfa: number;
+      sip: {
+        ariConnected: boolean;
+        trunkOnline: boolean | null;
+        liveChannels: number;
+        maxChannels: number;
+        maxCps: number;
+        causes24h: {
+          [key: string]: number;
+        };
+        avgLossPct: number | null;
+        avgJitterMs: number | null;
+      } | null;
+      /** @description Phase 18B: WhatsApp call audio; null when WhatsApp is off */
+      whatsappCalls: {
+        mediaEnabled: boolean;
+        publicIpSet: boolean;
+        portRange: string;
+        liveCalls: number;
+        lastSetupMs: number | null;
+        lastError: {
+          reason: string;
+          at: string;
+        } | null;
+        failedSetups15m: number;
+      } | null;
     };
     AgentFunction: {
       id: string;
@@ -30987,7 +31952,23 @@ export interface components {
         | 'calling_restricted'
         | 'no_agent_available'
         | 'outside_call_hours'
+        | 'machine'
         | null;
+      callerId: string | null;
+      sip: {
+        /** @enum {string} */
+        codec: 'ulaw' | 'alaw';
+        sipQ850: number | null;
+        dialStatus: string | null;
+        amd: string | null;
+        amdCause: string | null;
+        amdMs: number | null;
+        packetsIn: number;
+        packetsOut: number;
+        lossPct: number;
+        jitterMs: number;
+        firstAudioMs: number | null;
+      } | null;
       source: {
         /** @enum {string|null} */
         kind: 'flow' | 'agent' | null;
@@ -31134,7 +32115,7 @@ export interface components {
     };
     ContactFilterCondition: {
       /**
-       * @description A custom field key, or `lastDisposition` (eq / neq / exists / not_exists) / `lastCalledAt` (before / after / within_last_days / not_exists = never called)
+       * @description A custom field key, or `lastDisposition` (eq / neq / exists / not_exists) / `lastCalledAt` (before / after / within_last_days / not_exists = never called) / `whatsappCallPermission` (eq / neq: allowed, asked, declined, none)
        * @example days_past_due
        */
       key: string;
@@ -31316,6 +32297,12 @@ export interface components {
         priority: 'high' | 'normal' | 'low';
       };
       autoResume: boolean;
+      phoneLine: {
+        callerNumberId: string | null;
+        /** @enum {string} */
+        amd: 'off' | 'hangup' | 'leave_message';
+        voicemailText: string | null;
+      };
       dryRun: {
         mix: {
           [key: string]: number;
@@ -31415,6 +32402,8 @@ export interface components {
         | 'missing_values'
         | 'cap_reached'
         | 'campaign_ended'
+        | 'rejected'
+        | 'number_not_allowed'
         | null;
       /**
        * @description Why it waits for nextAttemptAt: window, daily_cap, weekly_cap or min_gap
@@ -31650,6 +32639,8 @@ export interface components {
       lastCalledAt: string | null;
       callCount: number;
       lastDisposition: string | null;
+      /** @enum {string} */
+      waCallPermission: 'allowed' | 'asked' | 'declined' | 'none';
       /** @description WhatsApp profile (set once the customer wrote on WhatsApp) */
       whatsapp: {
         profileName: string | null;
@@ -31723,6 +32714,27 @@ export interface components {
         optedOut: number;
         suppressed: number;
       };
+    };
+    PhoneNumber: {
+      id: string;
+      number: string;
+      /** @enum {string} */
+      kind: '1600' | 'landline' | 'mobile' | 'other';
+      accountId: string | null;
+      accountName: string | null;
+      /** @enum {string} */
+      purpose: 'outbound' | 'inbound';
+      label: string;
+      dltPrincipalEntityId: string | null;
+      /** @enum {string} */
+      status: 'active' | 'disabled';
+      warnings: string[];
+      createdAt: string;
+    };
+    PhoneLine: {
+      /** @enum {string} */
+      line: 'sip' | 'dryrun';
+      numbers: components['schemas']['PhoneNumber'][];
     };
     DndEntry: {
       id: string;
@@ -33243,7 +34255,10 @@ export interface components {
         | 'webhook.endpoint_disabled'
         | 'contacts.erase_completed'
         | 'account.export_ready'
-        | 'account.delete_scheduled';
+        | 'account.delete_scheduled'
+        | 'sip.spend_guard_paused'
+        | 'sip.trunk_down'
+        | 'whatsapp.call_permission_bulk_done';
       title: string;
       body: string;
       link: string | null;
@@ -33633,6 +34648,51 @@ export interface components {
       mediaTicket: string;
       expiresAt: string;
       wsPath: string;
+    };
+    WhatsAppCallingReadiness: {
+      /** @description No blocking item is false */
+      ready: boolean;
+      items: {
+        /** @enum {string} */
+        key:
+          | 'cloud_api'
+          | 'messaging_limit'
+          | 'business_verified'
+          | 'calls_webhook'
+          | 'app_permission'
+          | 'meta_status'
+          | 'restrictions'
+          | 'last_calls_webhook'
+          | 'media'
+          | 'prices';
+        /** @description null = could not tell */
+        ok: boolean | null;
+        detail: string;
+        fix: string | null;
+      }[];
+    };
+    WhatsAppCallPermissionRun: {
+      id: string;
+      channelId: string;
+      templateId: string;
+      /** @enum {string} */
+      status: 'queued' | 'running' | 'done' | 'stopped';
+      total: number;
+      sent: number;
+      skipped: {
+        dnd?: number;
+        opted_out?: number;
+        suppressed?: number;
+        no_whatsapp?: number;
+        already_allowed?: number;
+        meta_limit?: number;
+        declined_recently?: number;
+        wallet_empty?: number;
+      };
+      failed: number;
+      startedAt: string | null;
+      finishedAt: string | null;
+      createdAt: string;
     };
     WhatsAppChannel: {
       id: string;

@@ -11,6 +11,13 @@ import { DEFAULT_QUEUE_PREFIX } from '../../core/queues/queue-factory';
 import { UserModel } from '../../db/models/user.model';
 import { readOpsStatus, type OpsStatus } from '../ops/ops-status';
 
+import { readSipStatus, type SipStatus, type SipStatusEnv } from './sip-status';
+import {
+  readWhatsAppCallsStatus,
+  type WhatsAppCallsEnv,
+  type WhatsAppCallsStatus,
+} from './wa-calls-status';
+
 /** Admin → System (Phase 17): what a superadmin needs to see production is healthy. No secrets. */
 export interface SystemStatus extends OpsStatus {
   commit: string;
@@ -22,10 +29,14 @@ export interface SystemStatus extends OpsStatus {
   queues: Record<string, { waiting: number; active: number; delayed: number; failed: number }>;
   certificate: { daysLeft: number } | null;
   superadminsWithoutMfa: number;
+  /** Phase 18: the SIP line; `null` when the install has no trunk. */
+  sip: SipStatus | null;
+  /** Phase 18B: WhatsApp call audio; `null` when WhatsApp is off. */
+  whatsappCalls: WhatsAppCallsStatus | null;
 }
 
 export interface SystemDeps {
-  env: Pick<Env, 'NODE_ENV' | 'TLS_CERT_PATH'>;
+  env: Pick<Env, 'NODE_ENV' | 'TLS_CERT_PATH'> & SipStatusEnv & WhatsAppCallsEnv;
   build: { commit: string; builtAt: string };
   /** The app's Redis: the queue handles share it, `INFO memory` gives its size. */
   redis: Redis;
@@ -102,22 +113,25 @@ export const createSystemStatus = (deps: SystemDeps) => {
 
   const read = async (now = new Date()): Promise<SystemStatus> => {
     if (cached && now.getTime() - cached.at < CACHE_MS) return cached.value;
-    const [mongo, redis, queueState, ops, certificate, superadminsWithoutMfa] = await Promise.all([
-      mongoStatus(),
-      redisStatus(deps.redis),
-      queueCounts(),
-      readOpsStatus().catch(() => ({
-        lastBackup: null,
-        lastRestoreDrill: null,
-        lastRelease: null,
-      })),
-      certificateDays(deps.env.TLS_CERT_PATH, now),
-      UserModel.countDocuments({
-        platformRole: 'superadmin',
-        status: { $ne: 'disabled' },
-        'mfa.enabledAt': { $in: [null] },
-      }).catch(() => -1),
-    ]);
+    const [mongo, redis, queueState, ops, certificate, superadminsWithoutMfa, sip, whatsappCalls] =
+      await Promise.all([
+        mongoStatus(),
+        redisStatus(deps.redis),
+        queueCounts(),
+        readOpsStatus().catch(() => ({
+          lastBackup: null,
+          lastRestoreDrill: null,
+          lastRelease: null,
+        })),
+        certificateDays(deps.env.TLS_CERT_PATH, now),
+        UserModel.countDocuments({
+          platformRole: 'superadmin',
+          status: { $ne: 'disabled' },
+          'mfa.enabledAt': { $in: [null] },
+        }).catch(() => -1),
+        readSipStatus(deps.env, deps.redis, now).catch(() => null),
+        readWhatsAppCallsStatus(deps.env, now).catch(() => null),
+      ]);
     const value: SystemStatus = {
       commit: deps.build.commit,
       builtAt: deps.build.builtAt,
@@ -129,6 +143,8 @@ export const createSystemStatus = (deps: SystemDeps) => {
       ...ops,
       certificate,
       superadminsWithoutMfa,
+      sip,
+      whatsappCalls,
     };
     cached = { at: now.getTime(), value };
     return value;

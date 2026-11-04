@@ -58,6 +58,12 @@ export interface CampaignSettingsInput {
   };
   pacing?: { concurrency?: number; dialsPerMinute?: number; priority?: 'high' | 'normal' | 'low' };
   autoResume?: boolean;
+  /** Phase 18: caller number and answering machines (live campaigns). */
+  phoneLine?: {
+    callerNumberId?: string | null;
+    amd?: 'off' | 'hangup' | 'leave_message';
+    voicemailText?: string | null;
+  };
   /** `mix` in basis points (sum 10 000), `scenarios` in percent (sum 100). */
   dryRun?: {
     mix?: Record<DryRunOutcome, number>;

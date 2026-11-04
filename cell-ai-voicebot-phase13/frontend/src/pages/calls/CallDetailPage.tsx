@@ -106,6 +106,32 @@ function Outcome({ call }: { call: Call }) {
 }
 
 /** `/calls/:id` — one call: summary, recording, transcript, timeline, cost. */
+/** Q.850 cause in plain words (backend `sip/causes.ts`). */
+const Q850_TEXT: Record<number, string> = {
+  1: 'Number not in service',
+  3: 'No route to the number',
+  16: 'Call ended normally',
+  17: 'Busy',
+  18: 'No response',
+  19: 'Not answered',
+  20: 'Phone switched off or out of coverage',
+  21: 'Call rejected',
+  22: 'Number changed',
+  27: 'Phone out of order',
+  28: 'Number incomplete',
+  31: 'Call ended',
+  34: 'No line free at the carrier',
+  38: 'Carrier network down',
+  41: 'Carrier temporary failure',
+  42: 'Carrier congested',
+};
+
+const sipResult = (sip: { sipQ850: number | null } | null | undefined): string => {
+  const q = sip?.sipQ850;
+  if (q === null || q === undefined) return '—';
+  return `${Q850_TEXT[q] ?? 'Other'} (cause ${String(q)})`;
+};
+
 export function CallDetailPage() {
   const { id = '' } = useParams();
   const timezone = useAuthStore((s) => s.session?.account.timezone ?? 'Asia/Kolkata');
@@ -217,6 +243,9 @@ export function CallDetailPage() {
                   {whatsapp && (
                     <Chip size="small" color="success" variant="outlined" label="WhatsApp" />
                   )}
+                  {c.provider === 'sip' && (
+                    <Chip size="small" color="primary" variant="outlined" label="Phone" />
+                  )}
                   {c.provider === 'dryrun' ? (
                     <Chip size="small" variant="outlined" label="Simulated call" />
                   ) : (
@@ -249,6 +278,12 @@ export function CallDetailPage() {
                 <Row label="Started by" value={c.startedBy?.name ?? '—'} />
                 <Row label="Length" value={`${String(c.durationSec)} s`} />
                 <Row label="Ended" value={c.endReason ? END_REASON_LABELS[c.endReason] : '—'} />
+                {c.provider === 'sip' && (
+                  <>
+                    <Row label="Caller ID" value={c.callerId ?? '—'} />
+                    <Row label="Line result" value={sipResult(c.sip)} />
+                  </>
+                )}
                 <Row
                   label="Language"
                   value={
@@ -389,6 +424,20 @@ export function CallDetailPage() {
                   }
                 />
                 <Row label="Interruptions" value={m.bargeIns} />
+                {c.sip && (
+                  <>
+                    <Row
+                      label="Phone audio"
+                      value={`${c.sip.codec === 'alaw' ? 'G.711 A-law' : 'G.711 μ-law'} · loss ${String(c.sip.lossPct)}% · jitter ${String(c.sip.jitterMs)} ms`}
+                    />
+                    {c.sip.amd && (
+                      <Row
+                        label="Answering machine check"
+                        value={`${c.sip.amd === 'MACHINE' ? 'Machine' : c.sip.amd === 'HUMAN' ? 'Person' : 'Not sure'}${c.sip.amdMs === null ? '' : ` (${String(c.sip.amdMs)} ms)`}`}
+                      />
+                    )}
+                  </>
+                )}
                 <Row label="Silence prompts" value={m.silencePrompts} />
                 <Row label="AI time" value={`${String(m.aiSeconds)} s`} />
                 <Row

@@ -18,6 +18,8 @@ import { useCan } from '@/features/auth/hooks';
 import { useCanWriteCampaigns } from '@/features/campaigns/permissions';
 import { ExportDialog } from '@/features/contact-exports/ExportDialog';
 import { useCanExport } from '@/features/contact-exports/useExportJob';
+import { LazyBulkCallPermission } from '@/features/whatsapp-calling/panel/LazyBulkCallPermission';
+import { useCanRequestPermissionBulk } from '@/features/whatsapp-calling/permissions';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { contactListsApi } from '@/services/api/contact-lists';
 import { getErrorMessage, toApiError } from '@/services/api/errors';
@@ -105,6 +107,8 @@ export function ListsTab() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<ContactList | 'new' | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [asking, setAsking] = useState<ContactList | null>(null);
+  const canAskCalls = useCanRequestPermissionBulk();
   const query = { page, limit: 20, ...(q ? { q } : {}) };
   const lists = useQuery({
     queryKey: listKeys.list(query),
@@ -159,6 +163,11 @@ export function ListsTab() {
           {canCampaign && (
             <Button size="small" component={RouterLink} to={`/campaigns/new?listId=${l.id}`}>
               Create campaign
+            </Button>
+          )}
+          {canAskCalls && (
+            <Button size="small" onClick={() => setAsking(l)}>
+              Ask for call permission
             </Button>
           )}
           {canExport && (
@@ -237,6 +246,13 @@ export function ListsTab() {
         />
       )}
       {exporting && <ExportDialog open onClose={() => setExporting(null)} listId={exporting} />}
+      {asking && (
+        <LazyBulkCallPermission
+          target={{ listId: asking.id }}
+          count={Math.min(asking.contactCount, 5_000)}
+          onClose={() => setAsking(null)}
+        />
+      )}
     </>
   );
 }

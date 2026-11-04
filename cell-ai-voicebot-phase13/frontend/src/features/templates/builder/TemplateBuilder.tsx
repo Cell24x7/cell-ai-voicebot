@@ -62,10 +62,12 @@ import {
   BUTTON_CAPS,
   BUTTON_LABELS,
   bodyKeys,
+  callPermissionBody,
   canAddButton,
   emptyState,
   fromTemplate,
   insertAt,
+  isCallPermissionPreset,
   isMediaHeader,
   moveButton,
   nextVariable,
@@ -399,6 +401,13 @@ export function TemplateBuilder({
                 </Typography>
               )}
 
+              {permission && (
+                <Typography variant="body2" color="text.secondary">
+                  Category: Utility. A call permission request is sent as a Utility template
+                  (charged like one outside the 24-hour window); WhatsApp may still move it to
+                  Marketing in review — then it is charged as Marketing.
+                </Typography>
+              )}
               {!permission && (
                 <FormControl disabled={approved}>
                   <FormLabel id="tpl-category">Category</FormLabel>
@@ -481,6 +490,10 @@ export function TemplateBuilder({
                     set({
                       language: code,
                       ...(permission ? { name: `call_permission_${code.toLowerCase()}` } : {}),
+                      // an untouched preset follows the language (English / Hinglish)
+                      ...(permission && isCallPermissionPreset(form.body)
+                        ? { body: callPermissionBody(code) }
+                        : {}),
                     })
                   }
                   renderInput={(params) => (

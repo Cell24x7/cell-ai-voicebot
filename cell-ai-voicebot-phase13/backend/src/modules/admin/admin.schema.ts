@@ -1,4 +1,5 @@
 import { PUBLIC_API_LIMITS, ACCOUNT_LIMIT_RANGES } from '../../config/limits';
+import { ACCOUNT_VOICE_LINES } from '../../db/models/account.model';
 import { META_PAYERS, WA_CHANNEL_STATUSES, WA_MODES } from '../../db/models/whatsapp-channel.model';
 import { OffsetPageMetaSchema } from '../../shared/openapi/common.schemas';
 import { registry } from '../../shared/openapi/registry';
@@ -47,6 +48,13 @@ export const ApiLimitsBody = z.strictObject({
     })
     .nullable(),
 });
+/** Phase 18: the account's phone line (superadmin). */
+export const VoiceLineBody = z.strictObject({ voiceLine: z.enum(ACCOUNT_VOICE_LINES) });
+/** Phase 18: SIP overrides of the env defaults; `null` = the default. */
+export const SipSettingsBody = z.strictObject({
+  pulseSec: z.number().int().min(1).max(60).nullable(),
+  spendMinutesPerHour: z.number().int().min(1).max(100_000).nullable(),
+});
 export const SuspendBody = z.strictObject({ reason: z.string().trim().min(3).max(200) });
 export const AccountCampaignParams = z.strictObject({
   id: ObjectIdSchema,
@@ -90,6 +98,8 @@ export const AdminAccountDetailSchema = registry.register(
     owner: PublicUserSchema.nullable(),
     usersCount: z.number().int(),
     apiLimits: z.object({ readsPerMinute: z.number(), writesPerMinute: z.number() }).nullable(),
+    voiceLine: z.enum(ACCOUNT_VOICE_LINES),
+    sipSettings: SipSettingsBody,
     usersByStatus: z.object({ invited: z.number(), active: z.number(), disabled: z.number() }),
     limits: AccountLimitsSchema,
     retention: RetentionSchema,
@@ -358,6 +368,26 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'patch',
+  path: '/api/v1/admin/accounts/{id}/voice-line',
+  tags,
+  summary: 'Move this account to the phone line (sip) or back to the test line (superadmin)',
+  security: bearer,
+  request: { params: AccountIdParams, ...json(VoiceLineBody) },
+  responses: { 200: ok(VoiceLineBody), 403: errors[403], 404: errors[404], 422: errors[422] },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/api/v1/admin/accounts/{id}/sip-settings',
+  tags,
+  summary: "Set this account's SIP billing pulse and spend guard; null = default (superadmin)",
+  security: bearer,
+  request: { params: AccountIdParams, ...json(SipSettingsBody) },
+  responses: { 200: ok(SipSettingsBody), 403: errors[403], 404: errors[404], 422: errors[422] },
+});
+
+registry.registerPath({
+  method: 'patch',
   path: '/api/v1/admin/accounts/{id}/api-limits',
   tags,
   summary: "Set this account's API key limits per minute; null = default (superadmin)",
@@ -392,6 +422,30 @@ export const SystemStatusSchema = registry.register(
       .nullable(),
     certificate: z.object({ daysLeft: z.number().int() }).nullable(),
     superadminsWithoutMfa: z.number().int(),
+    sip: z
+      .object({
+        ariConnected: z.boolean(),
+        trunkOnline: z.boolean().nullable(),
+        liveChannels: z.number().int(),
+        maxChannels: z.number().int(),
+        maxCps: z.number().int(),
+        causes24h: z.record(z.string(), z.number()),
+        avgLossPct: z.number().nullable(),
+        avgJitterMs: z.number().nullable(),
+      })
+      .nullable(),
+    whatsappCalls: z
+      .object({
+        mediaEnabled: z.boolean(),
+        publicIpSet: z.boolean(),
+        portRange: z.string(),
+        liveCalls: z.number().int(),
+        lastSetupMs: z.number().nullable(),
+        lastError: z.object({ reason: z.string(), at: z.string() }).nullable(),
+        failedSetups15m: z.number().int(),
+      })
+      .nullable()
+      .openapi({ description: 'Phase 18B: WhatsApp call audio; null when WhatsApp is off' }),
   }),
 );
 

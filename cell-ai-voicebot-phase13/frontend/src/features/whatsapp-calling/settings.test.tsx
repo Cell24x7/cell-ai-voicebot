@@ -13,11 +13,17 @@ import { fakeCallingSettings } from '@/test/calls-wa';
 import { fakeFlowRow } from '@/test/flows';
 import { renderWithProviders } from '@/test/render';
 
+import { CallingReadyChip } from './settings/CallingReadiness';
 import { CallingSection } from './settings/CallingSection';
 import { settingsPatch, settingsProblems, draftOf } from './settings/form';
 
 vi.mock('@/services/api/whatsapp-calling', () => ({
-  whatsappCallingApi: { getSettings: vi.fn(), updateSettings: vi.fn(), syncSettings: vi.fn() },
+  whatsappCallingApi: {
+    getSettings: vi.fn(),
+    updateSettings: vi.fn(),
+    syncSettings: vi.fn(),
+    readiness: vi.fn(),
+  },
 }));
 vi.mock('@/services/api/flows', () => ({ flowsApi: { list: vi.fn() } }));
 vi.mock('@/services/api/agents', () => ({ agentsApi: { list: vi.fn() } }));
@@ -28,6 +34,27 @@ const offset = <T,>(data: T[]) => ({
   data,
   meta: { page: 1, limit: 100, total: data.length, totalPages: 1 },
 });
+
+const readiness = (over: { key: string; ok: boolean | null; fix?: string }[] = []) => {
+  const keys = [
+    'cloud_api',
+    'messaging_limit',
+    'business_verified',
+    'calls_webhook',
+    'app_permission',
+    'meta_status',
+    'restrictions',
+    'last_calls_webhook',
+    'media',
+    'prices',
+  ] as const;
+  const items = keys.map((key) => {
+    const o = over.find((x) => x.key === key);
+    return { key, ok: o ? o.ok : true, detail: `${key} detail`, fix: o?.fix ?? null };
+  });
+  const blocking = ['cloud_api', 'messaging_limit', 'calls_webhook', 'media'];
+  return { ready: !items.some((i) => blocking.includes(i.key) && i.ok === false), items };
+};
 
 const show = () =>
   renderWithProviders({ routes: [{ path: '/', element: <CallingSection channelId="wa1" /> }] });
@@ -44,6 +71,7 @@ beforeEach(() => {
     Promise.resolve(fakeCallingSettings(patch as never)),
   );
   api.syncSettings.mockResolvedValue(fakeCallingSettings());
+  api.readiness.mockResolvedValue(readiness());
   vi.mocked(flowsApi.list).mockResolvedValue(offset([fakeFlowRow()]));
   vi.mocked(agentsApi.list).mockResolvedValue(offset([fakeAgentRow()]));
   vi.mocked(teamApi.list).mockResolvedValue(
@@ -78,6 +106,83 @@ describe('number → Calling settings', () => {
     await waitFor(() =>
       expect(api.updateSettings).toHaveBeenCalledWith('wa1', { status: 'enabled' }),
     );
+  });
+
+  it("WhatsApp did not apply the switch: the message, then WhatsApp's state again (Phase 18B)", async () => {
+    api.getSettings.mockResolvedValue(fakeCallingSettings({ status: 'disabled' }));
+    let finish: (v: unknown) => void = () => undefined;
+    api.updateSettings.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          finish = () =>
+            reject(
+              new ApiError({
+                status: 502,
+                code: 'CALLING_SETTINGS_NOT_APPLIED',
+                message: 'x',
+                kind: 'http',
+                details: [],
+              }),
+            );
+        }),
+    );
+    show();
+    const s = await section();
+    await userEvent.click(within(s).getByRole('switch', { name: 'WhatsApp calling' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Turn on WhatsApp calling?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Turn on' }));
+    expect(await within(s).findByText('Turning on…')).toBeInTheDocument();
+    const reads = api.getSettings.mock.calls.length;
+    finish(null);
+    expect(await within(s).findByText(/WhatsApp did not apply the change/)).toBeInTheDocument();
+    await waitFor(() => expect(api.getSettings.mock.calls.length).toBeGreaterThan(reads));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await within(s).findByRole('switch', { name: 'WhatsApp calling' })).not.toBeChecked();
+  });
+
+  it('readiness: every item with its fix; a failing must-have keeps the switch off (Phase 18B)', async () => {
+    api.getSettings.mockResolvedValue(fakeCallingSettings({ status: 'disabled' }));
+    api.readiness.mockResolvedValue(
+      readiness([
+        { key: 'messaging_limit', ok: false, fix: 'Meta allows calling from 2,000 a day.' },
+        { key: 'prices', ok: null },
+      ]),
+    );
+    show();
+    const s = await section();
+    const list = await within(s).findByRole('region', { name: 'Calling readiness' });
+    expect(within(list).getByText(/fix the items marked red/)).toBeInTheDocument();
+    expect(within(list).getByText('Messaging limit: messaging_limit detail')).toBeInTheDocument();
+    expect(within(list).getAllByText('Meta allows calling from 2,000 a day.')).toHaveLength(1);
+    expect(within(list).getByTitle('Unknown')).toBeInTheDocument();
+    expect(within(s).getAllByText('Meta allows calling from 2,000 a day.').length).toBe(2);
+    expect(within(s).getByRole('switch', { name: 'WhatsApp calling' })).toBeDisabled();
+  });
+
+  it('readiness: all good says ready and the switch works', async () => {
+    api.getSettings.mockResolvedValue(fakeCallingSettings({ status: 'disabled' }));
+    show();
+    const s = await section();
+    expect(await within(s).findByText('Ready for calling')).toBeInTheDocument();
+    expect(within(s).getByRole('switch', { name: 'WhatsApp calling' })).toBeEnabled();
+  });
+
+  it('number card chip: shown while calling is not ready, hidden when ready', async () => {
+    api.readiness.mockResolvedValue(
+      readiness([
+        { key: 'calls_webhook', ok: false },
+        { key: 'prices', ok: false },
+      ]),
+    );
+    const view = renderWithProviders({
+      routes: [{ path: '/', element: <CallingReadyChip channelId="wa1" /> }],
+    });
+    expect(await screen.findByText('Calling: not ready (2)')).toBeInTheDocument();
+    view.unmount();
+    api.readiness.mockResolvedValue(readiness());
+    renderWithProviders({ routes: [{ path: '/', element: <CallingReadyChip channelId="wa1" /> }] });
+    await waitFor(() => expect(api.readiness).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(/Calling: not ready/)).not.toBeInTheDocument();
   });
 
   it('shows Meta restrictions and the business-call country rule', async () => {

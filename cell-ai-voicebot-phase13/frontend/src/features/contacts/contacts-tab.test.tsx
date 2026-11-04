@@ -65,6 +65,7 @@ const contact = (i: number, extra: Partial<Contact> = {}): Contact => ({
   lastCalledAt: null,
   callCount: 0,
   lastDisposition: null,
+  waCallPermission: 'none',
   whatsapp: null,
   createdAt: '2026-10-08T00:00:00Z',
   updatedAt: '2026-10-08T00:00:00Z',
@@ -136,6 +137,25 @@ describe('contacts table', () => {
     expect(within(table).getByText('Opted out')).toBeInTheDocument();
     expect(within(table).getByText('Do not call')).toBeInTheDocument();
     expect(lastQuery()).toEqual({ page: 1, limit: 20, sort: '-createdAt' });
+  });
+
+  it('WhatsApp calls column: allowed / asked / declined chips, a dash when never asked (Phase 18B)', async () => {
+    vi.mocked(contactsApi.list).mockResolvedValue(
+      page([
+        contact(1, { waCallPermission: 'allowed' }),
+        contact(2, { waCallPermission: 'asked' }),
+        contact(3, { waCallPermission: 'declined' }),
+        contact(4),
+      ]),
+    );
+    signInAs('owner');
+    renderWithProviders({ route: '/contacts/all' });
+    await screen.findByRole('link', { name: 'Borrower 4' });
+    const table = screen.getByRole('table', { name: 'Contacts' });
+    expect(within(table).getByRole('columnheader', { name: 'WhatsApp calls' })).toBeInTheDocument();
+    expect(within(table).getByText('Allowed')).toBeInTheDocument();
+    expect(within(table).getByText('Asked, waiting')).toBeInTheDocument();
+    expect(within(table).getByText('Declined or expired')).toBeInTheDocument();
   });
 
   it('adds field columns from the picker and remembers them per user', async () => {

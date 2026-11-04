@@ -36,6 +36,8 @@ const healthy = (): SystemStatus => ({
   },
   certificate: { daysLeft: 40 },
   superadminsWithoutMfa: 0,
+  sip: null,
+  whatsappCalls: null,
 });
 
 const open = () => {
@@ -55,6 +57,51 @@ describe('Admin → System', () => {
     expect(screen.getByText('Done')).toBeInTheDocument();
     expect(screen.getByText(/38 min to restore/)).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Queues' })).toHaveTextContent('whatsapp');
+  });
+
+  it('shows the phone line when the install has a trunk (Phase 18)', async () => {
+    api.status.mockResolvedValue({
+      ...healthy(),
+      sip: {
+        ariConnected: true,
+        trunkOnline: false,
+        liveChannels: 4,
+        maxChannels: 30,
+        maxCps: 2,
+        causes24h: { customer_hangup: 12, busy: 3 },
+        avgLossPct: 0.8,
+        avgJitterMs: 12.5,
+      },
+    });
+    open();
+    const card = await screen.findByText('Phone line (SIP)');
+    expect(card).toBeInTheDocument();
+    expect(screen.getByText('Connected')).toBeInTheDocument();
+    expect(screen.getByText('Offline')).toBeInTheDocument();
+    expect(screen.getByText('4 of 30')).toBeInTheDocument();
+    expect(screen.getByText('loss 0.8% · jitter 12.5 ms')).toBeInTheDocument();
+    expect(screen.getByText('customer hangup 12 · busy 3')).toBeInTheDocument();
+  });
+
+  it('shows WhatsApp call audio (Phase 18B)', async () => {
+    api.status.mockResolvedValue({
+      ...healthy(),
+      whatsappCalls: {
+        mediaEnabled: true,
+        publicIpSet: false,
+        portRange: '40000-40999',
+        liveCalls: 2,
+        lastSetupMs: 850,
+        lastError: { reason: 'media_timeout', at: hoursAgo(1) },
+        failedSetups15m: 3,
+      },
+    });
+    open();
+    expect(await screen.findByText('WhatsApp calls')).toBeInTheDocument();
+    expect(screen.getByText('Not set (WA_MEDIA_PUBLIC_IP)')).toBeInTheDocument();
+    expect(screen.getByText('40000-40999')).toBeInTheDocument();
+    expect(screen.getByText('850 ms')).toBeInTheDocument();
+    expect(screen.getByText(/media timeout/)).toBeInTheDocument();
   });
 
   it('marks what needs attention', async () => {

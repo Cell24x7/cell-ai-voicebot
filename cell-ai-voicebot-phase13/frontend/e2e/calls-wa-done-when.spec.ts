@@ -61,11 +61,11 @@ test.afterAll(async () => {
 
 test('the owner turns calling on in the number settings', async () => {
   const calling = await openCallingSettings(page);
-  await expect(calling.getByText('Calling off')).toBeVisible();
+  await expect(calling.getByText('Calling off', { exact: true })).toBeVisible();
   await calling.getByRole('switch', { name: 'WhatsApp calling' }).click();
   const confirm = page.getByRole('dialog', { name: 'Turn on WhatsApp calling?' });
   await confirm.getByRole('button', { name: 'Turn on' }).click();
-  await expect(calling.getByText('Calling on')).toBeVisible({ timeout: 20_000 });
+  await expect(calling.getByText('Calling on', { exact: true })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Close details' }).click();
 });
 

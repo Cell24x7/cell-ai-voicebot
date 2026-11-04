@@ -5,7 +5,11 @@ import { Types } from 'mongoose';
 import { WHATSAPP_CALL_LIMITS } from '../../config/limits';
 import type { MetaCallPermission } from '../../core/meta';
 import { notifyAccount } from '../../core/realtime/notify';
-import { ContactModel, type ContactDoc } from '../../db/models/contact.model';
+import {
+  ContactModel,
+  type ContactCallPermission,
+  type ContactDoc,
+} from '../../db/models/contact.model';
 import { ConversationModel, type ConversationDoc } from '../../db/models/conversation.model';
 import { MessageModel } from '../../db/models/message.model';
 import {
@@ -47,6 +51,44 @@ import type { CallingDeps } from './settings.service';
 export interface PermissionDeps extends CallingDeps {
   inbox: InboxContext;
 }
+
+/**
+ * Phase 18B: one word per contact over all its numbers' permissions (list column,
+ * filter `whatsappCallPermission`): allowed wins, then asked, then declined.
+ */
+export const permissionSummary = (
+  rows: Pick<WhatsAppCallPermissionDoc, 'status' | 'expiresAt'>[],
+  now: Date,
+): ContactCallPermission => {
+  const allowed = rows.some(
+    (r) =>
+      r.status === 'permanent' ||
+      (r.status === 'temporary' && (!r.expiresAt || r.expiresAt.getTime() > now.getTime())),
+  );
+  if (allowed) return 'allowed';
+  if (rows.some((r) => r.status === 'requested')) return 'asked';
+  if (rows.some((r) => ['declined', 'revoked', 'expired', 'temporary'].includes(r.status))) {
+    return 'declined';
+  }
+  return 'none';
+};
+
+/** Writes the contact's summary from its permission rows. */
+export const summarizePermission = async (
+  accountId: Types.ObjectId,
+  contactId: Types.ObjectId,
+  now = new Date(),
+): Promise<ContactCallPermission> => {
+  const rows = await WhatsAppCallPermissionModel.find({ accountId, contactId })
+    .select({ status: 1, expiresAt: 1 })
+    .lean<Pick<WhatsAppCallPermissionDoc, 'status' | 'expiresAt'>[]>();
+  const summary = permissionSummary(rows, now);
+  await ContactModel.updateOne(
+    { _id: contactId, accountId },
+    { $set: { waCallPermission: summary } },
+  );
+  return summary;
+};
 
 /** What the chat / contact panel shows (reason codes match the dial guard). */
 export interface PermissionPanel {
@@ -154,6 +196,12 @@ export const createCallPermissions = (deps: PermissionDeps) => {
     }).lean<WhatsAppCallPermissionDoc>();
 
   const emitUpdated = (row: WhatsAppCallPermissionDoc) => {
+    void summarizePermission(row.accountId, row.contactId).catch((err: unknown) =>
+      getLogger().warn(
+        { err, contactId: row.contactId.toString() },
+        'call permission: summary failed',
+      ),
+    );
     notifyAccount(row.accountId.toString(), 'whatsapp.call_permission.updated', {
       contactId: row.contactId.toString(),
       channelId: row.channelId.toString(),
@@ -315,12 +363,13 @@ export const createCallPermissions = (deps: PermissionDeps) => {
   };
 
   /** The WABA's approved call permission template (Phase 11), if any. */
-  const permissionTemplate = (channel: WhatsAppChannelDoc) =>
+  const permissionTemplate = (channel: WhatsAppChannelDoc, templateId?: string) =>
     WhatsAppTemplateModel.findOne({
       accountId: channel.accountId,
       wabaId: channel.wabaId,
       purpose: 'call_permission',
       status: 'APPROVED',
+      ...(templateId ? { _id: new Types.ObjectId(templateId) } : {}),
     })
       .select({ _id: 1 })
       .lean<{ _id: Types.ObjectId }>();
@@ -332,7 +381,18 @@ export const createCallPermissions = (deps: PermissionDeps) => {
    */
   const request = async (
     actor: PermissionActor,
-    input: { channelId: string; contactId: string; body?: string | null },
+    input: {
+      channelId: string;
+      contactId: string;
+      body?: string | null;
+      /** Bulk (Phase 18B): always the template (never relies on the 24 h window). */
+      forceTemplate?: boolean;
+      /** Bulk: this approved permission template, with its variable values. */
+      templateId?: string;
+      variables?: Record<string, string>;
+      /** Bulk: a stable id per contact and run, so a retried job never sends twice. */
+      clientId?: string;
+    },
   ) => {
     const now = nowOf(ctx);
     const channel = await loadChannel(actor.accountId, input.channelId);
@@ -396,7 +456,7 @@ export const createCallPermissions = (deps: PermissionDeps) => {
         source: 'outbound',
       }));
     const calling = channel.calling ?? defaultCalling();
-    const inWindow = isWindowOpen(conversation, now);
+    const inWindow = !input.forceTemplate && isWindowOpen(conversation, now);
     let kind: 'interactive' | 'template';
     let messageId: Types.ObjectId;
     if (inWindow) {
@@ -409,12 +469,13 @@ export const createCallPermissions = (deps: PermissionDeps) => {
       messageId = sent.message._id;
     } else {
       kind = 'template';
-      const template = await permissionTemplate(channel);
+      const template = await permissionTemplate(channel, input.templateId);
       if (!template) throw new AppError('WHATSAPP_CALL_PERMISSION_TEMPLATE_MISSING');
       const sent = await sendMessage(deps.inbox, actor, conversation._id.toString(), {
         type: 'template',
         templateId: template._id.toString(),
-        clientId: randomUUID(),
+        ...(input.variables ? { variables: input.variables } : {}),
+        clientId: input.clientId ?? randomUUID(),
       });
       messageId = sent.message._id;
     }
@@ -654,11 +715,14 @@ export const createCallPermissions = (deps: PermissionDeps) => {
   return {
     statusFor,
     request,
+    permissionTemplate,
     onReply,
     onCallOutcome,
     sweep,
     metaPermission,
     loadRow,
+    loadChannel,
+    channelBlock,
     valid,
   };
 };

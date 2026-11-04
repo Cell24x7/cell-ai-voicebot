@@ -26,6 +26,8 @@ import {
   type ConditionDraft,
   type FilterOp,
   type Tri,
+  type WaCallFilter,
+  WA_CALL_LABELS,
 } from './segment-filter';
 
 function ValueInput({
@@ -267,6 +269,21 @@ export function SegmentBuilder({
             </TextField>
           );
         })}
+        <TextField
+          size="small"
+          select
+          label="WhatsApp calls"
+          value={value.waCall}
+          onChange={(e) => set({ waCall: e.target.value as WaCallFilter })}
+          sx={{ minWidth: 200 }}
+        >
+          <MenuItem value="">All</MenuItem>
+          {Object.entries(WA_CALL_LABELS).map(([k, label]) => (
+            <MenuItem key={k} value={k}>
+              {label}
+            </MenuItem>
+          ))}
+        </TextField>
       </Stack>
       {value.rest.q && <Alert severity="info">Also matches the search “{value.rest.q}”.</Alert>}
     </Stack>

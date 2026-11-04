@@ -17,8 +17,10 @@ import { useCan, useSession } from '@/features/auth/hooks';
 import { ExportDialog } from '@/features/contact-exports/ExportDialog';
 import { useCanExport } from '@/features/contact-exports/useExportJob';
 import { AdvancedFilterDialog } from '@/features/segments/AdvancedFilterDialog';
-import { describeFilter, filterSize } from '@/features/segments/segment-filter';
+import { WA_CALL_LABELS, describeFilter, filterSize } from '@/features/segments/segment-filter';
 import { SegmentDialog } from '@/features/segments/SegmentDialog';
+import { LazyBulkCallPermission } from '@/features/whatsapp-calling/panel/LazyBulkCallPermission';
+import { useCanRequestPermissionBulk } from '@/features/whatsapp-calling/permissions';
 import { contactsApi } from '@/services/api/contacts';
 import type { Contact } from '@/services/api/types';
 import { formatFieldValue } from '@/utils/format';
@@ -62,7 +64,10 @@ export function ContactsTab() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [allMatching, setAllMatching] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
-  const [dialog, setDialog] = useState<'advanced' | 'save-segment' | 'export' | null>(null);
+  const [dialog, setDialog] = useState<
+    'advanced' | 'save-segment' | 'export' | 'call-permission' | null
+  >(null);
+  const canAskCalls = useCanRequestPermissionBulk();
   const canExport = useCanExport();
   const userId = session?.user.id ?? 'anon';
   const [visible, setVisible] = useState<string[]>(() => readColumns(userId));
@@ -142,6 +147,27 @@ export function ContactsTab() {
         ),
       },
       { key: 'status', header: 'Status', render: (c) => <ContactStatusChips contact={c} /> },
+      {
+        key: 'waCall',
+        header: 'WhatsApp calls',
+        render: (c) =>
+          c.waCallPermission === 'none' ? (
+            '—'
+          ) : (
+            <Chip
+              size="small"
+              variant="outlined"
+              color={
+                c.waCallPermission === 'allowed'
+                  ? 'success'
+                  : c.waCallPermission === 'asked'
+                    ? 'info'
+                    : 'default'
+              }
+              label={WA_CALL_LABELS[c.waCallPermission]}
+            />
+          ),
+      },
       ...shownFields.map<Column<Contact>>((f) => ({
         key: `field:${f.key}`,
         header: f.label,
@@ -310,7 +336,14 @@ export function ContactsTab() {
             setAllMatching(false);
           }}
           extraActions={
-            canExport ? <Button onClick={() => setDialog('export')}>Export</Button> : undefined
+            <>
+              {canExport && <Button onClick={() => setDialog('export')}>Export</Button>}
+              {canAskCalls && !allMatching && (
+                <Button onClick={() => setDialog('call-permission')}>
+                  Ask for WhatsApp call permission
+                </Button>
+              )}
+            </>
           }
         />
       )}
@@ -355,6 +388,13 @@ export function ContactsTab() {
       />
       {formOpen && (
         <ContactFormDialog open onClose={() => setFormOpen(false)} fields={fields.data ?? []} />
+      )}
+      {dialog === 'call-permission' && (
+        <LazyBulkCallPermission
+          target={{ contactIds: [...selected] }}
+          count={selected.size}
+          onClose={() => setDialog(null)}
+        />
       )}
       {dialog === 'advanced' && (
         <AdvancedFilterDialog
