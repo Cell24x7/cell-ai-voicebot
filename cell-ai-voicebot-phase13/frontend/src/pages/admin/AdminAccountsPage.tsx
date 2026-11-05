@@ -1,11 +1,13 @@
+import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Link as RouterLink } from 'react-router';
+import { Link as RouterLink, useSearchParams } from 'react-router';
 
 import { DataTable, type Column } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
@@ -14,6 +16,7 @@ import { StatusChip } from '@/components/StatusChip';
 import { AccountDeletionsCard } from '@/features/admin/AccountDeletionsCard';
 import { CreateAccountDialog } from '@/features/admin/CreateAccountDialog';
 import { adminKeys } from '@/features/admin/keys';
+import { SignupSettingsCard } from '@/features/admin/SignupSettingsCard';
 import { adminApi, type AdminAccountsQuery } from '@/services/api/admin';
 import type { AdminAccountRow } from '@/services/api/types';
 
@@ -27,6 +30,26 @@ const columns: Column<AdminAccountRow>[] = [
       </Link>
     ),
   },
+  {
+    key: 'kind',
+    header: 'Type',
+    render: (a) =>
+      a.kind === 'reseller' ? (
+        <Chip
+          size="small"
+          color={a.resellerStatus === 'pending_approval' ? 'warning' : 'primary'}
+          label={
+            a.resellerStatus === 'pending_approval'
+              ? 'Reseller · waiting for approval'
+              : `Reseller · ${String(a.customersCount ?? 0)} customers`
+          }
+        />
+      ) : a.parent ? (
+        `Customer of ${a.parent.name}`
+      ) : (
+        'Business'
+      ),
+  },
   { key: 'owner', header: 'Owner', render: (a) => a.ownerEmail ?? '—' },
   { key: 'users', header: 'Users', align: 'right', render: (a) => a.usersCount },
   { key: 'status', header: 'Status', render: (a) => <StatusChip status={a.status} /> },
@@ -38,6 +61,9 @@ export function AdminAccountsPage() {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [status, setStatus] = useState<AdminAccountsQuery['status'] | ''>('');
+  const [params] = useSearchParams();
+  const [kind, setKind] = useState<AdminAccountsQuery['kind'] | ''>('');
+  const parentAccountId = params.get('reseller') ?? '';
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [adding, setAdding] = useState(false);
@@ -55,6 +81,8 @@ export function AdminAccountsPage() {
     limit,
     ...(status ? { status } : {}),
     ...(debounced ? { search: debounced } : {}),
+    ...(kind ? { kind } : {}),
+    ...(parentAccountId ? { parentAccountId } : {}),
   };
   const accounts = useQuery({
     queryKey: adminKeys.accounts(query),
@@ -97,7 +125,31 @@ export function AdminAccountsPage() {
           <MenuItem value="active">Active</MenuItem>
           <MenuItem value="suspended">Suspended</MenuItem>
         </TextField>
+        <TextField
+          size="small"
+          select
+          label="Type"
+          value={kind}
+          onChange={(e) => {
+            setKind(e.target.value as AdminAccountsQuery['kind'] | '');
+            setPage(1);
+          }}
+          sx={{ minWidth: 160 }}
+        >
+          <MenuItem value="">All</MenuItem>
+          <MenuItem value="reseller">Resellers</MenuItem>
+          <MenuItem value="business">Businesses</MenuItem>
+        </TextField>
       </Stack>
+      {parentAccountId && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Showing the customers of one reseller.{' '}
+          <Link component={RouterLink} to="/admin/accounts">
+            Show all
+          </Link>
+        </Alert>
+      )}
+      <SignupSettingsCard />
       <AccountDeletionsCard />
       <DataTable
         aria-label="Accounts"

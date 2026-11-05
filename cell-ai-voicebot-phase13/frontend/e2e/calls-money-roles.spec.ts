@@ -99,7 +99,7 @@ test('a superadmin viewing as the owner sees calls read-only (no start, no playe
   const admin = await adminContext.newPage();
   await signInAsSuperadmin(admin);
   await openAdminAccount(admin, owner.businessName);
-  await admin.getByRole('button', { name: 'Impersonate' }).click();
+  await admin.getByRole('button', { name: 'View as' }).click();
   await admin.getByRole('dialog').getByRole('button', { name: 'Start viewing' }).click();
   await expect(admin.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
   // in-app navigation only: the impersonation token lives in memory

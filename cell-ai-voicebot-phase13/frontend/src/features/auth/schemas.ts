@@ -29,6 +29,8 @@ export const signupSchema = z.object({
       'Use the international format, e.g. +919876543210',
     ),
   timezone: z.string().min(1),
+  acceptTerms: z.boolean().refine((v) => v, 'Accept the terms to continue'),
+  website: z.string(),
 });
 export type SignupValues = z.infer<typeof signupSchema>;
 
@@ -52,9 +54,9 @@ export const forgotSchema = z.object({ email: emailField });
 export type ForgotValues = z.infer<typeof forgotSchema>;
 
 /** `next` from the query string, only same-app paths. */
-export const safeNext = (search: string): string => {
+export const safeNext = (search: string, fallback = '/'): string => {
   const next = new URLSearchParams(search).get('next');
-  return next?.startsWith('/') && !next.startsWith('//') ? next : '/';
+  return next?.startsWith('/') && !next.startsWith('//') ? next : fallback;
 };
 
 /** "Try again in 3 minutes" from a Retry-After value. */

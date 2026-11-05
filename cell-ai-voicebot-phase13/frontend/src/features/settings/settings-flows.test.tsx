@@ -77,7 +77,13 @@ describe('API keys tab', () => {
 
   it('hides create / revoke while impersonating and shows errors', async () => {
     signInAs('owner', {
-      impersonation: { impersonatorId: 'sa', expiresAt: '2026-10-08T01:00:00Z' },
+      impersonation: {
+        impersonatorId: 'sa',
+        expiresAt: '2026-10-08T01:00:00Z',
+        mode: 'view',
+        kind: 'superadmin',
+        returnTo: '/admin/accounts/a1',
+      },
     });
     vi.mocked(apiKeysApi.list).mockRejectedValue(
       new ApiError({ status: 0, code: 'NETWORK_ERROR', kind: 'network', message: 'x' }),
@@ -204,7 +210,13 @@ describe('Calls tab', () => {
     expect(screen.getByLabelText('Record calls')).toBeDisabled();
     first.unmount();
     signInAs('owner', {
-      impersonation: { impersonatorId: 'sa', expiresAt: '2026-10-08T01:00:00Z' },
+      impersonation: {
+        impersonatorId: 'sa',
+        expiresAt: '2026-10-08T01:00:00Z',
+        mode: 'view',
+        kind: 'superadmin',
+        returnTo: '/admin/accounts/a1',
+      },
     });
     const second = renderWithProviders({ route: '/settings/calls' });
     expect(
@@ -360,7 +372,15 @@ describe('Security tab', () => {
   });
 
   it('explains that password changes are off while impersonating', async () => {
-    signInAs('owner', { impersonation: { impersonatorId: 'sa', expiresAt: 'x' } });
+    signInAs('owner', {
+      impersonation: {
+        impersonatorId: 'sa',
+        expiresAt: 'x',
+        mode: 'view',
+        kind: 'superadmin',
+        returnTo: '/admin/accounts/a1',
+      },
+    });
     renderWithProviders({ route: '/settings/security' });
     expect(
       await screen.findByText('Password changes are not available while viewing as another user.'),

@@ -30,6 +30,7 @@ import { stringEq } from '../../db/partial-match';
 import { AppError, NotFoundError } from '../../shared/errors/app-error';
 import { getLogger } from '../../shared/logger';
 import { recordAudit, type AuditActorInput } from '../audit/audit.service';
+import { onCampaignCallPermission } from '../campaigns/permission-events';
 import type { InboxContext } from '../inbox/context';
 import { upsertConversation } from '../inbox/conversation-store';
 import { isWindowOpen, sendMessage } from '../inbox/outbound.service';
@@ -223,6 +224,7 @@ export const createCallPermissions = (deps: PermissionDeps) => {
     ).lean<WhatsAppCallPermissionDoc>();
     if (!row) throw new NotFoundError('Call permission not found');
     emitUpdated(row);
+    await onCampaignCallPermission(row);
     return row;
   };
 
@@ -392,6 +394,8 @@ export const createCallPermissions = (deps: PermissionDeps) => {
       variables?: Record<string, string>;
       /** Bulk: a stable id per contact and run, so a retried job never sends twice. */
       clientId?: string;
+      bulk?: boolean;
+      campaignRef?: string;
     },
   ) => {
     const now = nowOf(ctx);
@@ -471,12 +475,21 @@ export const createCallPermissions = (deps: PermissionDeps) => {
       kind = 'template';
       const template = await permissionTemplate(channel, input.templateId);
       if (!template) throw new AppError('WHATSAPP_CALL_PERMISSION_TEMPLATE_MISSING');
-      const sent = await sendMessage(deps.inbox, actor, conversation._id.toString(), {
-        type: 'template',
-        templateId: template._id.toString(),
-        ...(input.variables ? { variables: input.variables } : {}),
-        clientId: input.clientId ?? randomUUID(),
-      });
+      const sent = await sendMessage(
+        deps.inbox,
+        actor,
+        conversation._id.toString(),
+        {
+          type: 'template',
+          templateId: template._id.toString(),
+          ...(input.variables ? { variables: input.variables } : {}),
+          clientId: input.clientId ?? randomUUID(),
+        },
+        {
+          bulk: input.bulk ?? false,
+          ...(input.campaignRef ? { externalRef: input.campaignRef } : {}),
+        },
+      );
       messageId = sent.message._id;
     }
     await forgetMeta(channel._id, waId);

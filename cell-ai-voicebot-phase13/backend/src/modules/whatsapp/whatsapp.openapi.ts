@@ -61,6 +61,10 @@ export const WhatsAppChannelSchema = registry.register(
     newNameStatus: s,
     qualityRating: z.enum(WA_QUALITY),
     messagingLimitTier: z.enum(WA_LIMIT_TIERS).nullable(),
+    messageClassificationKnown: z.boolean().optional(),
+    messageRateLimit: z.number().optional().openapi({
+      description: 'Application send cap per second, including any lower deployment ceiling',
+    }),
     isOnBizApp: z
       .boolean()
       .openapi({ description: 'WhatsApp Business app number (coexistence) — no calling' }),

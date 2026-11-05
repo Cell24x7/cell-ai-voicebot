@@ -77,6 +77,7 @@ import { createWhatsAppBillingHook } from './modules/whatsapp-billing/billing-ho
 import { CallControlBus } from './modules/whatsapp-calling/bus';
 import { queueCallingJobs } from './modules/whatsapp-calling/jobs';
 import { createCallingRuntime } from './modules/whatsapp-calling/runtime';
+import { queueWaCampaignJobs } from './modules/whatsapp-campaigns/jobs';
 import { secretBoxKey } from './shared/crypto/secret-box';
 import { listen } from './shared/http/listen';
 import { getLogger, type Logger } from './shared/logger';
@@ -264,6 +265,7 @@ export const startServer = async (options: StartServerOptions = {}): Promise<Run
         inboxJobs: queueInboxJobs(whatsappQueue),
         templateJobs: queueTemplateJobs(whatsappQueue),
         callingJobs: queueCallingJobs(whatsappQueue),
+        waCampaignJobs: queueWaCampaignJobs(whatsappQueue),
         connectRateLimitStore: createRedisRateLimitStore(redis, 'rl:wa-connect:'),
         inboxSendRateLimitStore: createRedisRateLimitStore(redis, 'rl:inbox-send:'),
         inboxUploadRateLimitStore: createRedisRateLimitStore(redis, 'rl:inbox-upload:'),
@@ -317,6 +319,7 @@ export const startServer = async (options: StartServerOptions = {}): Promise<Run
     ...(whatsapp ? { whatsapp: { ...whatsapp, ...(calling ? { calling } : {}) } } : {}),
     rateLimitStore: createRedisRateLimitStore(redis),
     authRateLimitStore: createRedisRateLimitStore(redis, 'rl:auth:'),
+    signupRateLimitStore: createRedisRateLimitStore(redis, 'rl:signup:'),
     storage,
     contactJobs,
     billingJobs,
@@ -398,10 +401,12 @@ export const startServer = async (options: StartServerOptions = {}): Promise<Run
       // Phase 8: the dispatcher dials in this process (it owns the calls)
       const dispatcher = new CampaignDispatcher({
         calls: callManager,
+        ...(calling?.calls ? { whatsappCalls: calling.calls } : {}),
         rate: new DialRate(redis, prefix ? `${prefix}:` : ''),
         logger,
       });
       const unwire = wireCampaigns({
+        ...(calling ? { calling } : {}),
         jobs: queueCampaignJobs(createQueue(QUEUES.campaigns, queueDeps)),
         dispatcher,
         calls: callManager,

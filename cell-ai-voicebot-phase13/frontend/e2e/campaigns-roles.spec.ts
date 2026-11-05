@@ -104,11 +104,11 @@ test('superadmin: read-only while impersonating; "Pause all campaigns" → the o
   const admin = await (await browser.newContext()).newPage();
   await signInAsSuperadmin(admin);
   await openAdminAccount(admin, account.businessName);
-  await admin.getByRole('button', { name: 'Impersonate' }).click();
+  await admin.getByRole('button', { name: 'View as' }).click();
   await admin.getByRole('dialog').getByRole('button', { name: 'Start viewing' }).click();
   await expect(admin.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
   await expectReadOnly(admin);
-  await admin.getByRole('button', { name: 'Stop' }).click();
+  await admin.getByRole('button', { name: 'Back to admin' }).click();
 
   await openAdminAccount(admin, account.businessName);
   const limits = admin.getByRole('region', { name: 'Calling limits' });

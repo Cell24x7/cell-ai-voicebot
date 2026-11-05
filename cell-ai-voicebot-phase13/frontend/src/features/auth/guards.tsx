@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 
-import { useIsPlatformAdmin } from './hooks';
+import { useIsPlatformAdmin, useSession } from './hooks';
+import { safeNext } from './schemas';
 import { useAuthStore } from './store';
 
 /** Signed-in only; otherwise → /login?next=<here>. */
@@ -21,11 +22,12 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
 /** Auth pages: signed-in users go to `next` (or the dashboard). */
 export function RedirectIfAuthed({ children }: { children: ReactNode }) {
+  const session = useSession();
   const status = useAuthStore((s) => s.status);
   const location = useLocation();
   if (status === 'authenticated') {
-    const next = new URLSearchParams(location.search).get('next');
-    return <Navigate to={next?.startsWith('/') && !next.startsWith('//') ? next : '/'} replace />;
+    const home = session?.account.kind === 'reseller' && !session.impersonation ? '/reseller' : '/';
+    return <Navigate to={safeNext(location.search, home)} replace />;
   }
   return <>{children}</>;
 }

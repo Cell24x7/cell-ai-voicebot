@@ -222,7 +222,13 @@ describe('conversation actions', () => {
     signInAs('superadmin');
     useAuthStore.getState().startImpersonation(
       fakeSession('owner', {
-        impersonation: { impersonatorId: 'sa', expiresAt: '2030-01-01T00:00:00Z' },
+        impersonation: {
+          impersonatorId: 'sa',
+          expiresAt: '2030-01-01T00:00:00Z',
+          mode: 'view',
+          kind: 'superadmin',
+          returnTo: '/admin/accounts/a1',
+        },
       }),
     );
     at(<ConversationActions conversation={fakeConversationDetail()} />);

@@ -244,11 +244,13 @@ function DeleteDialog({
 /** Template details: preview, components, status history, usage, variable values, delete. */
 export function TemplateDrawer({
   templateId,
+  channelId,
   canManage,
   onClose,
   onEdit,
 }: {
   templateId: string | null;
+  channelId?: string | null;
   canManage: boolean;
   onClose: () => void;
   onEdit: (template: WhatsAppTemplate) => void;
@@ -258,7 +260,8 @@ export function TemplateDrawer({
   const [deleting, setDeleting] = useState(false);
   const t = query.data;
   const reason = t ? reasonText(t.statusReason) : null;
-  const editable = Boolean(t && t.editable && EDITABLE.includes(t.status));
+  const scoped = Boolean(channelId && t?.channelIds.includes(channelId));
+  const editable = Boolean(scoped && t && t.editable && EDITABLE.includes(t.status));
   const deletable = Boolean(t && !['DELETED', 'PENDING_DELETION'].includes(t.status));
 
   return (
@@ -347,16 +350,19 @@ export function TemplateDrawer({
                 {t.status === 'DRAFT' && (
                   <Button
                     variant="contained"
-                    disabled={submit.isPending}
+                    disabled={submit.isPending || !scoped}
                     onClick={() =>
-                      submit.mutate(t.id, {
-                        onSuccess: () =>
-                          enqueueSnackbar('Sent to WhatsApp for review', { variant: 'success' }),
-                        onError: (e) =>
-                          enqueueSnackbar(templateErrorMessage(toApiError(e)), {
-                            variant: 'error',
-                          }),
-                      })
+                      submit.mutate(
+                        { id: t.id, channelId: channelId ?? '' },
+                        {
+                          onSuccess: () =>
+                            enqueueSnackbar('Sent to WhatsApp for review', { variant: 'success' }),
+                          onError: (e) =>
+                            enqueueSnackbar(templateErrorMessage(toApiError(e)), {
+                              variant: 'error',
+                            }),
+                        },
+                      )
                     }
                   >
                     Submit for review

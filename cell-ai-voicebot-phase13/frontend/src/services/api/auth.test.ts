@@ -33,9 +33,15 @@ const record = () => {
 describe('authApi (contract with the backend routes)', () => {
   it('calls every auth endpoint with the right method, path and body', async () => {
     const calls = record();
-    await authApi.signup({ businessName: 'B', name: 'N', email: 'e@x.co', password: 'p' });
-    await authApi.verifyEmail({ email: 'e@x.co', code: '123456' });
-    await authApi.resendVerification('e@x.co');
+    await authApi.signup({
+      accountType: 'business',
+      acceptTerms: true,
+      businessName: 'B',
+      name: 'N',
+      email: 'e@x.co',
+      password: 'p',
+    });
+    await authApi.signupOptions();
     await authApi.login({ email: 'e@x.co', password: 'p' });
     await authApi.refresh();
     await authApi.logout();
@@ -52,8 +58,7 @@ describe('authApi (contract with the backend routes)', () => {
     await authApi.rbacCatalog();
     expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
       'post /auth/signup',
-      'post /auth/verify-email',
-      'post /auth/verify-email/resend',
+      'get /auth/signup-options',
       'post /auth/login',
       'post /auth/refresh',
       'post /auth/logout',
@@ -69,8 +74,9 @@ describe('authApi (contract with the backend routes)', () => {
       'post /ws/tickets',
       'get /rbac/permissions',
     ]);
-    expect(calls[2]?.data).toEqual({ email: 'e@x.co' });
-    expect(calls[13]?.params).toEqual({ token: 'tok' });
-    expect(calls[15]?.data).toEqual({});
+    expect(calls[0]?.data).toMatchObject({ accountType: 'business', acceptTerms: true });
+    expect(calls[7]?.data).toEqual({ email: 'e@x.co' });
+    expect(calls[12]?.params).toEqual({ token: 'tok' });
+    expect(calls[14]?.data).toEqual({});
   });
 });

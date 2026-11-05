@@ -7,6 +7,7 @@ Every request also passes the global limit of 1,200 a minute per IP. API keys ha
 ## Routes with no sign-in
 
 - `POST /api/v1/auth/signup`: own limiter
+- `GET /api/v1/auth/signup-options`: own limiter
 - `POST /api/v1/auth/verify-email`: own limiter
 - `POST /api/v1/auth/login`: own limiter
 - `POST /api/v1/auth/refresh`: own limiter
@@ -50,3 +51,8 @@ Every request also passes the global limit of 1,200 a minute per IP. API keys ha
 - `POST /api/v1/knowledge-bases/{id}/sources/files`
 - `POST /api/v1/knowledge-bases/{id}/sources/url`
 - `POST /api/v1/ws/tickets`
+- `POST /api/v1/reseller/customers`
+- `POST /api/v1/reseller/customers/{id}/login-as`
+- `POST /api/v1/reseller/customers/{id}/credit`
+- `POST /api/v1/reseller/customers/{id}/credit/reclaim`
+- `POST /api/v1/whatsapp-campaigns`

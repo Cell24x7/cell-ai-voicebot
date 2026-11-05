@@ -40,6 +40,11 @@ export type AmdMode = 'off' | 'hangup' | 'leave_message';
 
 export interface WizardDraft {
   name: string;
+  line: 'phone' | 'whatsapp';
+  channelId: string;
+  program: { kind: 'flow' | 'agent'; id: string } | null;
+  askPermissionTemplateId: string;
+  askPermissionFirst: boolean;
   mode: 'dry_run' | 'live';
   flowId: string;
   chosenVersion: number | null;
@@ -91,6 +96,11 @@ export const DEFAULT_SCENARIOS: Record<ScenarioKey, number> = {
 /** A new campaign (the server fills the same defaults). */
 export const emptyDraft = (account: { timezone: string; window: CampaignWindow }): WizardDraft => ({
   name: '',
+  line: 'phone',
+  channelId: '',
+  program: null,
+  askPermissionTemplateId: '',
+  askPermissionFirst: false,
   mode: 'dry_run',
   flowId: '',
   chosenVersion: null,
@@ -126,6 +136,11 @@ const audienceModeOf = (a: Campaign['audience']): AudienceMode => {
 /** A saved campaign → the wizard's draft. */
 export const draftFromCampaign = (c: Campaign): WizardDraft => ({
   name: c.name,
+  line: c.line ?? 'phone',
+  channelId: c.channelId ?? '',
+  program: c.program ?? null,
+  askPermissionTemplateId: c.askPermissionFirst?.templateId ?? '',
+  askPermissionFirst: Boolean(c.askPermissionFirst),
   mode: c.mode,
   flowId: c.flow.id,
   chosenVersion: c.chosenVersion,
@@ -172,11 +187,34 @@ const audienceOf = (d: WizardDraft): NonNullable<CampaignSettingsInput['audience
 
 /** The audience preview body (`null` when nothing is chosen yet). */
 export const previewBody = (d: WizardDraft) =>
-  d.flowId && !audienceProblems(d).length
-    ? { flowId: d.flowId, chosenVersion: d.chosenVersion, audience: audienceOf(d) }
+  (d.line === 'whatsapp' ? d.channelId && d.program?.id : d.flowId) && !audienceProblems(d).length
+    ? {
+        ...(d.flowId ? { flowId: d.flowId } : {}),
+        ...(d.line === 'whatsapp'
+          ? {
+              line: d.line,
+              channelId: d.channelId,
+              program: d.program,
+              askPermissionFirst: d.askPermissionFirst,
+            }
+          : {}),
+        chosenVersion: d.chosenVersion,
+        audience: audienceOf(d),
+      }
     : null;
 
 const settingsOf = (d: WizardDraft): CampaignSettingsInput => ({
+  ...(d.line === 'whatsapp'
+    ? {
+        line: 'whatsapp',
+        channelId: d.channelId,
+        program: d.program,
+        askPermissionFirst:
+          d.askPermissionFirst && d.askPermissionTemplateId
+            ? { templateId: d.askPermissionTemplateId }
+            : null,
+      }
+    : {}),
   chosenVersion: d.chosenVersion,
   audience: audienceOf(d),
   schedule: { ...d.schedule, timezone: d.timezone },
@@ -197,7 +235,7 @@ const settingsOf = (d: WizardDraft): CampaignSettingsInput => ({
 export const toCreateInput = (d: WizardDraft): CreateCampaignInput => ({
   name: d.name.trim(),
   mode: d.mode,
-  flowId: d.flowId,
+  ...(d.flowId ? { flowId: d.flowId } : {}),
   ...settingsOf(d),
 });
 
@@ -267,7 +305,10 @@ export const stepProblems = (step: StepIndex, d: WizardDraft, now = new Date()):
     if (!d.name.trim()) p.push('Give the campaign a name');
     if (d.name.trim().length > LIMITS.nameMax)
       p.push(`At most ${String(LIMITS.nameMax)} characters`);
-    if (!d.flowId) p.push('Choose a published flow');
+    if (d.line === 'whatsapp' && !d.channelId) p.push('Choose a WhatsApp calling number');
+    if (d.line === 'whatsapp' && d.askPermissionFirst && !d.askPermissionTemplateId)
+      p.push('Choose an approved call permission template');
+    if (!d.flowId && !(d.line === 'whatsapp' && d.program?.id)) p.push('Choose a published flow');
     if (
       d.mode === 'live' &&
       d.phoneLine.amd === 'leave_message' &&

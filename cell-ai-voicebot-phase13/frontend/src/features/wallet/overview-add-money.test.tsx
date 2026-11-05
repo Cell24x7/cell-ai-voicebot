@@ -214,7 +214,13 @@ describe('wallet overview', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     view.unmount();
     signInAs('owner', {
-      impersonation: { impersonatorId: 'sa', expiresAt: '2026-10-09T01:00:00Z' },
+      impersonation: {
+        impersonatorId: 'sa',
+        expiresAt: '2026-10-09T01:00:00Z',
+        mode: 'view',
+        kind: 'superadmin',
+        returnTo: '/admin/accounts/a1',
+      },
     });
     renderWithProviders({ route: '/wallet' });
     await screen.findByText('₹1,500.00');

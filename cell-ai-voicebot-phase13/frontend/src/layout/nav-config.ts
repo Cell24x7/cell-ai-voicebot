@@ -18,6 +18,7 @@ import ReceiptLongOutlined from '@mui/icons-material/ReceiptLongOutlined';
 import RequestQuoteOutlined from '@mui/icons-material/RequestQuoteOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import SmartToyOutlined from '@mui/icons-material/SmartToyOutlined';
+import StorefrontOutlined from '@mui/icons-material/StorefrontOutlined';
 
 export interface NavItem {
   key: string;
@@ -30,6 +31,8 @@ export interface NavItem {
   anyPermission?: readonly string[];
   /** Platform superadmins only. */
   platformOnly?: boolean;
+  /** Phase 19: reseller accounts only. */
+  resellerOnly?: boolean;
   /** Not built yet — hidden until its phase ships. */
   phase?: number;
   /** Shows a count badge (see `Sidebar`). */
@@ -92,7 +95,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Campaigns',
     path: '/campaigns',
     icon: CampaignOutlined,
-    permission: 'campaigns.read',
+    anyPermission: ['campaigns.read', 'whatsapp.campaigns.read'],
     phase: 8,
   },
   {
@@ -128,6 +131,14 @@ export const NAV_ITEMS: NavItem[] = [
     // webhooks / after the call need integrations.manage; Google Sheets contacts.import
     anyPermission: ['integrations.manage', 'contacts.import'],
     phase: 15,
+  },
+  {
+    key: 'reseller',
+    label: 'Reseller',
+    path: '/reseller',
+    icon: StorefrontOutlined,
+    permission: 'reseller.read',
+    resellerOnly: true,
   },
   { key: 'team', label: 'Team', path: '/team', icon: GroupOutlined, permission: 'team.read' },
   { key: 'settings', label: 'Settings', path: '/settings/profile', icon: SettingsOutlined },
@@ -181,17 +192,19 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 /** The phase currently shipped — items of later phases are hidden. */
-export const LIVE_PHASE = 18;
+export const LIVE_PHASE = 19;
 
 export const visibleNavItems = (
   can: (permission: string) => boolean,
   isPlatformAdmin: boolean,
   livePhase = LIVE_PHASE,
+  isReseller = false,
 ): NavItem[] =>
   NAV_ITEMS.filter(
     (item) =>
       (item.phase === undefined || item.phase <= livePhase) &&
       (!item.permission || can(item.permission)) &&
       (!item.anyPermission || item.anyPermission.some(can)) &&
-      (!item.platformOnly || isPlatformAdmin),
+      (!item.platformOnly || isPlatformAdmin) &&
+      (!item.resellerOnly || isReseller),
   );

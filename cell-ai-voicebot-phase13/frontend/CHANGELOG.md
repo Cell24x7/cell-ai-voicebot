@@ -10,6 +10,13 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Phase 19 — resellers and campaign channels** — 2026-11-05
+  - Business/reseller signup, reseller customer/credit panels and audited view/act entry points.
+  - Three campaign tabs with sender-aware creation: SIP / Normal, WhatsApp messages and WhatsApp calls using flows or AI agents.
+  - Bulk template wizard with A/B, variables, audience, media/location, recurrence, wallet estimate and live report/retry/export actions.
+  - WhatsApp number filters retained in template URLs and frozen during approval; shared call method/sender choices across Contact, Calls and Inbox.
+  - Selected sender/contact AI price confirmation with loading/error retry; reseller signup/login opens its panel consistently.
+
 - **Phase 18B — WhatsApp calling go-live** — 2026-11-04
   - Number → Calling: readiness checklist with fixes, switch blocked while something blocks it, "Turning on…" and a clear error when WhatsApp didn't apply the change; "Calling: not ready" chip on numbers.
   - Contacts: "WhatsApp calls" column and segment rule; WhatsApp calling card on the contact page; "New WhatsApp call" on the calls page.
@@ -201,3 +208,15 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 - **Phase 0** — 2026-10-08
   - Vite 8 + React 19 + MUI 9 + React Router 8 + React Query + notistack scaffold, ESLint 9 / Prettier / Husky / commitlint, Vitest + RTL, generated API types from the backend OpenAPI spec (`npm run gen:api`), GitHub Actions CI.
+
+## Phase 19 continuation (candidate)
+
+Campaigns expose SIP / Normal call, WhatsApp message and WhatsApp call tabs. The message
+wizard supports variables/A-B, uploads/location, recurrence, eligible cost estimates
+and live reports. WhatsApp call campaigns support published flows or active AI agents.
+Template management always shows a WhatsApp sender filter, preserves it in the URL and
+freezes builder approval context. Contact/Calls/Inbox call options share sender-aware
+Normal/WhatsApp choices, retaining per-number consent and AI selection.
+Backend-derived messaging caps are 18/sec for Business App/coexistence/unknown and
+75/sec for confirmed Cloud API numbers; lower limits still apply.
+See the backend channel guide and Phase 19 sign-off for validation and live checks.

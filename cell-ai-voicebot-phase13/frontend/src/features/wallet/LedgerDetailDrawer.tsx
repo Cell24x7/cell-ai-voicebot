@@ -31,6 +31,7 @@ const REF_LABELS: Record<LedgerEntry['ref']['type'], string> = {
   usage: 'Usage',
   seed: 'Demo data',
   whatsapp_message: 'WhatsApp message',
+  credit_transfer: 'Credit transfer',
 };
 
 function Row({ label, value }: { label: string; value: ReactNode }) {

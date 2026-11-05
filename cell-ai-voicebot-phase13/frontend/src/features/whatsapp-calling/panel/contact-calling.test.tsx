@@ -62,7 +62,7 @@ describe('WhatsApp calling from contacts (Phase 18B)', () => {
       routes: [{ path: '/', element: <ContactCallingCard contact={CONTACT} /> }],
     });
     const card = await screen.findByRole('region', { name: 'WhatsApp calling' });
-    await waitFor(() => expect(whatsappCallingApi.permission).toHaveBeenCalledWith('wa1', 'c1'));
+    expect(whatsappCallingApi.permission).not.toHaveBeenCalled();
     await userEvent.click(within(card).getByLabelText('From number'));
     await userEvent.click(await screen.findByRole('option', { name: 'Support' }));
     await waitFor(() => expect(whatsappCallingApi.permission).toHaveBeenCalledWith('wa2', 'c1'));
@@ -76,12 +76,12 @@ describe('WhatsApp calling from contacts (Phase 18B)', () => {
     renderWithProviders({
       routes: [{ path: '/', element: <NewWhatsAppCallDialog open onClose={() => undefined} /> }],
     });
-    const dialog = await screen.findByRole('dialog', { name: 'New WhatsApp call' });
+    const dialog = await screen.findByRole('dialog', { name: 'New call' });
     expect(within(dialog).getByText(/Pick a contact/)).toBeInTheDocument();
     await userEvent.type(within(dialog).getByLabelText('Contact'), 'As');
     await userEvent.click(await screen.findByRole('option', { name: /Asha Verma/ }));
     expect(
-      await within(dialog).findByRole('region', { name: 'WhatsApp calling' }),
+      await within(dialog).findByRole('combobox', { name: 'WhatsApp number' }),
     ).toBeInTheDocument();
     expect(contactsApi.list).toHaveBeenCalledWith({ q: 'As', limit: 10, page: 1 });
   });

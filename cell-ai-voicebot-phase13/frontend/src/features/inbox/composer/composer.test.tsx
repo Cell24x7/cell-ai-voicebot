@@ -111,7 +111,13 @@ describe('who can write, and when', () => {
     signInAs('owner');
     useAuthStore.getState().startImpersonation(
       fakeSession('owner', {
-        impersonation: { impersonatorId: 'sa', expiresAt: '2030-01-01T00:00:00Z' },
+        impersonation: {
+          impersonatorId: 'sa',
+          expiresAt: '2030-01-01T00:00:00Z',
+          mode: 'view',
+          kind: 'superadmin',
+          returnTo: '/admin/accounts/a1',
+        },
       }),
     );
     show();

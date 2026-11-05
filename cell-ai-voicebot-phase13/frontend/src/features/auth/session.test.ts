@@ -75,7 +75,13 @@ describe('auth store', () => {
 
     const imp = fakeSession('owner', {
       accessToken: 'imp-token',
-      impersonation: { impersonatorId: 'sa', expiresAt: '2026-10-08T01:00:00Z' },
+      impersonation: {
+        impersonatorId: 'sa',
+        expiresAt: '2026-10-08T01:00:00Z',
+        mode: 'view',
+        kind: 'superadmin',
+        returnTo: '/admin/accounts/a1',
+      },
     });
     useAuthStore.getState().startImpersonation(imp);
     expect(useAuthStore.getState().session?.accessToken).toBe('imp-token');
@@ -170,7 +176,13 @@ describe('HTTP client auth', () => {
     useAuthStore.getState().startImpersonation(
       fakeSession('owner', {
         accessToken: 'imp',
-        impersonation: { impersonatorId: 'u1', expiresAt: 'x' },
+        impersonation: {
+          impersonatorId: 'u1',
+          expiresAt: 'x',
+          mode: 'view',
+          kind: 'superadmin',
+          returnTo: '/admin/accounts/a1',
+        },
       }),
     );
     const calls = useServer(() => err(401, 'AUTH_TOKEN_EXPIRED'));

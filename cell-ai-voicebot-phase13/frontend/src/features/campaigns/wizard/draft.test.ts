@@ -211,3 +211,22 @@ describe('wizard draft', () => {
     });
   });
 });
+
+it('serializes a WhatsApp AI agent without a fake flow ID and requires sender/permission template choices', () => {
+  const draft = {
+    ...valid(),
+    line: 'whatsapp' as const,
+    channelId: 'wa1',
+    program: { kind: 'agent' as const, id: 'a1' },
+    flowId: '',
+    askPermissionFirst: true,
+    askPermissionTemplateId: '',
+  };
+  expect(stepProblems(0, draft)).toContain('Choose an approved call permission template');
+  draft.askPermissionTemplateId = 't1';
+  expect(stepProblems(0, draft)).toEqual([]);
+  const body = toCreateInput(draft);
+  expect(body).not.toHaveProperty('flowId');
+  expect(body.program).toEqual({ kind: 'agent', id: 'a1' });
+  expect(body.askPermissionFirst).toEqual({ templateId: 't1' });
+});

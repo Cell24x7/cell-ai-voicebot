@@ -19,6 +19,7 @@ import { segmentKeys } from '@/features/contacts/keys';
 import { useCustomFields, useSegments } from '@/features/contacts/queries';
 import { LazyBulkCallPermission } from '@/features/whatsapp-calling/panel/LazyBulkCallPermission';
 import { useCanRequestPermissionBulk } from '@/features/whatsapp-calling/permissions';
+import { useCanWriteWaCampaigns } from '@/features/whatsapp-campaigns/permissions';
 import { getErrorMessage } from '@/services/api/errors';
 import { segmentsApi } from '@/services/api/segments';
 import type { Segment } from '@/services/api/types';
@@ -32,6 +33,7 @@ export function SegmentsTab() {
   const can = useCan();
   const canExport = useCanExport();
   const canCampaign = useCanWriteCampaigns();
+  const canWaCampaign = useCanWriteWaCampaigns();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const segments = useSegments(true);
@@ -88,6 +90,15 @@ export function SegmentsTab() {
       align: 'right',
       render: (s) => (
         <Stack direction="row" spacing={0.5} sx={{ justifyContent: 'flex-end' }}>
+          {canWaCampaign && (
+            <Button
+              size="small"
+              component={RouterLink}
+              to={`/campaigns/whatsapp/new?segmentId=${s.id}`}
+            >
+              Send WhatsApp campaign
+            </Button>
+          )}
           {canCampaign && (
             <Button size="small" component={RouterLink} to={`/campaigns/new?segmentId=${s.id}`}>
               Create campaign

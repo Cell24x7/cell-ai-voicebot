@@ -5,7 +5,11 @@ import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { phoneNumbersApi } from '@/services/api/phone-numbers';
+import { templatesApi } from '@/services/api/templates';
+import { whatsappApi } from '@/services/api/whatsapp';
 import { signInAs } from '@/test/auth';
+import { fakeTemplateListItem } from '@/test/templates';
+import { fakeChannel } from '@/test/whatsapp';
 
 import { BasicsStep } from './BasicsStep';
 import { emptyDraft, stepProblems, toCreateInput, type WizardDraft } from './draft';
@@ -17,6 +21,10 @@ vi.mock('@/features/flows/queries', () => ({
 vi.mock('@/services/api/phone-numbers', async (original) => ({
   ...(await original<object>()),
   phoneNumbersApi: { line: vi.fn() },
+}));
+
+vi.mock('@/features/agents/queries', () => ({
+  useAgents: () => ({ data: { data: [{ id: 'agent1', name: 'Campaign agent' }] } }),
 }));
 
 const ACCOUNT = {
@@ -112,4 +120,43 @@ describe('campaign phone line (Phase 18)', () => {
       voicemailText: null,
     });
   });
+});
+
+it('configures a WhatsApp campaign agent and an approved ask-first template without a fake flow', async () => {
+  vi.mocked(phoneNumbersApi.line).mockResolvedValue({ line: 'dryrun', numbers: [] });
+  vi.spyOn(whatsappApi, 'channels').mockResolvedValue({
+    items: [
+      fakeChannel({ calling: { status: 'enabled', restricted: false, unavailableReason: null } }),
+    ],
+    counts: {},
+    limit: 10,
+  });
+  vi.spyOn(templatesApi, 'list').mockResolvedValue([
+    fakeTemplateListItem('APPROVED', 'UTILITY', {
+      id: 'permission1',
+      name: 'ask_to_call',
+      purpose: 'call_permission',
+    }),
+  ]);
+  wrap({ name: 'WhatsApp follow-up' });
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('combobox', { name: 'Call type' }));
+  await user.click(screen.getByRole('option', { name: 'WhatsApp call' }));
+  await user.click(screen.getByRole('combobox', { name: 'WhatsApp calling number' }));
+  await user.click(await screen.findByRole('option', { name: /Support line/ }));
+  await user.click(screen.getByRole('combobox', { name: 'AI program' }));
+  await user.click(screen.getByRole('option', { name: 'AI agent' }));
+  await user.click(screen.getByRole('combobox', { name: 'Active AI agent' }));
+  await user.click(screen.getByRole('option', { name: 'Campaign agent' }));
+  await user.click(screen.getByRole('checkbox', { name: 'Ask for permission first' }));
+  expect(stepProblems(0, seen.draft!)).toContain('Choose an approved call permission template');
+  await user.click(screen.getByRole('combobox', { name: 'Call permission template' }));
+  await user.click(await screen.findByRole('option', { name: 'ask_to_call' }));
+  expect(toCreateInput(seen.draft!)).toMatchObject({
+    line: 'whatsapp',
+    channelId: 'wa1',
+    program: { kind: 'agent', id: 'agent1' },
+    askPermissionFirst: { templateId: 'permission1' },
+  });
+  expect(toCreateInput(seen.draft!)).not.toHaveProperty('flowId');
 });

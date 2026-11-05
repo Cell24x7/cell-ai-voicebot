@@ -11,6 +11,7 @@ import type {
   WhatsAppCallPermissionRun,
   WhatsAppCallPermission,
   WhatsAppCallProgram,
+  WhatsAppCallPrice,
 } from './types';
 
 export interface StartWhatsAppCallInput {
@@ -46,6 +47,12 @@ const call = (id: string, action: string) => `/whatsapp/calls/${id}/${action}`;
 
 /** `/api/v1/whatsapp/…` calling routes (PHASE_12_PLAN §1o, api.md §14f). */
 export const whatsappCallingApi = {
+  quote: (channelId: string, contactId: string) =>
+    unwrap(
+      apiClient.get<SuccessEnvelope<WhatsAppCallPrice>>(settings(channelId, '/quote'), {
+        params: { contactId },
+      }),
+    ),
   getSettings: (channelId: string) =>
     unwrap(apiClient.get<SuccessEnvelope<WhatsAppCallingSettings>>(settings(channelId))),
   /** Meta first: only the fields that changed go to Meta (409 when calling is unavailable). */

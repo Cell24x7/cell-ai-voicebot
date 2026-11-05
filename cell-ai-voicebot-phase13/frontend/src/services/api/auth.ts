@@ -13,7 +13,13 @@ interface Message {
   message: string;
 }
 
+export type SignupAccountType = 'business' | 'reseller';
+
 export interface SignupInput {
+  accountType: SignupAccountType;
+  acceptTerms: true;
+  /** Honeypot (always empty from people). */
+  website?: string;
   businessName: string;
   name: string;
   email: string;
@@ -24,12 +30,15 @@ export interface SignupInput {
 
 /** Auth endpoints (`/api/v1/auth/*`, backend ADR 0009). */
 export const authApi = {
+  /** Phase 19: no e-mail — the answer is a signed-in session. */
   signup: (body: SignupInput) =>
-    unwrap(apiClient.post<SuccessEnvelope<Message>>('/auth/signup', body)),
-  verifyEmail: (body: { email: string; code: string }) =>
-    unwrap(apiClient.post<SuccessEnvelope<AuthSession>>('/auth/verify-email', body)),
-  resendVerification: (email: string) =>
-    unwrap(apiClient.post<SuccessEnvelope<Message>>('/auth/verify-email/resend', { email })),
+    unwrap(apiClient.post<SuccessEnvelope<AuthSession>>('/auth/signup', body)),
+  signupOptions: () =>
+    unwrap(
+      apiClient.get<
+        SuccessEnvelope<{ open: boolean; resellerSignup: 'open' | 'approval' | 'closed' }>
+      >('/auth/signup-options'),
+    ),
   login: (body: { email: string; password: string }) =>
     unwrap(apiClient.post<SuccessEnvelope<AuthSession>>('/auth/login', body)),
   mfaStatus: () =>

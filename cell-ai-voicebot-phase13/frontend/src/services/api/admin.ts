@@ -16,6 +16,14 @@ export interface AdminAccountsQuery {
   limit?: number;
   status?: 'active' | 'suspended';
   search?: string;
+  /** Phase 19 */
+  kind?: 'business' | 'reseller';
+  parentAccountId?: string;
+}
+
+export interface SignupSettings {
+  open: boolean;
+  resellerSignup: 'open' | 'approval' | 'closed';
 }
 
 export interface CreateAccountInput {
@@ -24,12 +32,36 @@ export interface CreateAccountInput {
   ownerEmail: string;
   ownerPassword: string;
   ownerPhone?: string;
+  kind?: 'business' | 'reseller';
+  parentAccountId?: string;
 }
 
 /** Superadmin endpoints (`/api/v1/admin/*`). */
 export const adminApi = {
   createAccount: (body: CreateAccountInput) =>
     unwrap(apiClient.post<SuccessEnvelope<PublicAccount>>('/admin/accounts', body)),
+  /** Phase 19: resellers and signup. */
+  setReseller: (id: string, parentAccountId: string | null) =>
+    unwrap(
+      apiClient.patch<SuccessEnvelope<PublicAccount>>(`/admin/accounts/${id}/reseller`, {
+        parentAccountId,
+      }),
+    ),
+  approveReseller: (id: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<PublicAccount>>(`/admin/accounts/${id}/approve-reseller`),
+    ),
+  suspendCustomers: (id: string, reason: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<{ suspended: number }>>(
+        `/admin/accounts/${id}/suspend-customers`,
+        { reason },
+      ),
+    ),
+  signupSettings: () =>
+    unwrap(apiClient.get<SuccessEnvelope<SignupSettings>>('/admin/settings/signup')),
+  setSignupSettings: (body: SignupSettings) =>
+    unwrap(apiClient.put<SuccessEnvelope<SignupSettings>>('/admin/settings/signup', body)),
   accountDeletions: () =>
     unwrap(
       apiClient.get<
@@ -92,8 +124,11 @@ export const adminApi = {
     ),
   enable: (id: string) =>
     unwrap(apiClient.post<SuccessEnvelope<PublicAccount>>(`/admin/accounts/${id}/enable`)),
-  impersonate: (id: string) =>
-    unwrap(apiClient.post<SuccessEnvelope<AuthSession>>(`/admin/accounts/${id}/impersonate`)),
+  /** Phase 19: `view` = read-only, `act` = work in the account (sensitive actions refused). */
+  impersonate: (id: string, mode: 'view' | 'act' = 'view') =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<AuthSession>>(`/admin/accounts/${id}/impersonate`, { mode }),
+    ),
   /** Dialing limits (max concurrent calls, dials per minute); audited. */
   setLimits: (id: string, body: Partial<AccountLimits>) =>
     unwrap(apiClient.patch<SuccessEnvelope<AccountLimits>>(`/admin/accounts/${id}/limits`, body)),

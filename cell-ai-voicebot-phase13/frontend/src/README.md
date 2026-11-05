@@ -76,3 +76,17 @@ Calling recovery: `live/queries.ts` polls active call status every 2 seconds and
 - **Features** (`features/integrations/`): `webhooks/` (endpoint, secret-once and test dialogs, delivery log), `after-call/` (rule form, live preview), `sheets/` (check link, map columns, schedule).
 - **Elsewhere:** `features/settings/ApiKeysTab.tsx` (scopes, allowlist, expiry, request log, Test a key), `features/calls/detail/AfterCallCard.tsx`, the flow form `features/flows/inspector/forms/basic.tsx` (`WhatsappForm`).
 - **E2E:** `e2e/integrations-*.spec.ts`, helpers `e2e/integrations.ts`.
+
+## Phase 19 continuation (candidate)
+
+Campaigns expose SIP / Normal call, WhatsApp message and WhatsApp call tabs. The message
+wizard supports variables/A-B, uploads/location, recurrence, eligible cost estimates
+and live reports. WhatsApp call campaigns support published flows or active AI agents.
+Template management always shows a WhatsApp sender filter, preserves it in the URL and
+freezes builder approval context. Contact/Calls/Inbox call options share sender-aware
+Normal/WhatsApp choices, retaining per-number consent and AI selection.
+Backend-derived messaging caps are 18/sec for Business App/coexistence/unknown and
+75/sec for confirmed Cloud API numbers; lower limits still apply.
+See the backend channel guide and Phase 19 sign-off for validation and live checks.
+
+Phase 19 continuation: `features/calls/CallMethodDialog` is shared across call entry points; sender/contact keys isolate WhatsApp permission and price previews. `features/whatsapp-campaigns` contains message campaign drafts, steps, queries and reports; call campaigns keep the existing engine with an explicit transport/program. Template builders retain their chosen sender.

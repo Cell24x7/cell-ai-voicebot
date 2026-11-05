@@ -2,13 +2,14 @@ import { Router } from 'express';
 import { ipKeyGenerator, type Store } from 'express-rate-limit';
 
 import type { Env } from '../../config/env';
-import { AUTH_RATE_LIMIT, AUTH_REFRESH_RATE_LIMIT } from '../../config/limits';
+import { AUTH_RATE_LIMIT, AUTH_REFRESH_RATE_LIMIT, SIGNUP_RATE_LIMIT } from '../../config/limits';
 import { ok } from '../../shared/http/envelope';
 import { authenticate } from '../../shared/middlewares/authenticate';
 import { originCheck } from '../../shared/middlewares/origin-check';
 import { createRateLimiter, type RateLimiterOptions } from '../../shared/middlewares/rate-limit';
-import { blockWhenImpersonating } from '../../shared/middlewares/require-permission';
+import { blockSensitiveWhenImpersonating } from '../../shared/middlewares/require-permission';
 import { handle } from '../../shared/middlewares/validate';
+import { getSignupSettings } from '../account/kinds';
 import { AcceptInviteBody, InviteTokenQuery } from '../team/team.schema';
 import { acceptInvite, inviteInfo } from '../team/team.service';
 
@@ -19,13 +20,12 @@ import {
   logoutAllHandler,
   logoutHandler,
   meHandler,
+  goneHandler,
   refreshHandler,
-  resendHandler,
   resetPasswordHandler,
   revokeSessionHandler,
   sessionsHandler,
   signupHandler,
-  verifyEmailHandler,
 } from './auth.controller';
 import {
   ChangePasswordBody,
@@ -35,7 +35,6 @@ import {
   SessionIdParams,
   SignupBody,
   UpdateProfileBody,
-  VerifyEmailBody,
 } from './auth.schema';
 import { updateProfile } from './login.service';
 
@@ -43,6 +42,8 @@ export interface AuthRouterDeps {
   env: Pick<Env, 'CORS_ORIGINS' | 'NODE_ENV'> & Partial<Pick<Env, 'AUTH_RATE_LIMIT_MAX'>>;
   /** Separate store (prefix `rl:auth:`) — never share the global limiter's store. */
   rateLimitStore?: Store;
+  /** Signup uses a different hour-long Redis window/prefix. */
+  signupRateLimitStore?: Store;
   /** Test hook. */
   rateLimit?: Partial<RateLimiterOptions>;
 }
@@ -62,9 +63,22 @@ export const createAuthRouter = (deps: AuthRouterDeps): Router => {
     ...deps.rateLimit,
   });
 
-  router.post('/signup', limiter, ...handle({ body: SignupBody }, signupHandler));
-  router.post('/verify-email', limiter, ...handle({ body: VerifyEmailBody }, verifyEmailHandler));
-  router.post('/verify-email/resend', limiter, ...handle({ body: EmailOnlyBody }, resendHandler));
+  // Phase 19: open signup (no e-mail) — 5 an hour per IP on top of the auth limiter
+  const signupLimiter = createRateLimiter({
+    windowMs: SIGNUP_RATE_LIMIT.windowMs,
+    limit: SIGNUP_RATE_LIMIT.limit,
+    keyGenerator: (req) => `signup-ip:${ipKeyGenerator(req.ip ?? '')}`,
+    ...(deps.signupRateLimitStore ? { store: deps.signupRateLimitStore } : {}),
+    // tests that lift the auth limit lift this one too
+    ...(deps.rateLimit?.limit !== undefined ? { limit: deps.rateLimit.limit } : {}),
+  });
+  router.get('/signup-options', limiter, async (_req, res) => {
+    res.set('Cache-Control', 'public, max-age=60');
+    ok(res, await getSignupSettings());
+  });
+  router.post('/signup', limiter, signupLimiter, ...handle({ body: SignupBody }, signupHandler));
+  router.post('/verify-email', limiter, goneHandler);
+  router.post('/verify-email/resend', limiter, goneHandler);
   router.post('/login', limiter, ...handle({ body: LoginBody }, loginHandler));
   router.post('/refresh', limiter, originCheck(deps.env), refreshHandler);
   router.post('/logout', originCheck(deps.env), logoutHandler);
@@ -95,10 +109,10 @@ export const createAuthRouter = (deps: AuthRouterDeps): Router => {
   router.post(
     '/change-password',
     authenticate(),
-    blockWhenImpersonating(),
+    blockSensitiveWhenImpersonating(),
     ...handle({ body: ChangePasswordBody }, changePasswordHandler),
   );
-  router.post('/logout-all', authenticate(), blockWhenImpersonating(), logoutAllHandler);
+  router.post('/logout-all', authenticate(), blockSensitiveWhenImpersonating(), logoutAllHandler);
   router.get('/me', authenticate(), meHandler);
   router.patch(
     '/me',
@@ -111,6 +125,7 @@ export const createAuthRouter = (deps: AuthRouterDeps): Router => {
   router.delete(
     '/sessions/:id',
     authenticate(),
+    blockSensitiveWhenImpersonating(),
     ...handle({ params: SessionIdParams }, revokeSessionHandler),
   );
   return router;

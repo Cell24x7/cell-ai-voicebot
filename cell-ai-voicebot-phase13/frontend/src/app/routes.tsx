@@ -21,7 +21,6 @@ import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { SignupPage } from '@/pages/auth/SignupPage';
-import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage';
 import { ActivityPage } from '@/pages/contacts/ActivityPage';
 import { ContactDetailPage } from '@/pages/contacts/ContactDetailPage';
 import { ContactsPage } from '@/pages/contacts/ContactsPage';
@@ -75,14 +74,8 @@ export const routes: RouteObject[] = [
           </RedirectIfAuthed>
         ),
       },
-      {
-        path: '/verify-email',
-        element: (
-          <RedirectIfAuthed>
-            <VerifyEmailPage />
-          </RedirectIfAuthed>
-        ),
-      },
+      // Phase 19: signup sends no e-mail code any more
+      { path: '/verify-email', element: <Navigate to="/login" replace /> },
       {
         path: '/forgot-password',
         element: (
@@ -173,6 +166,26 @@ export const routes: RouteObject[] = [
               { path: ':tab', element: <ContactsPage /> },
             ],
           },
+          // Phase 19: reseller panel (only reseller accounts; the page redirects others)
+          {
+            path: '/reseller',
+            lazy: async () => ({
+              Component: (await import('@/pages/reseller/ResellerPage')).ResellerPage,
+            }),
+          },
+          {
+            path: '/reseller/customers/:id',
+            lazy: async () => ({
+              Component: (await import('@/pages/reseller/ResellerCustomerPage'))
+                .ResellerCustomerPage,
+            }),
+          },
+          {
+            path: '/reseller/:tab',
+            lazy: async () => ({
+              Component: (await import('@/pages/reseller/ResellerPage')).ResellerPage,
+            }),
+          },
           {
             path: '/wallet',
             element: (
@@ -231,7 +244,7 @@ export const routes: RouteObject[] = [
           {
             path: '/campaigns',
             element: (
-              <RequirePermission perm="campaigns.read">
+              <RequirePermission anyOf={['campaigns.read', 'whatsapp.campaigns.read']}>
                 <Outlet />
               </RequirePermission>
             ),
@@ -243,12 +256,61 @@ export const routes: RouteObject[] = [
                 }),
               },
               {
-                // the dashboard (charts) is its own chunk
+                path: 'whatsapp',
+                element: (
+                  <RequirePermission perm="whatsapp.campaigns.read">
+                    <Outlet />
+                  </RequirePermission>
+                ),
+                children: [
+                  {
+                    path: ':id',
+                    lazy: async () => ({
+                      Component: (await import('@/pages/campaigns/WhatsAppCampaignDetailPage'))
+                        .WhatsAppCampaignDetailPage,
+                    }),
+                  },
+                  {
+                    element: (
+                      <RequirePermission perm="whatsapp.campaigns.write">
+                        <Outlet />
+                      </RequirePermission>
+                    ),
+                    children: [
+                      {
+                        path: 'new',
+                        lazy: async () => ({
+                          Component: (await import('@/pages/campaigns/WhatsAppCampaignWizardPage'))
+                            .WhatsAppCampaignWizardPage,
+                        }),
+                      },
+                      {
+                        path: ':id/edit',
+                        lazy: async () => ({
+                          Component: (await import('@/pages/campaigns/WhatsAppCampaignWizardPage'))
+                            .WhatsAppCampaignWizardPage,
+                        }),
+                      },
+                    ],
+                  },
+                ],
+              },
+              {
                 path: ':id',
-                lazy: async () => ({
-                  Component: (await import('@/pages/campaigns/CampaignDetailPage'))
-                    .CampaignDetailPage,
-                }),
+                element: (
+                  <RequirePermission perm="campaigns.read">
+                    <Outlet />
+                  </RequirePermission>
+                ),
+                children: [
+                  {
+                    index: true,
+                    lazy: async () => ({
+                      Component: (await import('@/pages/campaigns/CampaignDetailPage'))
+                        .CampaignDetailPage,
+                    }),
+                  },
+                ],
               },
               {
                 element: (

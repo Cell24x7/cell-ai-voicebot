@@ -12,6 +12,7 @@ import {
 } from '../../core/meta';
 import { ConversationModel, type ConversationDoc } from '../../db/models/conversation.model';
 import { MessageModel, type MessageDoc } from '../../db/models/message.model';
+import { WhatsAppCampaignModel } from '../../db/models/whatsapp-campaign.model';
 import {
   WhatsAppChannelModel,
   type WhatsAppChannelDoc,
@@ -27,6 +28,9 @@ import { templatePayloadFor } from '../templates/send.service';
 import { historyPush, recordTemplateUsage } from '../templates/template.service';
 import { SYSTEM_ACTOR } from '../whatsapp/channel-status';
 import { openSecret } from '../whatsapp/context';
+import { acquireMessageSlot } from '../whatsapp/message-pacer';
+import { autoPause } from '../whatsapp-campaigns/lifecycle';
+import { trackCampaignMessage } from '../whatsapp-campaigns/tracking';
 
 import { applyChannelEffect } from './channel-effects';
 import { inboxNow, type InboxContext } from './context';
@@ -317,6 +321,7 @@ const fail = async (
       pricing: null,
     });
     if (m.template) await recordTemplateUsage(m.template.templateId, 'failed', now);
+    await trackCampaignMessage({ _id: m._id, status: 'failed', error: { code } });
   }
   return { kind: 'failed' as const, reason };
 };
@@ -349,7 +354,12 @@ export const processSend = async (
   options: { finalAttempt: boolean; waits: number },
 ): Promise<SendOutcome> => {
   const m = await MessageModel.findById(messageId).lean<MessageDoc>();
-  if (!m || m.status !== 'queued' || m.direction !== 'out') return { kind: 'skipped' };
+  if (!m || m.direction !== 'out') return { kind: 'skipped' };
+  if (m.status !== 'queued') {
+    // A worker may have committed acceptance before crashing ahead of campaign tracking.
+    await trackCampaignMessage(m);
+    return { kind: 'skipped' };
+  }
   const now = inboxNow(ix);
   const earlier = await MessageModel.exists({
     conversationId: m.conversationId,
@@ -386,8 +396,54 @@ export const processSend = async (
             await contentOf(ix, m, token, channel.phoneNumberId, now),
             m.context?.replyToWaMessageId ?? null,
           );
+    // Validate first, then acquire immediately before entering the provider. No DB work
+    // may shift an already granted attempt into another worker's rolling window.
+    let sendingChannel = channel;
+    for (let pass = 0; pass < 2; pass++) {
+      if (m.externalRef?.startsWith('wac:')) {
+        const campaign = await WhatsAppCampaignModel.findOne({
+          _id: m.externalRef.slice(4),
+          accountId: m.accountId,
+        }).lean();
+        if (!campaign || ['stopped', 'failed'].includes(campaign.status))
+          throw new NotSendable('Campaign stopped');
+        if (['paused', 'scheduled'].includes(campaign.status))
+          return { kind: 'later', delayMs: 1000 };
+        const templateUnavailable =
+          m.template &&
+          !(await WhatsAppTemplateModel.exists({
+            _id: m.template.templateId,
+            accountId: m.accountId,
+            status: 'APPROVED',
+          }));
+        if (sendingChannel.qualityRating === 'RED' || templateUnavailable) {
+          await autoPause(
+            campaign,
+            sendingChannel.qualityRating === 'RED' ? 'quality_red' : 'template_paused',
+          );
+          return { kind: 'later', delayMs: 1000 };
+        }
+      }
+      const delay = await acquireMessageSlot(
+        ix.wa.redis,
+        sendingChannel,
+        ix.wa.env.WA_CAMPAIGN_MPS,
+      );
+      if (delay === 0) break;
+      if (pass === 1 || delay > 100) return { kind: 'later', delayMs: delay };
+      await new Promise<void>((resolve) => setTimeout(resolve, delay));
+      const fresh = await WhatsAppChannelModel.findOne({
+        _id: channel._id,
+        accountId: channel.accountId,
+      }).lean<WhatsAppChannelDoc>();
+      if (!fresh || !['connected', 'restricted'].includes(fresh.status))
+        throw new NotSendable('The WhatsApp number is not connected');
+      sendingChannel = fresh;
+      // Repeat the campaign guards after sleeping, before taking the actual send slot.
+    }
     const { waMessageId } = await ix.wa.meta.sendMessage(token, channel.phoneNumberId, payload);
     await update(m, 'queued', { waMessageId, error: null }, 'accepted', now);
+    await trackCampaignMessage({ _id: m._id, status: 'accepted' });
     return { kind: 'accepted', waMessageId };
   } catch (err) {
     if (err instanceof NotSendable) return fail(ix, m, null, null, err.reason, now);

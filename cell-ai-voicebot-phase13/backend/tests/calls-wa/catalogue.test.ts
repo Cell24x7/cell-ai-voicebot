@@ -67,7 +67,7 @@ import { ERROR_CODES } from '../../src/shared/errors/error-codes';
 
 describe('Phase 12 catalogue', () => {
   it('has 83 error codes incl. the fourteen calling codes (exact texts and statuses)', () => {
-    expect(Object.keys(ERROR_CODES)).toHaveLength(108); // Phase 18B: T18B.1 1; Phase 18: T18.7 4; Phase 16: T16.4 1, T16.5 1, T16.6 3, T16.9 2; + Phase 14: T14.3 3, T14.2 1, T14.4 1, T14.7 1, T14.8 1; Phase 15: T15.1 2, T15.3 2, T15.5 1, T15.6 1
+    expect(Object.keys(ERROR_CODES)).toHaveLength(115); // Phase 19: 7; Phase 18B: T18B.1 1; Phase 18: T18.7 4; Phase 16: T16.4 1, T16.5 1, T16.6 3, T16.9 2; + Phase 14: T14.3 3, T14.2 1, T14.4 1, T14.7 1, T14.8 1; Phase 15: T15.1 2, T15.3 2, T15.5 1, T15.6 1
     const added = {
       WHATSAPP_CALLING_DISABLED: [409, 'Calling is turned off for this WhatsApp number.'],
       WHATSAPP_CALLING_UNAVAILABLE: [409, "WhatsApp calling isn't available for this number."],
@@ -109,7 +109,7 @@ describe('Phase 12 catalogue', () => {
   });
 
   it('has 127 audit actions incl. the nine Phase 12 actions', () => {
-    expect(AUDIT_ACTIONS).toHaveLength(174); // Phase 18B: T18B.4 1; Phase 18: T18.6 2, T18.7 4; + Phase 14: T14.3 4, T14.4 1, T14.7 4, T14.8 2; Phase 15: T15.1 1, T15.3 6, T15.5 3, T15.6 2; Phase 16: T16.3 1, T16.4 1, T16.5 2, T16.6 5, T16.7 2, T16.9 4; Phase 17: T17.6 2
+    expect(AUDIT_ACTIONS).toHaveLength(194); // Phase 19: 20; Phase 18B: T18B.4 1; Phase 18: T18.6 2, T18.7 4; + Phase 14: T14.3 4, T14.4 1, T14.7 4, T14.8 2; Phase 15: T15.1 1, T15.3 6, T15.5 3, T15.6 2; Phase 16: T16.3 1, T16.4 1, T16.5 2, T16.6 5, T16.7 2, T16.9 4; Phase 17: T17.6 2
     expect(AUDIT_ACTIONS.slice(118, 127)).toEqual([
       'whatsapp.calling_settings_updated',
       'whatsapp.call_permission_requested',
@@ -125,7 +125,7 @@ describe('Phase 12 catalogue', () => {
   });
 
   it('adds 5 notification types (26 + 5; Phase 14: 32) with titles, audiences, links and e-mail flags', () => {
-    expect(NOTIFICATION_TYPES).toHaveLength(39); // Phase 18B: T18B.4 1; Phase 18: T18.14 1, T18.15 1; + Phase 14 analytics.reconcile_mismatch, Phase 15 webhook.endpoint_disabled
+    expect(NOTIFICATION_TYPES).toHaveLength(45); // Phase 19: 6; Phase 18B: T18B.4 1; Phase 18: T18.14 1, T18.15 1; + Phase 14 analytics.reconcile_mismatch, Phase 15 webhook.endpoint_disabled
     const added = NOTIFICATION_TYPES.slice(26, 31);
     expect(added).toEqual([
       'call.whatsapp_missed',
@@ -182,6 +182,25 @@ describe('Phase 12 catalogue', () => {
     expect(has('calls.answer')).toEqual([true, true, true, true, false]);
     expect(has('whatsapp.calling.manage')).toEqual([true, true, false, false, false]);
     expect(has('calls.trigger')).toEqual([true, true, true, true, false]);
+  });
+
+  it('Phase 19: catalogue counts at the P19-DONE targets', () => {
+    // prompt §1 literals: errors 115, audit 194, notifications 45, permissions 49, ledger 12, WS 41
+    expect(PERMISSIONS).toHaveLength(49);
+    expect(LEDGER_TYPES).toHaveLength(12);
+    expect(WS_EVENT_TYPES).toHaveLength(41);
+    expect(PERMISSIONS).toEqual(
+      expect.arrayContaining([
+        'reseller.read',
+        'reseller.manage',
+        'whatsapp.campaigns.read',
+        'whatsapp.campaigns.write',
+      ]),
+    );
+    expect(LEDGER_TYPES).toEqual(
+      expect.arrayContaining(['credit_transfer_out', 'credit_transfer_in']),
+    );
+    expect(WS_EVENT_TYPES).toEqual(expect.arrayContaining(['whatsapp_campaign.progress']));
   });
 
   it('job names, ids (no `:`) and schedules', () => {
@@ -273,6 +292,7 @@ describe('Phase 12 catalogue', () => {
       'whatsappCalling',
       'callingWindowCeiling',
       'opsStatus',
+      'signup',
     ]);
   });
 

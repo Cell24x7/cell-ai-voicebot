@@ -47,7 +47,7 @@ const ContactTemplateButton = lazy(async () => ({
   default: (await import('@/features/templates/send/ContactTemplateButton')).ContactTemplateButton,
 }));
 const CallNowDialog = lazy(async () => ({
-  default: (await import('@/features/calls/CallNowDialog')).CallNowDialog,
+  default: (await import('@/features/calls/CallMethodDialog')).CallMethodDialog,
 }));
 const ContactCallingCard = lazy(async () => ({
   default: (await import('@/features/whatsapp-calling/panel/ContactCallingCard'))
@@ -442,7 +442,12 @@ export function ContactDetailPage() {
       </Grid>
       {calling && (
         <Suspense fallback={null}>
-          <CallNowDialog contactId={c.id} timezone={timezone} onClose={() => setCalling(false)} />
+          <CallNowDialog
+            contactId={c.id}
+            phoneE164={c.phoneE164}
+            label={c.name ?? c.phoneE164}
+            onClose={() => setCalling(false)}
+          />
         </Suspense>
       )}
       {editing && (

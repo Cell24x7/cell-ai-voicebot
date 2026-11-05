@@ -1,7 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
 import { PASSWORD, SUPERADMIN } from './env';
-import { extractCode, waitForEmail } from './mailpit';
 
 let counter = 0;
 /** Unique per run, so a spec can be re-run without resetting anything. */
@@ -14,24 +13,43 @@ export interface Owner {
   businessName: string;
 }
 
-/** Signs up through the UI, enters the emailed code and lands on the dashboard. */
-export async function signUpOwner(page: Page, tag: string): Promise<Owner> {
+/** Signs up through the UI and lands on the dashboard without an email-code step. */
+export async function signUpOwner(
+  page: Page,
+  tag: string,
+  kind: 'business' | 'reseller' = 'business',
+): Promise<Owner> {
   const owner = {
     email: uniqueEmail(tag),
     name: 'Asha Verma',
     businessName: `E2E ${tag} ${Date.now().toString(36)}`,
   };
+  await page.route('**/api/v1/auth/signup', (route) =>
+    route.continue({
+      headers: {
+        ...route.request().headers(),
+        'x-forwarded-for': `198.18.${String(Math.floor(Math.random() * 255))}.${String(Math.floor(Math.random() * 254) + 1)}`,
+      },
+    }),
+  );
   await page.goto('/signup');
+  await page
+    .getByRole('button', { name: kind === 'business' ? 'Business' : 'Reseller', exact: true })
+    .click();
   await page.getByLabel('Business name').fill(owner.businessName);
   await page.getByLabel('Your name').fill(owner.name);
   await page.getByLabel('Work email').fill(owner.email);
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await page.getByRole('checkbox', { name: /I agree/ }).check();
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
-  const code = extractCode(await waitForEmail(owner.email, /verif|code/i));
-  await page.getByLabel('Digit 1').click();
-  await page.keyboard.type(code);
-  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', {
+      level: 1,
+      name: kind === 'reseller' ? 'Reseller' : 'Dashboard',
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.unroute('**/api/v1/auth/signup');
   return owner;
 }
 

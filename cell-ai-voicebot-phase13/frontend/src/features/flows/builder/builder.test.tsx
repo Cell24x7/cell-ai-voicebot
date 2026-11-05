@@ -440,7 +440,13 @@ describe('flow builder', () => {
 
   it('impersonation and small screens are read-only; load errors offer a retry', async () => {
     signInAs('owner', {
-      impersonation: { impersonatorId: 'sa', expiresAt: '2030-01-01T00:00:00Z' },
+      impersonation: {
+        impersonatorId: 'sa',
+        expiresAt: '2030-01-01T00:00:00Z',
+        mode: 'view',
+        kind: 'superadmin',
+        returnTo: '/admin/accounts/a1',
+      },
     });
     vi.stubGlobal(
       'matchMedia',

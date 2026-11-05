@@ -46,7 +46,7 @@ test('roles: readers see agents read-only, impersonators cannot chat, a new AI p
   await rates.getByLabel('AI text (₹ per 1,000 tokens)').fill('2');
   await rates.getByRole('button', { name: /Save/ }).click();
   await expect(rates).toBeHidden();
-  await admin.getByRole('button', { name: 'Impersonate' }).click();
+  await admin.getByRole('button', { name: 'View as' }).click();
   await admin.getByRole('button', { name: 'Start viewing' }).click();
   await expect(admin.getByText(/Viewing as/)).toBeVisible();
   await admin

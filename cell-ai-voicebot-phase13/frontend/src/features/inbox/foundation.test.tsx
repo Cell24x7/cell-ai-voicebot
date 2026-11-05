@@ -583,7 +583,13 @@ describe('sending', () => {
     api.read.mockClear();
     useAuthStore.getState().startImpersonation(
       fakeSession('owner', {
-        impersonation: { impersonatorId: 'sa', expiresAt: '2026-10-22T10:00:00Z' },
+        impersonation: {
+          impersonatorId: 'sa',
+          expiresAt: '2026-10-22T10:00:00Z',
+          mode: 'view',
+          kind: 'superadmin',
+          returnTo: '/admin/accounts/a1',
+        },
       }),
     );
     renderHook(() => useMarkRead('cv9', 4), { wrapper });
@@ -815,7 +821,13 @@ describe('permissions', () => {
     signInAs('owner');
     useAuthStore.getState().startImpersonation(
       fakeSession('owner', {
-        impersonation: { impersonatorId: 'sa', expiresAt: '2026-10-22T10:00:00Z' },
+        impersonation: {
+          impersonatorId: 'sa',
+          expiresAt: '2026-10-22T10:00:00Z',
+          mode: 'view',
+          kind: 'superadmin',
+          returnTo: '/admin/accounts/a1',
+        },
       }),
     );
     expect(renderHook(() => useCanReply(), { wrapper }).result.current).toBe(false);

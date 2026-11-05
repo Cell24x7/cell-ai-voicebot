@@ -30,6 +30,7 @@ export interface CallPermissionInput {
 }
 
 export interface TemplateMediaInput {
+  channelId?: string;
   file: Blob;
   fileName?: string;
   onProgress?: (percent: number) => void;
@@ -62,8 +63,13 @@ export const templatesApi = {
     unwrap(apiClient.post<SuccessEnvelope<WhatsAppTemplate>>('/whatsapp/templates', body)),
   edit: (id: string, body: WhatsAppTemplateEdit) =>
     unwrap(apiClient.patch<SuccessEnvelope<WhatsAppTemplate>>(tpl(id), body)),
-  submit: (id: string) =>
-    unwrap(apiClient.post<SuccessEnvelope<WhatsAppTemplate>>(tpl(id, '/submit'))),
+  submit: (id: string, channelId?: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<WhatsAppTemplate>>(
+        tpl(id, '/submit'),
+        channelId ? { channelId } : undefined,
+      ),
+    ),
   remove: (id: string, scope: DeleteScope = 'language') =>
     unwrap(apiClient.delete<SuccessEnvelope<{ deleted: number }>>(tpl(id), { params: { scope } })),
   setVariables: (id: string, sources: WhatsAppVariableSourceInput[]) =>
@@ -83,8 +89,12 @@ export const templatesApi = {
       ),
     ),
   /** Media header example (multipart). No timeout: big files, the user can cancel. */
-  uploadMedia: (id: string, { file, fileName, onProgress, signal }: TemplateMediaInput) => {
+  uploadMedia: (
+    id: string,
+    { file, fileName, onProgress, signal, channelId }: TemplateMediaInput,
+  ) => {
     const form = new FormData();
+    if (channelId) form.append('channelId', channelId);
     if (fileName === undefined) form.append('file', file);
     else form.append('file', file, fileName);
     return unwrap(

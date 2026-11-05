@@ -179,7 +179,7 @@ async function impersonate(browser: Browser, o: Owner): Promise<Page> {
   const admin = await (await browser.newContext()).newPage();
   await signInAsSuperadmin(admin);
   await openAdminAccount(admin, o.businessName);
-  await admin.getByRole('button', { name: 'Impersonate' }).click();
+  await admin.getByRole('button', { name: 'View as' }).click();
   await admin.getByRole('dialog').getByRole('button', { name: 'Start viewing' }).click();
   await expect(admin.getByText(`Viewing as ${o.name}`, { exact: false })).toBeVisible();
   return admin;

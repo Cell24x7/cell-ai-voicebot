@@ -14,6 +14,7 @@ import { Link as RouterLink, useSearchParams } from 'react-router';
 import { DataTable, type Column } from '@/components/DataTable';
 import { RelativeTime } from '@/components/RelativeTime';
 import { useCan, useSession } from '@/features/auth/hooks';
+import { CallAction } from '@/features/calls/CallMethodDialog';
 import { ExportDialog } from '@/features/contact-exports/ExportDialog';
 import { useCanExport } from '@/features/contact-exports/useExportJob';
 import { AdvancedFilterDialog } from '@/features/segments/AdvancedFilterDialog';
@@ -132,6 +133,13 @@ export function ContactsTab() {
         ),
       },
       { key: 'phone', header: 'Phone', render: (c) => formatPhone(c.phoneE164) },
+      {
+        key: 'call',
+        header: 'Call',
+        render: (c) => (
+          <CallAction contactId={c.id} phoneE164={c.phoneE164} label={c.name ?? c.phoneE164} />
+        ),
+      },
       {
         key: 'tags',
         header: 'Tags',

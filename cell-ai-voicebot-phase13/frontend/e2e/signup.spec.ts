@@ -3,7 +3,9 @@ import { expect, test } from '@playwright/test';
 import { PASSWORD } from './env';
 import { signIn, signOut, signUpOwner } from './helpers';
 
-test('sign up → verify email → dashboard → sign out → sign in again', async ({ page }) => {
+test('sign up without email verification → dashboard → sign out → sign in again', async ({
+  page,
+}) => {
   const owner = await signUpOwner(page, 'signup');
   await expect(page.getByText(`Welcome, ${owner.name}`)).toBeVisible();
   await expect(page.getByRole('banner').getByText(owner.businessName)).toBeVisible();

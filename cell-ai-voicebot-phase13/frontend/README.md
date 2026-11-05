@@ -241,3 +241,17 @@ All project docs (plans, ADRs, conventions) live in the **backend repo** `docs/`
 `/privacy`, `/terms`, `/contact` and `/data-deletion` work without login, with links on the auth screens and user menu. Legal Markdown is rendered as React text (no raw HTML), with public `VITE_LEGAL_*` placeholders and a draft banner until approved and complete. Icons/manifest come from `npm run icons` using the existing pinned Playwright renderer. `scripts/build-web.sh <sha>` builds and packages an immutable artifact; supply only public build values. Backend secrets must never enter this process.
 
 Embedded Signup uses the v4 configuration (`extras: {}` for Cloud API), keeps coexistence options separate and accepts compatible session messages. Graph defaults to v26.0 in the API. Three legal-page browser scenarios supplement the existing suite. See the backend [staging runbook](../cell-ai-voicebot-backend/docs/ops/staging.md) for owner gates and deployment.
+
+## Phase 19 continuation
+
+Campaigns expose SIP / Normal call, WhatsApp message and WhatsApp call tabs. The message
+wizard supports variables/A-B, uploads/location, recurrence, eligible cost estimates
+and live reports. WhatsApp call campaigns support published flows or active AI agents.
+Template management always shows a WhatsApp sender filter, preserves it in the URL and
+freezes builder approval context. Contact/Calls/Inbox call options share sender-aware
+Normal/WhatsApp choices, retaining per-number consent and AI selection.
+Backend-derived messaging caps are 18/sec for Business App/coexistence/unknown and
+75/sec for confirmed Cloud API numbers; lower limits still apply.
+See the backend channel guide and Phase 19 sign-off for validation and live checks.
+
+AI call confirmations wait for the selected sender/contact selling-price quote and offer retry on price errors. Reseller signup/login defaults to the reseller panel; safe same-app return links remain supported.

@@ -31,6 +31,7 @@ export function CallButton({
   label,
   conversationId,
   windowExpiresAt,
+  onStarted,
 }: {
   channelId: string;
   contactId: string;
@@ -38,6 +39,7 @@ export function CallButton({
   label: string;
   conversationId: string | null;
   windowExpiresAt: string | null;
+  onStarted?: () => void;
 }) {
   const canCall = useCanCall();
   const canRequest = useCanRequestPermission();
@@ -65,6 +67,7 @@ export function CallButton({
       idempotencyKey: key.current,
       recording,
     });
+    onStarted?.();
   };
   const button = (() => {
     if (!p) {
@@ -137,6 +140,10 @@ export function CallButton({
       </Menu>
       {dialog === 'ai' && (
         <CallWithAiDialog
+          key={`${channelId}:${contactId}`}
+          channelId={channelId}
+          contactId={contactId}
+          contactLabel={label}
           phoneE164={phoneE164}
           onCall={(program) => call('ai', program)}
           onClose={() => setDialog(null)}

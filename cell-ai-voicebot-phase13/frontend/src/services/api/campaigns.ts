@@ -30,6 +30,10 @@ export type ScenarioKey =
 
 /** Settings groups — every one optional (create fills defaults, update merges). */
 export interface CampaignSettingsInput {
+  line?: 'phone' | 'whatsapp';
+  channelId?: string | null;
+  program?: { kind: 'flow' | 'agent'; id: string } | null;
+  askPermissionFirst?: { templateId: string } | null;
   audience?: {
     listIds?: string[];
     segmentId?: string | null;
@@ -77,7 +81,7 @@ export interface CampaignSettingsInput {
 export interface CreateCampaignInput extends CampaignSettingsInput {
   name: string;
   mode?: CampaignMode;
-  flowId: string;
+  flowId?: string;
 }
 
 export interface UpdateCampaignInput extends CampaignSettingsInput {
@@ -88,6 +92,7 @@ export interface UpdateCampaignInput extends CampaignSettingsInput {
 }
 
 export interface ListCampaignsQuery {
+  line?: 'phone' | 'whatsapp';
   cursor?: string;
   limit?: number;
   status?: CampaignStatus[];
@@ -109,7 +114,11 @@ export interface ListCampaignContactsQuery {
 }
 
 export interface AudiencePreviewInput {
-  flowId: string;
+  channelId?: string;
+  askPermissionFirst?: boolean;
+  line?: 'phone' | 'whatsapp';
+  program?: { kind: 'flow' | 'agent'; id: string } | null;
+  flowId?: string;
   chosenVersion?: number | null;
   audience: NonNullable<CampaignSettingsInput['audience']>;
 }

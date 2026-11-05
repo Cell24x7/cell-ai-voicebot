@@ -27,6 +27,11 @@ vi.mock('@/services/api/admin', () => ({
     setRetentionCap: vi.fn(),
     pauseCampaigns: vi.fn(),
     resumeCampaign: vi.fn(),
+    signupSettings: vi.fn(() => new Promise(() => undefined)),
+    setSignupSettings: vi.fn(),
+    setReseller: vi.fn(),
+    approveReseller: vi.fn(),
+    suspendCustomers: vi.fn(),
   },
 }));
 vi.mock('@/services/api/phone-numbers', async (original) => ({
@@ -47,6 +52,10 @@ const ROW: AdminAccountRow = {
   status: 'active',
   ownerEmail: 'asha@example.com',
   usersCount: 3,
+  kind: 'business',
+  parent: null,
+  customersCount: null,
+  resellerStatus: null,
   createdAt: '2026-10-01T00:00:00Z',
 };
 
@@ -119,6 +128,7 @@ describe('Add account (superadmin)', () => {
       ownerEmail: 'meera@example.com',
       ownerPassword: 'short-enough-now',
       ownerPhone: '+919876543210',
+      kind: 'business',
     });
     expect(await screen.findByText(/The owner can sign in now/)).toBeInTheDocument();
     expect(await screen.findByRole('tab', { name: /overview/i })).toBeInTheDocument();
@@ -145,6 +155,7 @@ describe('Add account (superadmin)', () => {
       ownerName: 'Meera',
       ownerEmail: 'used@example.com',
       ownerPassword: 'long-enough-pass',
+      kind: 'business',
     });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -274,7 +285,13 @@ describe('Admin accounts list', () => {
 
   it('sends an impersonating admin to the customer dashboard', async () => {
     signInAs('superadmin', {
-      impersonation: { impersonatorId: 'sa', expiresAt: '2026-10-08T00:30:00Z' },
+      impersonation: {
+        impersonatorId: 'sa',
+        expiresAt: '2026-10-08T00:30:00Z',
+        mode: 'view',
+        kind: 'superadmin',
+        returnTo: '/admin/accounts/a1',
+      },
     });
     renderWithProviders({ route: '/admin/accounts' });
     expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
@@ -465,11 +482,17 @@ describe('Admin account detail', () => {
     api.impersonate.mockResolvedValue(
       fakeSession('owner', {
         expiresIn: 1800,
-        impersonation: { impersonatorId: admin.user.id, expiresAt: '2026-10-08T00:30:00Z' },
+        impersonation: {
+          impersonatorId: admin.user.id,
+          expiresAt: '2026-10-08T00:30:00Z',
+          mode: 'view',
+          kind: 'superadmin',
+          returnTo: '/admin/accounts/acc1',
+        },
       }),
     );
     renderWithProviders({ route: '/admin/accounts/acc1' });
-    await userEvent.click(await screen.findByRole('button', { name: 'Impersonate' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'View as' }));
     const dialog = screen.getByRole('dialog', { name: 'View as the owner of Demo Finance?' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Start viewing' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -477,6 +500,19 @@ describe('Admin account detail', () => {
     const state = useAuthStore.getState();
     expect(state.session?.impersonation?.impersonatorId).toBe(admin.user.id);
     expect(state.savedSession?.user.platformRole).toBe('superadmin');
+    expect(api.impersonate).toHaveBeenCalledWith('acc1', 'view');
+  });
+
+  it('Log in as asks first and starts an act session (Phase 19)', async () => {
+    signInAs('superadmin');
+    api.account.mockResolvedValue(detail());
+    api.impersonate.mockResolvedValue(fakeSession('owner'));
+    renderWithProviders({ route: '/admin/accounts/acc1' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Log in as' }));
+    const dialog = screen.getByRole('dialog', { name: 'Log in as the owner of Demo Finance?' });
+    expect(within(dialog).getByText(/payments, ownership/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Log in' }));
+    await waitFor(() => expect(api.impersonate).toHaveBeenCalledWith('acc1', 'act'));
   });
 
   it('does nothing when impersonation is cancelled; shows impersonation errors', async () => {
@@ -491,13 +527,13 @@ describe('Admin account detail', () => {
       }),
     );
     renderWithProviders({ route: '/admin/accounts/acc1' });
-    await userEvent.click(await screen.findByRole('button', { name: 'Impersonate' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'View as' }));
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }),
     );
     expect(api.impersonate).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    await userEvent.click(screen.getByRole('button', { name: 'Impersonate' }));
+    await userEvent.click(screen.getByRole('button', { name: 'View as' }));
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Start viewing' }),
     );
@@ -516,7 +552,8 @@ describe('Admin account detail', () => {
     renderWithProviders({ route: '/admin/accounts/acc1' });
     expect(await screen.findByText('Not found.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByRole('button', { name: 'Impersonate' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'View as' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Log in as' })).toBeDisabled();
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 

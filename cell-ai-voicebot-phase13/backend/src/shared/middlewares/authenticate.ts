@@ -49,7 +49,6 @@ export const authenticate = (
         accountId: 1,
         roleId: 1,
         status: 1,
-        emailVerifiedAt: 1,
         tokenVersion: 1,
         platformRole: 1,
       })
@@ -58,7 +57,6 @@ export const authenticate = (
     if (user.tokenVersion !== claims.tv) throw new UnauthenticatedError();
     if (user.status === 'disabled') throw new AppError('AUTH_USER_DISABLED');
     if (user.status !== 'active') throw new UnauthenticatedError();
-    if (!user.emailVerifiedAt) throw new AppError('AUTH_EMAIL_NOT_VERIFIED');
 
     const [role, account] = await Promise.all([
       RoleModel.findOne({ _id: user.roleId, accountId: user.accountId })
@@ -92,7 +90,13 @@ export const authenticate = (
       roleKey: role.key,
       permissions,
       ...(superadmin ? { platformRole: 'superadmin' as const } : {}),
-      ...(claims.imp ? { impersonatorId: claims.imp } : {}),
+      ...(claims.imp
+        ? {
+            impersonatorId: claims.imp,
+            impersonationMode: claims.imm ?? ('view' as const),
+            impersonatorKind: claims.imk ?? ('superadmin' as const),
+          }
+        : {}),
       sessionId: claims.sid,
       tokenVersion: user.tokenVersion,
       ...(claims.exp ? { tokenExpiresAt: new Date(claims.exp * 1000) } : {}),

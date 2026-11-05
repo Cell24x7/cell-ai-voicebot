@@ -30,10 +30,14 @@ import { LIVE_STATUSES, useCall, useCallLiveUpdates } from './queries';
 /** "Call now" from a contact: a flow (published, campaign trigger) or an agent → live status. */
 export function CallNowDialog({
   contactId,
+  callerNumberId,
+  callerLabel,
   timezone,
   onClose,
 }: {
   contactId: string;
+  callerNumberId?: string;
+  callerLabel?: string;
   timezone: string;
   onClose: () => void;
 }) {
@@ -78,7 +82,11 @@ export function CallNowDialog({
       <DialogTitle>Call now</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
-          <Alert severity="info">Simulated call — no phone line yet. Nothing is charged.</Alert>
+          <Alert severity="info">
+            {callerNumberId
+              ? `Normal call from ${callerLabel ?? 'the selected SIP number'}. Calling windows, DND and wallet checks apply.`
+              : 'Simulated call — no phone line yet. Nothing is charged.'}
+          </Alert>
           {live ? (
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }} aria-live="polite">
               <Typography variant="body2">Call status:</Typography>
@@ -153,7 +161,10 @@ export function CallNowDialog({
             variant="contained"
             disabled={!ready || start.isPending}
             onClick={() =>
-              start.mutate(kind === 'flow' ? { contactId, flowId } : { contactId, agentId })
+              start.mutate({
+                ...(kind === 'flow' ? { contactId, flowId } : { contactId, agentId }),
+                ...(callerNumberId ? { callerNumberId } : {}),
+              })
             }
           >
             {start.isPending ? 'Calling…' : 'Call'}

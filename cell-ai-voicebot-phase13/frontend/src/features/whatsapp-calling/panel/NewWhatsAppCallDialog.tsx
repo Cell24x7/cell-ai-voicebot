@@ -10,11 +10,10 @@ import Typography from '@mui/material/Typography';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { CallMethodContent } from '@/features/calls/CallMethodDialog';
 import { contactsApi } from '@/services/api/contacts';
 import type { Contact } from '@/services/api/types';
 import { formatPhone } from '@/utils/phone';
-
-import { ContactCallingCard } from './ContactCallingCard';
 
 /** Calls page (Phase 18B): pick a contact, then ask permission or call on WhatsApp. */
 export function NewWhatsAppCallDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -32,7 +31,7 @@ export function NewWhatsAppCallDialog({ open, onClose }: { open: boolean; onClos
   };
   return (
     <Dialog open={open} onClose={close} fullWidth maxWidth="sm">
-      <DialogTitle>New WhatsApp call</DialogTitle>
+      <DialogTitle>New call</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Autocomplete
@@ -49,10 +48,16 @@ export function NewWhatsAppCallDialog({ open, onClose }: { open: boolean; onClos
             renderInput={(p) => <TextField {...p} label="Contact" autoFocus />}
           />
           {picked ? (
-            <ContactCallingCard contact={picked} />
+            <CallMethodContent
+              onStarted={close}
+              key={picked.id}
+              contactId={picked.id}
+              phoneE164={picked.phoneE164}
+              label={picked.name ?? picked.phoneE164}
+            />
           ) : (
             <Typography variant="body2" color="text.secondary">
-              Pick a contact to see if they allowed WhatsApp calls, ask them, or call.
+              Pick a contact, then choose Normal call or WhatsApp call and the sender.
             </Typography>
           )}
         </Stack>

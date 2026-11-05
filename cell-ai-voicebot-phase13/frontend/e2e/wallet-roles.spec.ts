@@ -38,7 +38,7 @@ test('roles: managers read the wallet only, agents have none, impersonators cann
   const admin = await adminContext.newPage();
   await signInAsSuperadmin(admin);
   await openAdminAccount(admin, owner.businessName);
-  await admin.getByRole('button', { name: 'Impersonate' }).click();
+  await admin.getByRole('button', { name: 'View as' }).click();
   await admin.getByRole('button', { name: 'Start viewing' }).click();
   await expect(admin.getByText(/Viewing as/)).toBeVisible();
   // navigate inside the app — a full reload ends the impersonation (no refresh token for it)

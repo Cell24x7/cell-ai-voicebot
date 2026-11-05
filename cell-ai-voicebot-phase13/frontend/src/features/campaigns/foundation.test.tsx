@@ -88,7 +88,13 @@ describe('campaign queries', () => {
     signInAs('viewer');
     expect(renderHook(useAll, { wrapper }).result.current).toEqual([false, false, false]);
     signInAs('owner', {
-      impersonation: { impersonatorId: 'sa', expiresAt: '2026-10-08T01:00:00Z' },
+      impersonation: {
+        impersonatorId: 'sa',
+        expiresAt: '2026-10-08T01:00:00Z',
+        mode: 'view',
+        kind: 'superadmin',
+        returnTo: '/admin/accounts/a1',
+      },
     });
     expect(renderHook(useAll, { wrapper }).result.current).toEqual([false, false, false]);
   });

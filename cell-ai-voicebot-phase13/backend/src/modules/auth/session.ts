@@ -10,6 +10,7 @@ import {
 import { RoleModel, type RoleDoc } from '../../db/models/role.model';
 import { UserModel, type UserDoc } from '../../db/models/user.model';
 import { UnauthenticatedError } from '../../shared/errors/app-error';
+import { kindOf } from '../account/kinds';
 import { PLATFORM_PERMISSIONS } from '../rbac/permissions';
 
 import { REFRESH_COOKIE, REFRESH_COOKIE_PATH } from './auth.constants';
@@ -40,6 +41,11 @@ export interface PublicAccount {
   suspendReason: string | null;
   ownerId: string | null;
   isPlatform: boolean;
+  /** Phase 19: platform / reseller / business; `parentAccountId` = the business's reseller. */
+  kind: AccountDoc['kind'];
+  parentAccountId: string | null;
+  /** Only on reseller accounts. */
+  reseller: { status: 'active' | 'pending_approval'; customersCanTopUp: boolean } | null;
   timezone: string;
   country: string;
   defaultLanguage: AccountDoc['defaultLanguage'];
@@ -51,7 +57,16 @@ export interface PublicAccount {
 export interface Impersonation {
   impersonatorId: string;
   expiresAt: string;
+  /** Phase 19: `view` = read-only, `act` = may work (sensitive actions still refused). */
+  mode: 'view' | 'act';
+  kind: 'superadmin' | 'reseller';
+  /** Where "Back" goes. */
+  returnTo: string;
 }
+
+/** Phase 19: where "Back" leads after a login-as session. */
+export const returnToFor = (kind: 'superadmin' | 'reseller', accountId: string): string =>
+  kind === 'reseller' ? `/reseller/customers/${accountId}` : `/admin/accounts/${accountId}`;
 
 export interface AuthSessionBody {
   user: PublicUser;
@@ -93,6 +108,15 @@ export const toPublicAccount = (a: AccountDoc): PublicAccount => ({
     : null,
   ownerId: a.ownerId ? a.ownerId.toString() : null,
   isPlatform: a.isPlatform,
+  kind: kindOf(a),
+  parentAccountId: a.parentAccountId ? a.parentAccountId.toString() : null,
+  reseller:
+    kindOf(a) === 'reseller'
+      ? {
+          status: a.reseller?.status ?? 'active',
+          customersCanTopUp: a.reseller?.customersCanTopUp ?? false,
+        }
+      : null,
   timezone: a.timezone,
   country: a.country,
   defaultLanguage: a.defaultLanguage,
@@ -145,7 +169,12 @@ export const buildSessionBody = (
 export const accessTokenFor = async (
   user: Pick<UserDoc, '_id' | 'accountId' | 'roleId' | 'tokenVersion'>,
   sessionId: string,
-  options: { impersonatorId?: string; ttl?: string } = {},
+  options: {
+    impersonatorId?: string;
+    ttl?: string;
+    mode?: 'view' | 'act';
+    kind?: 'superadmin' | 'reseller';
+  } = {},
 ) =>
   signAccessToken(
     {
@@ -155,6 +184,8 @@ export const accessTokenFor = async (
       tv: user.tokenVersion,
       sid: sessionId,
       ...(options.impersonatorId ? { imp: options.impersonatorId } : {}),
+      ...(options.impersonatorId && options.mode ? { imm: options.mode } : {}),
+      ...(options.impersonatorId && options.kind ? { imk: options.kind } : {}),
     },
     options.ttl ?? getEnv().JWT_ACCESS_TTL,
   );

@@ -91,3 +91,27 @@ describe('WhatsApp calling API client', () => {
     expect(seen[14]?.params).toEqual({ provider: 'whatsapp', direction: 'inbound', mode: 'ai' });
   });
 });
+
+it('quotes the exact selected sender/contact pair', async () => {
+  const original = apiClient.defaults.adapter;
+  let params: unknown;
+  let url: string | undefined;
+  apiClient.defaults.adapter = (config) => {
+    params = config.params;
+    url = config.url;
+    return Promise.resolve({
+      config,
+      status: 200,
+      statusText: '',
+      headers: new AxiosHeaders(),
+      data: { success: true, data: { market: 'OTHER' } },
+    });
+  };
+  try {
+    await expect(whatsappCallingApi.quote('wa2', 'k2')).resolves.toEqual({ market: 'OTHER' });
+    expect(url).toBe('/whatsapp/channels/wa2/calling/quote');
+    expect(params).toEqual({ contactId: 'k2' });
+  } finally {
+    apiClient.defaults.adapter = original;
+  }
+});

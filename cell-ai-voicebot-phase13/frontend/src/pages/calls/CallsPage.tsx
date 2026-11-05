@@ -253,9 +253,9 @@ export function CallsPage() {
                 }
               />
             )}
-            {canTrigger && can('whatsapp.read') && (
+            {canTrigger && (
               <Button variant="outlined" onClick={() => setWaCall(true)}>
-                New WhatsApp call
+                New call
               </Button>
             )}
             {canTrigger && (

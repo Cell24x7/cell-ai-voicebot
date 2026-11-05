@@ -171,7 +171,13 @@ describe('wallet banner', () => {
     view.unmount();
 
     signInAs('owner', {
-      impersonation: { impersonatorId: 'sa', expiresAt: '2026-10-09T01:00:00Z' },
+      impersonation: {
+        impersonatorId: 'sa',
+        expiresAt: '2026-10-09T01:00:00Z',
+        mode: 'view',
+        kind: 'superadmin',
+        returnTo: '/admin/accounts/a1',
+      },
     });
     renderWithProviders({ route: '/' });
     expect(await screen.findByText(/No money available in the wallet/)).toBeInTheDocument();

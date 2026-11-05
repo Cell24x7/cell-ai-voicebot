@@ -8,7 +8,7 @@ import { AppError, NotFoundError, UnauthenticatedError } from '../../shared/erro
 import { auditRequest, recordAudit } from '../audit/audit.service';
 
 import { REFRESH_COOKIE } from './auth.constants';
-import { findUserByEmail, sendVerificationCode } from './auth.service';
+import { findUserByEmail } from './auth.service';
 import { hmacToken } from './hmac';
 import { assertNotLocked, clearFailedLogins, registerFailedLogin } from './lockout';
 import { hashPassword, verifyAgainstDummy, verifyPassword } from './password';
@@ -29,6 +29,7 @@ import {
   startSession,
   type AuthSession,
   type AuthSessionBody,
+  returnToFor,
 } from './session';
 
 const invalidCredentials = () => new UnauthenticatedError('AUTH_INVALID_CREDENTIALS');
@@ -67,10 +68,6 @@ export const login = async (
   }
   if (user.status === 'disabled') throw new AppError('AUTH_USER_DISABLED');
   if (user.status !== 'active') throw invalidCredentials();
-  if (!user.emailVerifiedAt) {
-    await sendVerificationCode(user, { quiet: true });
-    throw new AppError('AUTH_EMAIL_NOT_VERIFIED');
-  }
 
   await clearFailedLogins(email);
   await UserModel.updateOne(
@@ -110,7 +107,7 @@ export const refresh = async (req: Request, res: Response): Promise<AuthSession>
       await revokeFamily(doc.familyId, 'disabled');
       throw new AppError('AUTH_USER_DISABLED');
     }
-    if (parts.user.status !== 'active' || !parts.user.emailVerifiedAt) {
+    if (parts.user.status !== 'active') {
       await revokeFamily(doc.familyId, 'session_revoked');
       throw new UnauthenticatedError('AUTH_SESSION_REVOKED');
     }
@@ -159,6 +156,9 @@ export const me = async (req: Request): Promise<AuthSessionBody> => {
       ? {
           impersonatorId: auth.impersonatorId,
           expiresAt: (auth.tokenExpiresAt ?? new Date()).toISOString(),
+          mode: auth.impersonationMode ?? 'view',
+          kind: auth.impersonatorKind ?? 'superadmin',
+          returnTo: returnToFor(auth.impersonatorKind ?? 'superadmin', auth.accountId),
         }
       : null,
   );

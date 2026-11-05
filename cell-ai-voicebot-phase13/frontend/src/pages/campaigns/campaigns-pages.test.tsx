@@ -140,7 +140,7 @@ describe('/campaigns list', () => {
     expect(screen.getByText(/would have cost — nothing was charged/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Load more' }));
     expect(await within(table).findByText('Third')).toBeInTheDocument();
-    expect(api.list).toHaveBeenLastCalledWith({ limit: 25, cursor: 'n1' });
+    expect(api.list).toHaveBeenLastCalledWith({ limit: 25, line: 'phone', cursor: 'n1' });
   });
 
   it('filters live in the URL; clear filters; empty states by role', async () => {
@@ -150,6 +150,7 @@ describe('/campaigns list', () => {
     await screen.findByText('Nothing matches these filters');
     expect(api.list).toHaveBeenCalledWith({
       limit: 25,
+      line: 'phone',
       status: ['running', 'paused'],
       mode: 'dry_run',
       flowId: 'f1',
@@ -416,4 +417,20 @@ describe('/campaigns/:id/edit', () => {
       await screen.findByRole('heading', { name: /403|forbidden|access/i }),
     ).toBeInTheDocument();
   });
+});
+
+it('separates WhatsApp call campaigns and exposes all three campaign types', async () => {
+  signInAs('manager');
+  renderWithProviders({ route: '/campaigns?line=whatsapp-call' });
+  expect(
+    await screen.findByRole('heading', { name: 'WhatsApp call campaigns' }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'SIP / Normal call' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'WhatsApp message' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'WhatsApp call' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'New campaign' })).toHaveAttribute(
+    'href',
+    '/campaigns/new?line=whatsapp',
+  );
+  expect(api.list).toHaveBeenCalledWith({ limit: 25, line: 'whatsapp' });
 });

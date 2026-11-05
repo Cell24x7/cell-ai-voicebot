@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider, useLocation } from 'react-router';
 import { describe, expect, it } from 'vitest';
 
-import { signInAs } from '@/test/auth';
+import { fakeSession, signInAs } from '@/test/auth';
 
 import { RedirectIfAuthed, RequireAuth, RequirePermission, RequirePlatformAdmin } from './guards';
 import { useAuthStatus, useCan, useIsPlatformAdmin, usePermission, useSession } from './hooks';
@@ -137,4 +137,17 @@ describe('permission hooks', () => {
     });
     expect(screen.getByTestId('probe')).toHaveTextContent('false|false|false|anonymous|-');
   });
+});
+
+it('sends an authenticated reseller to its panel and preserves a safe next path', () => {
+  const base = fakeSession('owner');
+  signInAs('owner', {
+    account: {
+      ...base.account,
+      kind: 'reseller',
+      reseller: { status: 'active', customersCanTopUp: false },
+    },
+  });
+  mount('/login?next=//external.example');
+  expect(screen.getByTestId('where')).toHaveTextContent('/reseller');
 });

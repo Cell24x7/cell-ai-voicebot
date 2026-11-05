@@ -16,7 +16,10 @@ import { LEGAL_LINKS } from './links';
 import { fillPlaceholders, parseInline, parseLegal, safeHref } from './markdown';
 
 vi.mock('@/services/api/auth', () => ({
-  authApi: { refresh: vi.fn(() => Promise.reject(new Error('no session'))) },
+  authApi: {
+    refresh: vi.fn(() => Promise.reject(new Error('no session'))),
+    signupOptions: vi.fn(() => Promise.resolve({ open: true, resellerSignup: 'open' })),
+  },
 }));
 vi.mock('@/services/api/system', () => ({
   getSystemInfo: vi.fn(() => new Promise(() => undefined)),
@@ -243,7 +246,9 @@ describe('legal links elsewhere', () => {
     expect(await screen.findByRole('navigation', { name: 'Legal' })).toBeVisible();
     login.unmount();
     renderWithProviders({ route: '/signup' });
-    const consent = await screen.findByText(/By creating an account you agree to the/);
+    // Phase 19: the form (with the terms tick) follows the account type
+    await userEvent.click(await screen.findByRole('button', { name: 'Business' }));
+    const consent = await screen.findByText(/I agree to the/);
     expect(within(consent).getByRole('link', { name: 'Terms of Service' })).toHaveAttribute(
       'href',
       '/terms',

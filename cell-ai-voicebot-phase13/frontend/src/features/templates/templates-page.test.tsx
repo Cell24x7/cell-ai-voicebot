@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,6 +16,7 @@ import { fakeChannel, fakeWhatsAppConfig } from '@/test/whatsapp';
 
 import { callPermissionState } from './builder/model';
 import { TemplateBuilder, type TemplateBuilderProps } from './builder/TemplateBuilder';
+import { templateKeys } from './keys';
 
 vi.mock('@/services/api/templates', () => ({
   templatesApi: {
@@ -103,6 +105,10 @@ const openTab = async (
 describe('Templates tab', () => {
   it('lists name, language, category, status (+ reason), quality, number and usage', async () => {
     const { table } = await openTab();
+    expect(screen.getByRole('combobox', { name: 'WhatsApp number' })).toHaveTextContent(
+      'Support line',
+    );
+    expect(api.list).toHaveBeenCalledWith({ channelId: 'wa1' });
     const rows = within(table).getAllByRole('row');
     expect(rows).toHaveLength(3);
     const emi = within(rows[1] as HTMLElement);
@@ -122,15 +128,22 @@ describe('Templates tab', () => {
     await openTab();
     await userEvent.click(screen.getByRole('combobox', { name: 'Status' }));
     await userEvent.click(screen.getByRole('option', { name: 'Approved' }));
-    await waitFor(() => expect(api.list).toHaveBeenLastCalledWith({ status: ['APPROVED'] }));
+    await waitFor(() =>
+      expect(api.list).toHaveBeenLastCalledWith({ channelId: 'wa1', status: ['APPROVED'] }),
+    );
     await userEvent.click(screen.getByRole('combobox', { name: 'Category' }));
     await userEvent.click(screen.getByRole('option', { name: 'Marketing' }));
     await waitFor(() =>
-      expect(api.list).toHaveBeenLastCalledWith({ status: ['APPROVED'], category: 'MARKETING' }),
+      expect(api.list).toHaveBeenLastCalledWith({
+        channelId: 'wa1',
+        status: ['APPROVED'],
+        category: 'MARKETING',
+      }),
     );
     await userEvent.type(screen.getByRole('textbox', { name: 'Search' }), 'emi');
     await waitFor(() =>
       expect(api.list).toHaveBeenLastCalledWith({
+        channelId: 'wa1',
         status: ['APPROVED'],
         category: 'MARKETING',
         q: 'emi',
@@ -154,10 +167,12 @@ describe('Templates tab', () => {
       limit: 10,
     });
     await openTab();
-    await userEvent.click(screen.getByRole('combobox', { name: 'Number' }));
+    expect(screen.getByRole('button', { name: 'Create template' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Sync now' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('combobox', { name: 'WhatsApp number' }));
     expect(screen.getAllByRole('option')).toHaveLength(3);
     api.list.mockResolvedValue([]);
-    await userEvent.click(screen.getByRole('option', { name: 'Sales line' }));
+    await userEvent.click(screen.getByRole('option', { name: /Sales line/ }));
     await waitFor(() => expect(api.list).toHaveBeenLastCalledWith({ channelId: 'wa2' }));
     expect(await screen.findByText('No templates yet')).toBeInTheDocument();
   });
@@ -542,7 +557,7 @@ describe('Template builder', () => {
     api.uploadMedia.mockResolvedValue(fakeTemplate('DRAFT'));
     api.submit.mockResolvedValue(fakeTemplate('PENDING'));
     await userEvent.click(d.getByRole('button', { name: 'Submit for review' }));
-    await waitFor(() => expect(api.submit).toHaveBeenCalledWith('tpl1'));
+    await waitFor(() => expect(api.submit).toHaveBeenCalledWith('tpl1', 'wa1'));
     expect(api.create).toHaveBeenCalledTimes(1);
     expect(api.edit).toHaveBeenCalledTimes(1);
     expect(api.uploadMedia).toHaveBeenLastCalledWith(
@@ -616,7 +631,7 @@ describe('Template builder', () => {
     api.edit.mockResolvedValue(draft);
     api.submit.mockResolvedValue({ ...draft, status: 'PENDING' });
     await userEvent.click(d.getByRole('button', { name: 'Submit for review' }));
-    await waitFor(() => expect(api.submit).toHaveBeenCalledWith('tpl1'));
+    await waitFor(() => expect(api.submit).toHaveBeenCalledWith('tpl1', 'wa1'));
     expect(api.uploadMedia).not.toHaveBeenCalled();
   });
 
@@ -785,4 +800,18 @@ describe('chips', () => {
     expect(within(table).getByText('Marketing (was Utility)')).toBeInTheDocument();
     expect(within(table).getByText('Quality not rated yet')).toBeInTheDocument();
   });
+});
+
+it('hides cached templates for a sender that is no longer connected, including its language choices', async () => {
+  signInAs('owner');
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(templateKeys.list({ channelId: 'old-sender' }), [
+    fakeTemplateListItem('APPROVED', 'UTILITY', { language: 'hi' }),
+  ]);
+  renderWithProviders({ route: '/whatsapp/templates?channelId=old-sender', queryClient });
+  await screen.findByRole('combobox', { name: 'WhatsApp number' });
+  expect(screen.queryByText('emi_reminder')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Create template' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Sync now' })).toBeDisabled();
+  expect(api.list).not.toHaveBeenCalled();
 });

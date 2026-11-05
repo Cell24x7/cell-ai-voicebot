@@ -12,6 +12,7 @@ import type { ReactNode } from 'react';
 
 import { useListOptions, useSegments } from '@/features/contacts/queries';
 import { useFlows } from '@/features/flows/queries';
+import { useChannels } from '@/features/whatsapp/queries';
 import type { DryRunOutcome, ScenarioKey } from '@/services/api/campaigns';
 import { getErrorMessage } from '@/services/api/errors';
 import type { CampaignEstimate } from '@/services/api/types';
@@ -75,6 +76,8 @@ export function ReviewStep({ draft, onEdit, estimate }: ReviewStepProps) {
   const flows = useFlows({ status: 'published', limit: 100 });
   const lists = useListOptions();
   const segments = useSegments();
+  const numbers = useChannels(draft.line === 'whatsapp');
+  const number = numbers.data?.items.find((n) => n.id === draft.channelId);
   const flow = flows.data?.data.find((f) => f.id === draft.flowId);
   const e = estimate?.data;
   const wallet = e?.walletAvailableMicros;
@@ -96,11 +99,21 @@ export function ReviewStep({ draft, onEdit, estimate }: ReviewStepProps) {
   return (
     <Stack spacing={2}>
       <Section title="Basics" step={0} onEdit={onEdit}>
-        {draft.name} · {draft.mode === 'dry_run' ? 'Dry run' : 'Live'} · {flow?.name ?? 'Flow'}{' '}
-        {draft.chosenVersion
-          ? `v${String(draft.chosenVersion)}`
-          : `latest (v${String(flow?.publishedVersion ?? '?')})`}
+        {draft.name} · {draft.mode === 'dry_run' ? 'Dry run' : 'Live'} ·{' '}
+        {draft.program?.kind === 'agent' ? 'AI agent' : (flow?.name ?? 'Flow')}{' '}
+        {draft.program?.kind === 'agent'
+          ? ''
+          : draft.chosenVersion
+            ? `v${String(draft.chosenVersion)}`
+            : `latest (v${String(flow?.publishedVersion ?? '?')})`}
       </Section>
+      {draft.line === 'whatsapp' && (
+        <Alert severity="info">
+          WhatsApp call ·{' '}
+          {number?.displayPhoneNumber ?? number?.label ?? 'Selected WhatsApp number'} · Calls
+          require permission from this number.
+        </Alert>
+      )}
       <Section title="Audience" step={1} onEdit={onEdit}>
         {audience}
         {draft.excludeActiveCampaigns ? ' · skips contacts in other active campaigns' : ''}

@@ -22,6 +22,7 @@ export interface StartWebCallInput {
 
 /** `POST /calls` — one contact now (dry-run line until phone lines exist). */
 export interface StartCallInput {
+  callerNumberId?: string;
   contactId: string;
   flowId?: string;
   version?: 'published' | number;

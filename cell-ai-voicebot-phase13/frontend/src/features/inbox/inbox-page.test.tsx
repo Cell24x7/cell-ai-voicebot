@@ -667,11 +667,17 @@ describe('chat', () => {
 
   it('impersonation: no read marker', async () => {
     signInAs('superadmin');
-    useAuthStore
-      .getState()
-      .startImpersonation(
-        fakeSession('owner', { impersonation: { impersonatorId: 'sa', expiresAt: iso(HOUR) } }),
-      );
+    useAuthStore.getState().startImpersonation(
+      fakeSession('owner', {
+        impersonation: {
+          impersonatorId: 'sa',
+          expiresAt: iso(HOUR),
+          mode: 'view',
+          kind: 'superadmin',
+          returnTo: '/admin/accounts/a1',
+        },
+      }),
+    );
     open();
     await screen.findByRole('region', { name: 'Chat with Asha Verma' });
     await screen.findByText(/EMI ki date/);

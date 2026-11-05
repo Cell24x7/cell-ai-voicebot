@@ -103,6 +103,8 @@ export interface WsEventMap {
     status: string;
     expiresAt: string | null;
   };
+  /** Phase 19: a WhatsApp campaign moved on (account level, throttled 1 / s per campaign). */
+  'whatsapp_campaign.progress': { campaignId: string; status: string; counters: unknown };
   /** Phase 10, account level — ids + counts only, never message text. */
   'inbox.conversation.updated': {
     conversationId: string;
@@ -176,6 +178,7 @@ export const WS_EVENT_TYPES: readonly WsEventType[] = [
   'whatsapp.call.taken',
   'whatsapp.call.ended_ringing',
   'whatsapp.call_permission.updated',
+  'whatsapp_campaign.progress',
   'inbox.conversation.updated',
   'inbox.summary.updated',
   'inbox.message.created',

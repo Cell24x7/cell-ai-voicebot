@@ -89,6 +89,7 @@ export function CampaignWizardPage() {
 /** `?flowId=` (flow page), `?listId=` / `?segmentId=` (contacts) prefill a new draft. */
 const prefill = (draft: WizardDraft, params: URLSearchParams): WizardDraft => {
   const next = { ...draft };
+  if (params.get('line') === 'whatsapp') next.line = 'whatsapp';
   const flowId = params.get('flowId');
   const listId = params.get('listId');
   const segmentId = params.get('segmentId');

@@ -11,7 +11,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Create an account + owner; sends a 6-digit email code (always 202) */
+    /** Sign up as a business or a reseller and sign in at once (Phase 19: no e-mail; 5 / hour per IP) */
     post: {
       parameters: {
         query?: never;
@@ -22,6 +22,11 @@ export interface paths {
       requestBody?: {
         content: {
           'application/json': {
+            /**
+             * @default business
+             * @enum {string}
+             */
+            accountType?: 'business' | 'reseller';
             /** @example Demo Finance */
             businessName: string;
             /** @example Asha Verma */
@@ -36,17 +41,42 @@ export interface paths {
             phone?: string;
             /** @example Asia/Kolkata */
             timezone?: string;
+            /** @enum {boolean} */
+            acceptTerms: true;
+            website?: string;
           };
         };
       };
       responses: {
-        /** @description Accepted */
-        202: {
+        /** @description Signed in. Sets the httpOnly `cav_rt` refresh cookie (Path=/api/v1/auth, SameSite=Strict). */
+        201: {
           headers: {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['Accepted'];
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['AuthSession'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
           };
         };
         /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
@@ -75,6 +105,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/auth/signup-options': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Whether signup and reseller signup are open (public) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['SignupOptions'];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/auth/verify-email': {
     parameters: {
       query?: never;
@@ -84,7 +154,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Confirm the email code and sign in */
+    /** Gone (Phase 19): signup no longer sends an e-mail code — always 410 AUTH_ROUTE_GONE */
     post: {
       parameters: {
         query?: never;
@@ -92,44 +162,10 @@ export interface paths {
         path?: never;
         cookie?: never;
       };
-      requestBody?: {
-        content: {
-          'application/json': {
-            /**
-             * Format: email
-             * @example asha@example.com
-             */
-            email: string;
-            /** @example 042917 */
-            code: string;
-          };
-        };
-      };
+      requestBody?: never;
       responses: {
-        /** @description Signed in. Sets the httpOnly `cav_rt` refresh cookie (Path=/api/v1/auth, SameSite=Strict). */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @enum {boolean} */
-              success: true;
-              data: components['schemas']['AuthSession'];
-            };
-          };
-        };
-        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
-        422: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
-        429: {
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        410: {
           headers: {
             [name: string]: unknown;
           };
@@ -587,7 +623,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Send a new email code (always 202; 60 s cooldown, 5 per hour) */
+    /** Gone (Phase 19) — always 410 AUTH_ROUTE_GONE */
     post: {
       parameters: {
         query?: never;
@@ -595,38 +631,10 @@ export interface paths {
         path?: never;
         cookie?: never;
       };
-      requestBody?: {
-        content: {
-          'application/json': {
-            /**
-             * Format: email
-             * @example asha@example.com
-             */
-            email: string;
-          };
-        };
-      };
+      requestBody?: never;
       responses: {
-        /** @description Accepted */
-        202: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['Accepted'];
-          };
-        };
-        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
-        422: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
-        429: {
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        410: {
           headers: {
             [name: string]: unknown;
           };
@@ -1663,7 +1671,8 @@ export interface paths {
             | 'simulator'
             | 'usage'
             | 'seed'
-            | 'whatsapp_message';
+            | 'whatsapp_message'
+            | 'credit_transfer';
           from?: string;
           to?: string;
         };
@@ -1881,6 +1890,51 @@ export interface paths {
           };
           content: {
             'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/wallet/provider': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Phase 19: the reseller that adds this account's credit, and whether it may top up itself */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                provider: {
+                  name: string;
+                } | null;
+                topupAllowed: boolean;
+              };
+            };
           };
         };
       };
@@ -2455,7 +2509,8 @@ export interface paths {
             | 'simulator'
             | 'usage'
             | 'seed'
-            | 'whatsapp_message';
+            | 'whatsapp_message'
+            | 'credit_transfer';
           from?: string;
           to?: string;
         };
@@ -3257,6 +3312,8 @@ export interface paths {
           limit?: number;
           status?: 'active' | 'suspended';
           search?: string;
+          kind?: 'business' | 'reseller';
+          parentAccountId?: string;
         };
         header?: never;
         path?: never;
@@ -3323,6 +3380,9 @@ export interface paths {
             ownerPhone?: string;
             /** @example Asia/Kolkata */
             timezone?: string;
+            /** @enum {string} */
+            kind?: 'business' | 'reseller';
+            parentAccountId?: string;
           };
         };
       };
@@ -4589,6 +4649,343 @@ export interface paths {
       };
     };
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/accounts/{id}/reseller': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Move a business under a reseller, or back to direct (superadmin) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            parentAccountId: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['PublicAccount'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/admin/accounts/{id}/approve-reseller': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Approve a reseller waiting for approval (superadmin) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['PublicAccount'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/accounts/{id}/suspend-customers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Suspend every active customer of a reseller (superadmin) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            reason: string;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                suspended: number;
+              };
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/settings/signup': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Signup settings (superadmin) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                open: boolean;
+                /** @enum {string} */
+                resellerSignup: 'open' | 'approval' | 'closed';
+              };
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    /** Open / close signup and reseller signup (superadmin) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            open: boolean;
+            /** @enum {string} */
+            resellerSignup: 'open' | 'approval' | 'closed';
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                open: boolean;
+                /** @enum {string} */
+                resellerSignup: 'open' | 'approval' | 'closed';
+              };
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
     post?: never;
     delete?: never;
     options?: never;
@@ -7400,6 +7797,7 @@ export interface paths {
       requestBody?: {
         content: {
           'application/json': {
+            callerNumberId?: string;
             contactId: string;
             flowId?: string;
             /** @description Flows: `published` (default) or a version number */
@@ -8109,6 +8507,7 @@ export interface paths {
     get: {
       parameters: {
         query?: {
+          line?: 'phone' | 'whatsapp';
           cursor?: string;
           limit?: number;
           status?:
@@ -8198,7 +8597,18 @@ export interface paths {
              * @enum {string}
              */
             mode?: 'dry_run' | 'live';
-            flowId: string;
+            flowId?: string;
+            /** @enum {string} */
+            line?: 'phone' | 'whatsapp';
+            channelId?: string | null;
+            program?: {
+              /** @enum {string} */
+              kind: 'flow' | 'agent';
+              id: string;
+            } | null;
+            askPermissionFirst?: {
+              templateId: string;
+            } | null;
             audience?: {
               listIds?: string[];
               segmentId?: string | null;
@@ -8461,7 +8871,16 @@ export interface paths {
       requestBody?: {
         content: {
           'application/json': {
-            flowId: string;
+            channelId?: string | null;
+            askPermissionFirst?: boolean;
+            /** @enum {string} */
+            line?: 'phone' | 'whatsapp';
+            program?: {
+              /** @enum {string} */
+              kind: 'flow' | 'agent';
+              id: string;
+            } | null;
+            flowId?: string;
             chosenVersion?: number | null;
             audience: {
               listIds?: string[];
@@ -8690,6 +9109,17 @@ export interface paths {
             /** @enum {string} */
             mode?: 'dry_run' | 'live';
             flowId?: string;
+            /** @enum {string} */
+            line?: 'phone' | 'whatsapp';
+            channelId?: string | null;
+            program?: {
+              /** @enum {string} */
+              kind: 'flow' | 'agent';
+              id: string;
+            } | null;
+            askPermissionFirst?: {
+              templateId: string;
+            } | null;
             audience?: {
               listIds?: string[];
               segmentId?: string | null;
@@ -9592,7 +10022,9 @@ export interface paths {
             | 'cap_reached'
             | 'campaign_ended'
             | 'rejected'
-            | 'number_not_allowed';
+            | 'number_not_allowed'
+            | 'no_call_permission'
+            | 'unanswered_limit';
           q?: string;
         };
         header?: never;
@@ -24269,6 +24701,1837 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/reseller/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Dashboard numbers (reseller.read; cached 5 min) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['ResellerSummary'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/reseller/customers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Customers with wallet, spend (30 d) and last sign-in (reseller.read) */
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          limit?: number;
+          q?: string;
+          status?: 'active' | 'suspended';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['ResellerCustomer'][];
+              meta: components['schemas']['OffsetPageMeta'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Add a customer with its owner and password; optional starting credit (reseller.manage; 50 / day; Idempotency-Key) */
+    post: {
+      parameters: {
+        query?: never;
+        header: {
+          'idempotency-key': string;
+        };
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            businessName: string;
+            ownerName: string;
+            /**
+             * Format: email
+             * @example asha@example.com
+             */
+            ownerEmail: string;
+            ownerPhone?: string;
+            ownerPassword: string;
+            /** @example Asia/Kolkata */
+            timezone?: string;
+            startingCreditMicros?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['ResellerCustomer'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/reseller/customers/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One customer + last 20 transfers (reseller.read) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['ResellerCustomerDetail'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Rename, suspend or enable a customer (reseller.manage) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            name?: string;
+            /** @enum {string} */
+            status?: 'active' | 'suspended';
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['ResellerCustomerDetail'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/reseller/customers/{id}/owner-password': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Set the customer owner's password; their sessions end (reseller.manage) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            password: string;
+          };
+        };
+      };
+      responses: {
+        /** @description No content */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/reseller/customers/{id}/login-as': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Log in as the customer owner to act (1 h; sensitive actions refused; reseller.manage) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['AuthSession'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/reseller/customers/{id}/credit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Give credit from the reseller's wallet (reseller.manage; Idempotency-Key; 60 / h) */
+    post: {
+      parameters: {
+        query?: never;
+        header: {
+          'idempotency-key': string;
+        };
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            amountMicros: number;
+            note?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['ResellerCreditResult'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/reseller/customers/{id}/credit/reclaim': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Take back unused credit (reseller.manage; Idempotency-Key; 60 / h) */
+    post: {
+      parameters: {
+        query?: never;
+        header: {
+          'idempotency-key': string;
+        };
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            amountMicros: number;
+            note?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['ResellerCreditResult'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/reseller/statement': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Credit given / taken back (reseller.read; `format=csv` downloads) */
+    get: {
+      parameters: {
+        query?: {
+          from?: string;
+          to?: string;
+          format?: 'json' | 'csv';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['ResellerStatementRow'][];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/reseller/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Reseller settings (reseller.read) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                customersCanTopUp: boolean;
+              };
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** May customers top up by themselves (reseller.manage) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            customersCanTopUp: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                customersCanTopUp: boolean;
+              };
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/whatsapp-campaigns': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** WhatsApp campaigns (whatsapp.campaigns.read) */
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          limit?: number;
+          status?:
+            | 'draft'
+            | 'scheduled'
+            | 'running'
+            | 'waiting_for_limit'
+            | 'paused'
+            | 'completed'
+            | 'stopped'
+            | 'failed';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCampaign'][];
+              meta: components['schemas']['OffsetPageMeta'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Create a draft campaign (whatsapp.campaigns.write; 30 / h) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            name: string;
+            headerMediaToken?: string | null;
+            headerLocation?: {
+              latitude: number;
+              longitude: number;
+              name?: string;
+              address?: string;
+            } | null;
+            channelId: string;
+            variants: {
+              /** @enum {string} */
+              key: 'A' | 'B' | 'C';
+              templateId: string;
+              splitPct: number;
+            }[];
+            abWinner?: {
+              /** @enum {string} */
+              metric: 'read' | 'reply';
+              afterHours: number;
+            } | null;
+            variables?: {
+              [key: string]: {
+                /** @enum {string} */
+                kind: 'field' | 'contact.name' | 'contact.phone' | 'static';
+                value?: string | null;
+              };
+            };
+            audience: {
+              listIds?: string[];
+              segmentId?: string | null;
+              tags?: {
+                values: string[];
+                /** @enum {string} */
+                mode: 'any' | 'all';
+              } | null;
+              contactIds?: string[];
+              csvUploadId?: string | null;
+            };
+            excludeRecentDays?: number;
+            schedule?: {
+              /** @enum {string} */
+              kind: 'now' | 'at' | 'recurring';
+              /** Format: date-time */
+              at?: string | null;
+              /** @example Asia/Kolkata */
+              timezone?: string;
+              recurrence?: {
+                /** @enum {string} */
+                freq: 'daily' | 'weekly';
+                /** @default [] */
+                days?: number[];
+                time: string;
+                /**
+                 * Format: date-time
+                 * @default null
+                 */
+                until?: string | null;
+              } | null;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCampaign'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp-campaigns/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One campaign with live counters */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCampaign'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete a draft */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description No content */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Edit a draft or scheduled campaign (409 WA_CAMPAIGN_NOT_EDITABLE after start) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            name: string;
+            headerMediaToken?: string | null;
+            headerLocation?: {
+              latitude: number;
+              longitude: number;
+              name?: string;
+              address?: string;
+            } | null;
+            channelId: string;
+            variants: {
+              /** @enum {string} */
+              key: 'A' | 'B' | 'C';
+              templateId: string;
+              splitPct: number;
+            }[];
+            abWinner?: {
+              /** @enum {string} */
+              metric: 'read' | 'reply';
+              afterHours: number;
+            } | null;
+            variables?: {
+              [key: string]: {
+                /** @enum {string} */
+                kind: 'field' | 'contact.name' | 'contact.phone' | 'static';
+                value?: string | null;
+              };
+            };
+            audience: {
+              listIds?: string[];
+              segmentId?: string | null;
+              tags?: {
+                values: string[];
+                /** @enum {string} */
+                mode: 'any' | 'all';
+              } | null;
+              contactIds?: string[];
+              csvUploadId?: string | null;
+            };
+            excludeRecentDays?: number;
+            schedule?: {
+              /** @enum {string} */
+              kind: 'now' | 'at' | 'recurring';
+              /** Format: date-time */
+              at?: string | null;
+              /** @example Asia/Kolkata */
+              timezone?: string;
+              recurrence?: {
+                /** @enum {string} */
+                freq: 'daily' | 'weekly';
+                /** @default [] */
+                days?: number[];
+                time: string;
+                /**
+                 * Format: date-time
+                 * @default null
+                 */
+                until?: string | null;
+              } | null;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCampaign'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/whatsapp-campaigns/{id}/estimate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cost by market × template price, and the wallet check */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCampaignEstimate'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp-campaigns/{id}/start': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Snapshot the audience, check the wallet, send now or at the scheduled time (Idempotency-Key) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCampaign'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp-campaigns/{id}/pause': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Pause (sends stop between batches) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCampaign'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp-campaigns/{id}/resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resume a paused campaign */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCampaign'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp-campaigns/{id}/stop': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stop for good: the rest are skipped `stopped` */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCampaign'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp-campaigns/{id}/retry-failed': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Send again to failed recipients with a retryable error */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                retried: number;
+              };
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp-campaigns/{id}/recipients': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Recipients with status (phones masked) */
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          limit?: number;
+          status?: 'pending' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'skipped';
+        };
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCampaignRecipient'][];
+              meta: components['schemas']['OffsetPageMeta'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp-campaigns/{id}/export': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** CSV of every recipient (phones only with contacts.export) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description CSV */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'text/csv': string;
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp-campaigns/{id}/report': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Funnel, cost, errors, per day, variants */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCampaignReport'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/whatsapp/templates': {
     parameters: {
       query?: never;
@@ -24953,7 +27216,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Submit a draft to Meta for review (templates.manage) */
+    /** Submit a draft to Meta for review using an owned same-WABA sender (templates.manage) */
     post: {
       parameters: {
         query?: never;
@@ -24963,7 +27226,13 @@ export interface paths {
         };
         cookie?: never;
       };
-      requestBody?: never;
+      requestBody?: {
+        content: {
+          'application/json': {
+            channelId?: string;
+          };
+        };
+      };
       responses: {
         /** @description OK */
         200: {
@@ -25192,6 +27461,7 @@ export interface paths {
           'multipart/form-data': {
             /** Format: binary */
             file: string;
+            channelId?: string;
           };
         };
       };
@@ -26755,6 +29025,111 @@ export interface paths {
           content: {
             'application/json': components['schemas']['ErrorEnvelope'];
           };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp/channels/{id}/calling/quote': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Selling price for this owned sender/contact, no provider costs (calls.trigger) */
+    get: {
+      parameters: {
+        query: {
+          contactId: string;
+        };
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCallPrice'];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp calling or media capacity unavailable */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
         };
       };
     };
@@ -30508,6 +32883,11 @@ export interface components {
       nextCursor: string | null;
       hasMore: boolean;
     };
+    SignupOptions: {
+      open: boolean;
+      /** @enum {string} */
+      resellerSignup: 'open' | 'approval' | 'closed';
+    };
     Session: {
       /** @description Session (refresh family) id */
       id: string;
@@ -30550,6 +32930,14 @@ export interface components {
       } | null;
       ownerId: string | null;
       isPlatform: boolean;
+      /** @enum {string} */
+      kind: 'platform' | 'reseller' | 'business';
+      parentAccountId: string | null;
+      reseller: {
+        /** @enum {string} */
+        status: 'active' | 'pending_approval';
+        customersCanTopUp: boolean;
+      } | null;
       timezone: string;
       country: string;
       /** @enum {string} */
@@ -30594,6 +32982,11 @@ export interface components {
       impersonation: {
         impersonatorId: string;
         expiresAt: string;
+        /** @enum {string} */
+        mode: 'view' | 'act';
+        /** @enum {string} */
+        kind: 'superadmin' | 'reseller';
+        returnTo: string;
       } | null;
     };
     AuthSession: {
@@ -30610,6 +33003,11 @@ export interface components {
       impersonation: {
         impersonatorId: string;
         expiresAt: string;
+        /** @enum {string} */
+        mode: 'view' | 'act';
+        /** @enum {string} */
+        kind: 'superadmin' | 'reseller';
+        returnTo: string;
       } | null;
     };
     AccountWithWarning: components['schemas']['PublicAccount'] & {
@@ -30768,7 +33166,9 @@ export interface components {
         | 'subscription'
         | 'recording_charge'
         | 'whatsapp_charge'
-        | 'whatsapp_call_charge';
+        | 'whatsapp_call_charge'
+        | 'credit_transfer_out'
+        | 'credit_transfer_in';
       /** @enum {string} */
       direction: 'credit' | 'debit';
       /** @enum {string} */
@@ -30825,7 +33225,8 @@ export interface components {
           | 'simulator'
           | 'usage'
           | 'seed'
-          | 'whatsapp_message';
+          | 'whatsapp_message'
+          | 'credit_transfer';
         id: string;
       };
       holdId: string | null;
@@ -30954,7 +33355,9 @@ export interface components {
             | 'subscription'
             | 'recording_charge'
             | 'whatsapp_charge'
-            | 'whatsapp_call_charge';
+            | 'whatsapp_call_charge'
+            | 'credit_transfer_out'
+            | 'credit_transfer_in';
           amountMicros: number;
         }[];
         totalMicros: number;
@@ -31193,7 +33596,27 @@ export interface components {
         | 'phone_number.updated'
         | 'phone_number.assigned'
         | 'phone_number.released'
-        | 'whatsapp.call_permission_bulk_requested';
+        | 'whatsapp.call_permission_bulk_requested'
+        | 'account.signed_up'
+        | 'account.reseller_changed'
+        | 'platform.signup_settings_updated'
+        | 'reseller.approved'
+        | 'reseller.customer_created'
+        | 'reseller.customer_suspended'
+        | 'reseller.customer_enabled'
+        | 'reseller.customer_password_reset'
+        | 'reseller.credit_transferred'
+        | 'reseller.credit_reclaimed'
+        | 'reseller.login_as_started'
+        | 'reseller.login_as_stopped'
+        | 'reseller.settings_updated'
+        | 'whatsapp_campaign.created'
+        | 'whatsapp_campaign.started'
+        | 'whatsapp_campaign.paused'
+        | 'whatsapp_campaign.resumed'
+        | 'whatsapp_campaign.stopped'
+        | 'whatsapp_campaign.completed'
+        | 'whatsapp_campaign.retried';
       actor: {
         /** @enum {string} */
         type: 'user' | 'api_key' | 'system';
@@ -31258,6 +33681,16 @@ export interface components {
       status: 'active' | 'suspended';
       ownerEmail: string | null;
       usersCount: number;
+      /** @enum {string} */
+      kind: 'platform' | 'reseller' | 'business';
+      parent: {
+        id: string;
+        name: string;
+      } | null;
+      /** @description Resellers only */
+      customersCount: number | null;
+      /** @enum {string|null} */
+      resellerStatus: 'active' | 'pending_approval' | null;
       createdAt: string;
     };
     AdminAccountDetail: {
@@ -32207,6 +34640,18 @@ export interface components {
         | 'flow_not_runnable'
         | null;
       waitingUntil: string | null;
+      /** @enum {string} */
+      line?: 'phone' | 'whatsapp';
+      channelId?: string | null;
+      program?: {
+        /** @enum {string} */
+        kind: 'flow' | 'agent';
+        id: string;
+        name?: string;
+      } | null;
+      askPermissionFirst?: {
+        templateId: string;
+      } | null;
       flow: {
         id: string;
         name: string;
@@ -32404,6 +34849,8 @@ export interface components {
         | 'campaign_ended'
         | 'rejected'
         | 'number_not_allowed'
+        | 'no_call_permission'
+        | 'unanswered_limit'
         | null;
       /**
        * @description Why it waits for nextAttemptAt: window, daily_cap, weekly_cap or min_gap
@@ -32446,6 +34893,7 @@ export interface components {
         expectedAttempts: number;
       };
       walletAvailableMicros: number;
+      transportNote?: string;
     };
     CampaignSummary: {
       running: number;
@@ -34258,7 +36706,13 @@ export interface components {
         | 'account.delete_scheduled'
         | 'sip.spend_guard_paused'
         | 'sip.trunk_down'
-        | 'whatsapp.call_permission_bulk_done';
+        | 'whatsapp.call_permission_bulk_done'
+        | 'account.reseller_signed_up'
+        | 'reseller.approved'
+        | 'wallet.credit_received'
+        | 'wallet.customer_low_balance'
+        | 'whatsapp_campaign.completed'
+        | 'whatsapp_campaign.paused';
       title: string;
       body: string;
       link: string | null;
@@ -34534,6 +36988,245 @@ export interface components {
       inviterName: string;
       roleName: string;
     };
+    ResellerCustomer: {
+      id: string;
+      name: string;
+      /** @enum {string} */
+      status: 'active' | 'suspended' | 'deleted';
+      owner: {
+        name: string;
+        email: string;
+      } | null;
+      wallet: {
+        balanceMicros: number;
+        availableMicros: number;
+      };
+      spend30dMicros: number;
+      lastActiveAt: string | null;
+      createdAt: string;
+    };
+    ResellerCustomerDetail: components['schemas']['ResellerCustomer'] & {
+      timezone: string;
+      transfers: {
+        id: string;
+        /** @enum {string} */
+        direction: 'given' | 'taken_back';
+        amountMicros: number;
+        note: string | null;
+        at: string;
+      }[];
+    };
+    ResellerCreditResult: {
+      transferId: string;
+      amountMicros: number;
+      resellerBalanceMicros: number;
+      customerBalanceMicros: number;
+      replay: boolean;
+    };
+    ResellerStatementRow: {
+      id: string;
+      at: string;
+      /** @enum {string} */
+      direction: 'given' | 'taken_back';
+      amountMicros: number;
+      balanceAfterMicros: number | null;
+      customer: {
+        id: string;
+        name: string;
+      } | null;
+      note: string | null;
+    };
+    ResellerSummary: {
+      customers: {
+        active: number;
+        suspended: number;
+        total: number;
+      };
+      creditGivenThisMonthMicros: number;
+      customersSpend30d: {
+        calls: number;
+        whatsapp: number;
+        ai: number;
+        totalMicros: number;
+      };
+      lowBalanceCustomers: {
+        id: string;
+        name: string;
+        availableMicros: number;
+      }[];
+    };
+    WhatsAppCampaign: {
+      id: string;
+      name: string;
+      channelId: string;
+      /** @enum {string} */
+      status:
+        | 'draft'
+        | 'scheduled'
+        | 'running'
+        | 'waiting_for_limit'
+        | 'paused'
+        | 'completed'
+        | 'stopped'
+        | 'failed';
+      /** @enum {string|null} */
+      pauseReason:
+        'user' | 'wallet_empty' | 'template_paused' | 'quality_red' | 'channel_down' | null;
+      variants: {
+        /** @enum {string} */
+        key: 'A' | 'B' | 'C';
+        templateId: string;
+        splitPct: number;
+      }[];
+      abWinner: {
+        /** @enum {string} */
+        metric: 'read' | 'reply';
+        afterHours: number;
+        decidedAt: string | null;
+        /** @enum {string|null} */
+        winner: 'A' | 'B' | 'C' | null;
+      } | null;
+      variables: {
+        [key: string]: {
+          /** @enum {string} */
+          kind: 'field' | 'contact.name' | 'contact.phone' | 'static';
+          value: string | null;
+        };
+      };
+      audience: {
+        listIds: string[];
+        segmentId: string | null;
+        tags: {
+          values: string[];
+          /** @enum {string} */
+          mode: 'any' | 'all';
+        } | null;
+        contactIds: string[];
+        csvUploadId: string | null;
+      };
+      excludeRecentDays: number;
+      schedule: {
+        /** @enum {string} */
+        kind: 'now' | 'at' | 'recurring';
+        at: string | null;
+        timezone: string;
+        recurrence: {
+          /** @enum {string} */
+          freq: 'daily' | 'weekly';
+          /** @default [] */
+          days: number[];
+          time: string;
+          /**
+           * Format: date-time
+           * @default null
+           */
+          until: string | null;
+        } | null;
+      };
+      parentCampaignId: string | null;
+      recurrenceEnabled: boolean;
+      headerLocation?: {
+        latitude: number;
+        longitude: number;
+        name?: string;
+        address?: string;
+      } | null;
+      headerMedia: {
+        kind: string;
+        fileName: string | null;
+        mimeType: string;
+        size: number;
+      } | null;
+      counters: {
+        total: number;
+        queued: number;
+        sent: number;
+        delivered: number;
+        read: number;
+        replied: number;
+        failedTotal: number;
+        skippedTotal: number;
+        skipped: {
+          [key: string]: number;
+        };
+        failed: {
+          [key: string]: number;
+        };
+      };
+      cost: {
+        estimateMicros: number;
+        chargedMicros: number;
+      };
+      nextBatchAt: string | null;
+      startedAt: string | null;
+      finishedAt: string | null;
+      createdAt: string;
+      updatedAt: string;
+    };
+    WhatsAppCampaignEstimate: {
+      recipients: number;
+      skipped: {
+        [key: string]: number;
+      };
+      shortfallMicros: number;
+      byMarket: {
+        market: string;
+        category: string;
+        count: number;
+        priceMicros: number;
+      }[];
+      totalMicros: number;
+      walletAvailableMicros: number;
+      enough: boolean;
+      note: string;
+    };
+    WhatsAppCampaignRecipient: {
+      contactId: string;
+      name: string | null;
+      /** @description Masked */
+      phone: string | null;
+      /** @enum {string} */
+      variant: 'A' | 'B' | 'C';
+      /** @enum {string} */
+      status: 'pending' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'skipped';
+      skipReason: string | null;
+      errorCode: number | null;
+      sentAt: string | null;
+      repliedAt: string | null;
+    };
+    WhatsAppCampaignReport: {
+      funnel: {
+        total: number;
+        skipped: number;
+        sent: number;
+        delivered: number;
+        read: number;
+        replied: number;
+        failed: number;
+      };
+      cost: {
+        estimateMicros: number;
+        chargedMicros: number;
+      };
+      skippedByReason: {
+        [key: string]: number;
+      };
+      failedByCode: {
+        [key: string]: number;
+      };
+      perDay: {
+        day: string;
+        sent: number;
+      }[];
+      variants: {
+        key: string;
+        sent: number;
+        read: number;
+        replied: number;
+      }[];
+      /** @enum {string|null} */
+      winner: 'A' | 'B' | 'C' | null;
+    };
     WebhookEndpoint: {
       id: string;
       url: string;
@@ -34581,6 +37274,16 @@ export interface components {
         error: string | null;
       }[];
       createdAt: string;
+    };
+    WhatsAppCallPrice: {
+      channelId: string;
+      contactId: string;
+      senderLabel: string;
+      senderPhone: string | null;
+      market: string;
+      callPerMinuteMicros: number;
+      aiPerMinuteMicros: number;
+      pulseSec: number;
     };
     WhatsAppCallingSettings: {
       channelId: string;
@@ -34737,6 +37440,9 @@ export interface components {
         | 'TIER_100K'
         | 'TIER_UNLIMITED'
         | null;
+      messageClassificationKnown?: boolean;
+      /** @description Application send cap per second, including any lower deployment ceiling */
+      messageRateLimit?: number;
       /** @description WhatsApp Business app number (coexistence) — no calling */
       isOnBizApp: boolean;
       calling: {
@@ -35257,6 +37963,7 @@ export interface components {
       submit?: boolean;
     };
     WhatsAppTemplateEdit: {
+      channelId?: string;
       name?: string;
       language?: string;
       /** @enum {string} */

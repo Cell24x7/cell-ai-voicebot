@@ -7,6 +7,7 @@ import { computeTopupTax } from '../../core/billing/gst';
 import type { BillingJobs } from '../../core/billing/jobs';
 import { creditTopup } from '../../core/billing/topup-credit';
 import type { FakePaymentProvider, PaymentProvider } from '../../core/payments';
+import { AccountModel } from '../../db/models/account.model';
 import { TopupOrderModel, type TopupOrderDoc } from '../../db/models/topup-order.model';
 import { requireAuth } from '../../shared/auth/auth-context';
 import { tenantFilter } from '../../shared/auth/tenant';
@@ -53,6 +54,33 @@ const actorOf = (req: Request): AuditActorInput => {
 };
 
 /** Step 1: order saved first (`creating`), then the gateway order (outside any transaction). */
+/** Phase 19: a reseller's customer tops up only when the reseller allows it. */
+export const assertTopupAllowed = async (accountId: Types.ObjectId): Promise<void> => {
+  const account = await AccountModel.findById(accountId)
+    .select({ parentAccountId: 1 })
+    .lean<{ parentAccountId?: Types.ObjectId | null }>();
+  if (!account?.parentAccountId) return;
+  const parent = await AccountModel.findById(account.parentAccountId)
+    .select({ reseller: 1 })
+    .lean<{ reseller?: { customersCanTopUp?: boolean } | null }>();
+  if (!parent?.reseller?.customersCanTopUp) throw new AppError('TOPUP_NOT_ALLOWED');
+};
+
+/** `GET /wallet/provider` — `provider` null for direct accounts (they always top up). */
+export const walletProvider = async (accountId: Types.ObjectId) => {
+  const account = await AccountModel.findById(accountId)
+    .select({ parentAccountId: 1 })
+    .lean<{ parentAccountId?: Types.ObjectId | null }>();
+  if (!account?.parentAccountId) return { provider: null, topupAllowed: true };
+  const parent = await AccountModel.findById(account.parentAccountId)
+    .select({ name: 1, reseller: 1 })
+    .lean<{ name: string; reseller?: { customersCanTopUp?: boolean } | null }>();
+  return {
+    provider: parent ? { name: parent.name } : null,
+    topupAllowed: Boolean(parent?.reseller?.customersCanTopUp),
+  };
+};
+
 export const createTopup = async (
   req: Request,
   body: z.infer<typeof CreateTopupBody>,
@@ -60,6 +88,7 @@ export const createTopup = async (
 ) => {
   const { accountId } = tenantFilter(req);
   const auth = requireAuth(req);
+  await assertTopupAllowed(accountId);
   const profile = await loadBillingProfile(accountId);
   if (!profile?.legalName || !profile.stateCode) throw new AppError('BILLING_PROFILE_REQUIRED');
   const amounts = computeTopupTax(

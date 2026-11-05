@@ -5,9 +5,10 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { enqueueSnackbar } from 'notistack';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -29,6 +30,13 @@ export function CreateAccountDialog({ onClose }: { onClose: () => void }) {
   const [ownerEmail, setOwnerEmail] = useState('');
   const [ownerPassword, setOwnerPassword] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
+  const [kind, setKind] = useState<'business' | 'reseller'>('business');
+  const [parentId, setParentId] = useState('');
+  const resellers = useQuery({
+    queryKey: adminKeys.accounts({ kind: 'reseller', limit: 100, page: 1 }),
+    queryFn: () => adminApi.accounts({ kind: 'reseller', limit: 100, page: 1 }),
+    meta: { silent: true },
+  });
   const email = ownerEmail.trim();
   const phone = ownerPhone.trim();
   const ready =
@@ -44,6 +52,8 @@ export function CreateAccountDialog({ onClose }: { onClose: () => void }) {
         ownerEmail: email,
         ownerPassword,
         ...(phone ? { ownerPhone: phone } : {}),
+        kind,
+        ...(kind === 'business' && parentId ? { parentAccountId: parentId } : {}),
       }),
     meta: { silent: true },
     onSuccess: (account) => {
@@ -65,6 +75,36 @@ export function CreateAccountDialog({ onClose }: { onClose: () => void }) {
         </DialogContentText>
         <Stack spacing={2}>
           {create.error && <Alert severity="error">{getErrorMessage(create.error)}</Alert>}
+          <TextField
+            select
+            label="Type"
+            value={kind}
+            onChange={(e) => setKind(e.target.value as 'business' | 'reseller')}
+            helperText={
+              kind === 'reseller'
+                ? 'A reseller adds and manages its own customers.'
+                : 'A business uses the platform itself.'
+            }
+          >
+            <MenuItem value="business">Business</MenuItem>
+            <MenuItem value="reseller">Reseller</MenuItem>
+          </TextField>
+          {kind === 'business' && (
+            <TextField
+              select
+              label="Reseller (optional)"
+              value={parentId}
+              onChange={(e) => setParentId(e.target.value)}
+              helperText="Leave empty for a direct customer."
+            >
+              <MenuItem value="">None — direct customer</MenuItem>
+              {(resellers.data?.data ?? []).map((r) => (
+                <MenuItem key={r.id} value={r.id}>
+                  {r.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           <TextField
             label="Business name"
             autoFocus

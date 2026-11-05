@@ -20,6 +20,7 @@ import { ExportDialog } from '@/features/contact-exports/ExportDialog';
 import { useCanExport } from '@/features/contact-exports/useExportJob';
 import { LazyBulkCallPermission } from '@/features/whatsapp-calling/panel/LazyBulkCallPermission';
 import { useCanRequestPermissionBulk } from '@/features/whatsapp-calling/permissions';
+import { useCanWriteWaCampaigns } from '@/features/whatsapp-campaigns/permissions';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { contactListsApi } from '@/services/api/contact-lists';
 import { getErrorMessage, toApiError } from '@/services/api/errors';
@@ -100,6 +101,7 @@ export function ListsTab() {
   const can = useCan();
   const canExport = useCanExport();
   const canCampaign = useCanWriteCampaigns();
+  const canWaCampaign = useCanWriteWaCampaigns();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -160,6 +162,15 @@ export function ListsTab() {
       align: 'right',
       render: (l) => (
         <Stack direction="row" spacing={0.5} sx={{ justifyContent: 'flex-end' }}>
+          {canWaCampaign && (
+            <Button
+              size="small"
+              component={RouterLink}
+              to={`/campaigns/whatsapp/new?listId=${l.id}`}
+            >
+              Send WhatsApp campaign
+            </Button>
+          )}
           {canCampaign && (
             <Button size="small" component={RouterLink} to={`/campaigns/new?listId=${l.id}`}>
               Create campaign

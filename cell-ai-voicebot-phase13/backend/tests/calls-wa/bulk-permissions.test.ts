@@ -101,6 +101,27 @@ describe('bulk call permission (T18B.4)', () => {
     ).toBe(false);
   });
 
+  it('replays a campaign-owned permission run with the same ID and rejects a foreign run collision', async () => {
+    const c = await contact();
+    const runId = new Types.ObjectId().toString();
+    const s = service();
+    const input = {
+      runId,
+      channelId: channelId.toString(),
+      target: { contactIds: [c._id.toString()] },
+      templateId: templateId.toString(),
+    };
+    await s.start(actor, input);
+    await s.start(actor, input);
+    expect(await CallPermissionRunModel.countDocuments({ _id: runId })).toBe(1);
+    expect(jobs.enqueuePermissionBulk).toHaveBeenCalledTimes(2);
+    await CallPermissionRunModel.updateOne(
+      { _id: runId },
+      { $set: { accountId: new Types.ObjectId() } },
+    );
+    await expect(s.start(actor, input)).rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND' });
+  });
+
   it('start validates the template and number, stores the run, audits, queues one job', async () => {
     const c = await contact();
     const s = service();
@@ -130,6 +151,7 @@ describe('bulk call permission (T18B.4)', () => {
     expect(await s.get(accountId, runId)).toMatchObject({ status: 'queued', total: 1, sent: 0 });
     const audit = await AuditLogModel.findOne({
       action: 'whatsapp.call_permission_bulk_requested',
+      'meta.runId': runId,
     }).lean();
     expect(audit?.meta).toMatchObject({ runId, total: 1, channelId: channelId.toString() });
     await expect(s.get(new Types.ObjectId(), runId)).rejects.toMatchObject({
@@ -303,10 +325,9 @@ describe('0020-call-permission-runs', () => {
     return found;
   };
 
-  it('is the last one, right after 0019', () => {
+  it('is right after 0019', () => {
     const names = MIGRATIONS.map((m) => m.name);
     expect(names.indexOf('0020-call-permission-runs')).toBe(names.indexOf('0019-sip-lines') + 1);
-    expect(names.at(-1)).toBe('0020-call-permission-runs');
   });
 
   it('backfills waCallPermission from permission rows, else none (idempotent, additive)', async () => {

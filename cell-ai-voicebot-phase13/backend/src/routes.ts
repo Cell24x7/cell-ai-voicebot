@@ -75,6 +75,7 @@ import {
 } from './modules/report-subscriptions/report-subscriptions.routes';
 import type { ReportCacheStore } from './modules/reports/cache';
 import { createReportsRouter } from './modules/reports/reports.routes';
+import { createResellerRouter } from './modules/resellers/resellers.routes';
 import { createRetentionRouter } from './modules/retention/retention.routes';
 import { createSegmentsRouter } from './modules/segments/segments.routes';
 import { createSheetImportsRouter } from './modules/sheet-imports/sheet-imports.routes';
@@ -106,6 +107,8 @@ import { createCallingRouter } from './modules/whatsapp-calling/calling.routes';
 import type { CallingJobs } from './modules/whatsapp-calling/jobs';
 import type { CallingRuntime } from './modules/whatsapp-calling/runtime';
 import { createInboxCallingHook } from './modules/whatsapp-calling/webhooks';
+import { createWaCampaignsRouter } from './modules/whatsapp-campaigns/campaigns.routes';
+import type { WaCampaignJobs } from './modules/whatsapp-campaigns/campaigns.service';
 import { secretBoxKey } from './shared/crypto/secret-box';
 import { AppError } from './shared/errors/app-error';
 
@@ -131,6 +134,8 @@ export type WhatsAppDeps = MetaWebhooksDeps & {
   /** Phase 12: calling jobs on the `whatsapp` queue (settings sync after a connect). */
   callingJobs?: CallingJobs;
   calling?: CallingRuntime;
+  /** Phase 19: WhatsApp campaign jobs on the `whatsapp` queue. */
+  waCampaignJobs?: WaCampaignJobs;
 };
 
 export interface BillingDeps {
@@ -434,6 +439,15 @@ export const createApiRouter = ({
   router.use('/reports', createReportsRouter({ cache: reports.cache ?? null }));
   router.use('/report-subscriptions', createReportSubscriptionsRouter());
   router.use('/webhook-endpoints', createWebhookEndpointsRouter(webhookRuntime(env, webhooks)));
+  // Phase 19: reseller panel
+  router.use('/reseller', createResellerRouter());
+  router.use(
+    '/whatsapp-campaigns',
+    createWaCampaignsRouter({
+      ...(whatsapp?.storage ? { storage: whatsapp.storage } : {}),
+      ...(whatsapp?.waCampaignJobs ? { jobs: whatsapp.waCampaignJobs } : {}),
+    }),
+  );
   router.use('/webhook-deliveries', createWebhookDeliveriesRouter());
   router.use('/report-unsubscribe', createReportUnsubscribeRouter());
   router.use(

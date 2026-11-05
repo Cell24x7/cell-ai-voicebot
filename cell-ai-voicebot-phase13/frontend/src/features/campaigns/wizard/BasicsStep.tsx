@@ -1,5 +1,6 @@
 import {
   Alert,
+  Checkbox,
   FormControlLabel,
   FormHelperText,
   MenuItem,
@@ -12,7 +13,11 @@ import {
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 
+import { whatsappCapabilities } from '@/features/calls/capabilities';
 import { useFlows, useFlowVersions } from '@/features/flows/queries';
+import { useTemplates } from '@/features/templates/queries';
+import { useChannels } from '@/features/whatsapp/queries';
+import { ProgramPicker } from '@/features/whatsapp-calling/ProgramPicker';
 import { phoneNumberKeys, phoneNumbersApi } from '@/services/api/phone-numbers';
 
 import { isLocked, LIMITS, type AmdMode, type LockRule, type WizardDraft } from './draft';
@@ -41,12 +46,102 @@ export function BasicsStep({ draft, onChange, lock }: StepProps) {
   const selected = usable.find((f) => f.id === draft.flowId);
   const flowLocked = isLocked(lock, 'flow');
   const phone = useQuery({ queryKey: phoneNumberKeys.line, queryFn: () => phoneNumbersApi.line() });
-  const onSip = phone.data?.line === 'sip';
+  const channels = useChannels(draft.line === 'whatsapp');
+  const ready = (channels.data?.items ?? []).filter((c) => whatsappCapabilities(c).calling);
+  const permissionTemplates = useTemplates(
+    { channelId: draft.channelId, purpose: 'call_permission', status: ['APPROVED'] },
+    draft.line === 'whatsapp' && Boolean(draft.channelId),
+  );
+  const onSip =
+    draft.line === 'whatsapp'
+      ? ready.some((c) => c.id === draft.channelId)
+      : phone.data?.line === 'sip';
   const line = draft.phoneLine;
   const setLine = (patch: Partial<WizardDraft['phoneLine']>) =>
     onChange({ phoneLine: { ...line, ...patch } });
   return (
     <Stack spacing={3}>
+      <TextField
+        select
+        label="Call type"
+        value={draft.line}
+        disabled={isLocked(lock, 'mode')}
+        onChange={(e) =>
+          onChange({
+            line: e.target.value as WizardDraft['line'],
+            channelId: '',
+            program: null,
+            flowId: '',
+            chosenVersion: null,
+            askPermissionFirst: false,
+            askPermissionTemplateId: '',
+          })
+        }
+      >
+        <MenuItem value="phone">SIP / Normal call</MenuItem>
+        <MenuItem value="whatsapp">WhatsApp call</MenuItem>
+      </TextField>
+      {draft.line === 'whatsapp' && (
+        <Stack spacing={2}>
+          <TextField
+            select
+            label="WhatsApp calling number"
+            value={draft.channelId}
+            disabled={isLocked(lock, 'mode')}
+            onChange={(e) => onChange({ channelId: e.target.value, askPermissionTemplateId: '' })}
+          >
+            {ready.map((c) => (
+              <MenuItem key={c.id} value={c.id}>
+                {c.label} · {c.displayPhoneNumber ?? c.phoneE164}
+              </MenuItem>
+            ))}
+          </TextField>
+          {!ready.length && (
+            <Alert severity="info">
+              Connect a WhatsApp number and enable calling first. Business App numbers support
+              messaging only.
+            </Alert>
+          )}
+          <ProgramPicker
+            campaign
+            value={draft.program}
+            disabled={flowLocked}
+            onChange={(program) =>
+              onChange({
+                program,
+                flowId: program?.kind === 'flow' ? program.id : '',
+                chosenVersion: null,
+              })
+            }
+          />
+          <Alert severity="info">
+            Only customers who allowed WhatsApp calls from this number are called.
+          </Alert>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={draft.askPermissionFirst}
+                onChange={(_e, checked) => onChange({ askPermissionFirst: checked })}
+              />
+            }
+            label="Ask for permission first"
+          />
+          {draft.askPermissionFirst && (
+            <TextField
+              select
+              label="Call permission template"
+              value={draft.askPermissionTemplateId}
+              onChange={(e) => onChange({ askPermissionTemplateId: e.target.value })}
+            >
+              {(permissionTemplates.data ?? []).map((t) => (
+                <MenuItem key={t.id} value={t.id}>
+                  {t.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
+        </Stack>
+      )}
       <TextField
         label="Campaign name"
         value={draft.name}
@@ -87,7 +182,7 @@ export function BasicsStep({ draft, onChange, lock }: StepProps) {
           is called and nothing is charged.
         </FormHelperText>
       </div>
-      {draft.mode === 'live' && (
+      {draft.mode === 'live' && draft.line !== 'whatsapp' && (
         <Stack spacing={2} component="section" aria-label="Phone line">
           <TextField
             select
@@ -135,51 +230,53 @@ export function BasicsStep({ draft, onChange, lock }: StepProps) {
           )}
         </Stack>
       )}
-      <Tooltip title={flowLocked ? LOCKED_HINT : ''}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
-            select
-            label="Flow"
-            value={usable.some((f) => f.id === draft.flowId) ? draft.flowId : ''}
-            disabled={flowLocked || flows.isPending}
-            onChange={(e) => onChange({ flowId: e.target.value, chosenVersion: null })}
-            sx={{ minWidth: 280 }}
-            helperText={
-              flows.isSuccess && !usable.length
-                ? 'Publish a flow whose start step allows campaigns first.'
-                : 'Published flows that can start from a campaign'
-            }
-          >
-            {usable.map((f) => (
-              <MenuItem key={f.id} value={f.id}>
-                {f.name}
+      {draft.line !== 'whatsapp' && (
+        <Tooltip title={flowLocked ? LOCKED_HINT : ''}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
+              select
+              label="Flow"
+              value={usable.some((f) => f.id === draft.flowId) ? draft.flowId : ''}
+              disabled={flowLocked || flows.isPending}
+              onChange={(e) => onChange({ flowId: e.target.value, chosenVersion: null })}
+              sx={{ minWidth: 280 }}
+              helperText={
+                flows.isSuccess && !usable.length
+                  ? 'Publish a flow whose start step allows campaigns first.'
+                  : 'Published flows that can start from a campaign'
+              }
+            >
+              {usable.map((f) => (
+                <MenuItem key={f.id} value={f.id}>
+                  {f.name}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              label="Version"
+              value={draft.chosenVersion ?? 'latest'}
+              disabled={flowLocked || !selected}
+              onChange={(e) =>
+                onChange({
+                  chosenVersion: e.target.value === 'latest' ? null : Number(e.target.value),
+                })
+              }
+              sx={{ minWidth: 200 }}
+            >
+              <MenuItem value="latest">
+                Latest{selected?.publishedVersion ? ` (v${String(selected.publishedVersion)})` : ''}
               </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            label="Version"
-            value={draft.chosenVersion ?? 'latest'}
-            disabled={flowLocked || !selected}
-            onChange={(e) =>
-              onChange({
-                chosenVersion: e.target.value === 'latest' ? null : Number(e.target.value),
-              })
-            }
-            sx={{ minWidth: 200 }}
-          >
-            <MenuItem value="latest">
-              Latest{selected?.publishedVersion ? ` (v${String(selected.publishedVersion)})` : ''}
-            </MenuItem>
-            {(versions.data ?? []).map((v) => (
-              <MenuItem key={v.version} value={v.version}>
-                v{v.version}
-                {v.notes ? ` — ${v.notes}` : ''}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Stack>
-      </Tooltip>
+              {(versions.data ?? []).map((v) => (
+                <MenuItem key={v.version} value={v.version}>
+                  v{v.version}
+                  {v.notes ? ` — ${v.notes}` : ''}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
+        </Tooltip>
+      )}
       {selected && (
         <Alert severity="info">
           {selected.name}: {selected.nodesCount} steps

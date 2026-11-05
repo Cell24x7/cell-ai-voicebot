@@ -21,6 +21,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { StatusChip } from '@/components/StatusChip';
 import { adminKeys } from '@/features/admin/keys';
 import { OwnerPasswordDialog } from '@/features/admin/OwnerPasswordDialog';
+import { ResellerCard } from '@/features/admin/ResellerCard';
 import { SuspendDialog } from '@/features/admin/SuspendDialog';
 import { AccountRatesTab } from '@/features/admin-billing/AccountRatesTab';
 import { AccountWalletTab } from '@/features/admin-billing/AccountWalletTab';
@@ -70,6 +71,7 @@ function Overview({ detail }: { detail: AdminAccountDetail }) {
   const [changingPassword, setChangingPassword] = useState(false);
   return (
     <Stack spacing={3}>
+      {account.kind !== 'platform' && <ResellerCard account={account} />}
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 6 }}>
           <Card variant="outlined">
@@ -193,7 +195,7 @@ export function AdminAccountDetailPage() {
     },
   });
   const impersonate = useMutation({
-    mutationFn: () => adminApi.impersonate(id),
+    mutationFn: (mode: 'view' | 'act') => adminApi.impersonate(id, mode),
     onSuccess: (session) => {
       queryClient.clear();
       useAuthStore.getState().startImpersonation(session);
@@ -235,14 +237,23 @@ export function AdminAccountDetailPage() {
   const { account } = detail.data;
   const suspended = account.status === 'suspended';
 
-  const onImpersonate = async () => {
-    const ok = await confirm({
-      title: `View as the owner of ${account.name}?`,
-      message:
-        'You will see the app exactly as the account owner does for up to 30 minutes. Everything you do is recorded in their audit log. Password, ownership and API key changes are blocked.',
-      confirmText: 'Start viewing',
-    });
-    if (ok) impersonate.mutate();
+  const onImpersonate = async (mode: 'view' | 'act') => {
+    const ok = await confirm(
+      mode === 'view'
+        ? {
+            title: `View as the owner of ${account.name}?`,
+            message:
+              'You will see the app exactly as the account owner does, read-only, for up to an hour. Everything you do is recorded in their audit log.',
+            confirmText: 'Start viewing',
+          }
+        : {
+            title: `Log in as the owner of ${account.name}?`,
+            message:
+              'You can work in the account for up to an hour. Password, sign-in, API keys, payments, ownership and account delete / export stay blocked. Everything you do is recorded in their audit log.',
+            confirmText: 'Log in',
+          },
+    );
+    if (ok) impersonate.mutate(mode);
   };
   const onEnable = async () => {
     const ok = await confirm({
@@ -275,11 +286,18 @@ export function AdminAccountDetailPage() {
               </Button>
             )}
             <Button
-              variant="contained"
-              onClick={() => void onImpersonate()}
+              variant="outlined"
+              onClick={() => void onImpersonate('view')}
               disabled={impersonate.isPending || !detail.data.owner}
             >
-              Impersonate
+              View as
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => void onImpersonate('act')}
+              disabled={impersonate.isPending || !detail.data.owner}
+            >
+              Log in as
             </Button>
           </>
         }

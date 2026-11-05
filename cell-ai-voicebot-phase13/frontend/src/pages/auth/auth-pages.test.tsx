@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,8 +12,7 @@ vi.mock('@/services/api/auth', () => ({
   authApi: {
     login: vi.fn(),
     signup: vi.fn(),
-    verifyEmail: vi.fn(),
-    resendVerification: vi.fn(),
+    signupOptions: vi.fn(() => Promise.resolve({ open: true, resellerSignup: 'open' })),
     forgotPassword: vi.fn(),
     resetPassword: vi.fn(),
     inviteInfo: vi.fn(),
@@ -61,7 +60,7 @@ describe('LoginPage', () => {
     expect(api.login).not.toHaveBeenCalled();
   });
 
-  it('shows wrong credentials, lockout time, and sends unverified users to the code screen', async () => {
+  it('shows wrong credentials and the lockout time', async () => {
     renderWithProviders({ route: '/login' });
     await userEvent.type(screen.getByLabelText('Email'), 'asha@example.com');
     await userEvent.type(screen.getByLabelText('Password'), 'x');
@@ -75,10 +74,6 @@ describe('LoginPage', () => {
     expect(
       await screen.findByText('Too many failed sign-ins. Try again in 10 minutes.'),
     ).toBeInTheDocument();
-    api.login.mockRejectedValueOnce(httpError(403, 'AUTH_EMAIL_NOT_VERIFIED'));
-    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(await screen.findByRole('heading', { name: 'Check your email' })).toBeInTheDocument();
-    expect(screen.getByText('asha@example.com')).toBeInTheDocument();
   });
 
   it('toggles password visibility', async () => {
@@ -90,28 +85,60 @@ describe('LoginPage', () => {
   });
 });
 
-describe('SignupPage', () => {
-  it('creates the account and opens the code screen', async () => {
-    api.signup.mockResolvedValue({ message: 'ok' });
-    renderWithProviders({ route: '/signup' });
+describe('SignupPage (Phase 19: no e-mail)', () => {
+  const fill = async () => {
     await userEvent.type(screen.getByLabelText('Business name'), 'Demo Finance');
     await userEvent.type(screen.getByLabelText('Your name'), 'Asha');
     await userEvent.type(screen.getByLabelText('Work email'), 'asha@example.com');
     await userEvent.type(screen.getByLabelText('Password'), 'blue-tiger-river-42');
+    await userEvent.click(screen.getByRole('checkbox'));
+  };
+
+  it('Business: pick the type, fill the form, signed in and sent home', async () => {
+    api.signup.mockResolvedValue(fakeSession('owner'));
+    renderWithProviders({ route: '/signup' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Business' }));
+    await fill();
     await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
-    expect(await screen.findByRole('heading', { name: 'Check your email' })).toBeInTheDocument();
+    await waitFor(() => expect(useAuthStore.getState().status).toBe('authenticated'));
     expect(api.signup).toHaveBeenCalledWith(
       expect.objectContaining({
+        accountType: 'business',
         businessName: 'Demo Finance',
         email: 'asha@example.com',
-        phone: undefined,
+        acceptTerms: true,
         timezone: expect.any(String) as string,
       }),
     );
+    expect(api.signup.mock.calls[0]?.[0]).not.toHaveProperty('website');
   });
 
-  it('shows client rules and server field errors', async () => {
+  it('Reseller: sends accountType reseller and opens the reseller panel', async () => {
+    const base = fakeSession('owner');
+    api.signup.mockResolvedValue({
+      ...base,
+      account: {
+        ...base.account,
+        kind: 'reseller',
+        reseller: { status: 'active', customersCanTopUp: false },
+      },
+    });
     renderWithProviders({ route: '/signup' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Reseller' }));
+    expect(
+      screen.getByRole('heading', { name: 'Create your reseller account' }),
+    ).toBeInTheDocument();
+    await fill();
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    await waitFor(() =>
+      expect(api.signup).toHaveBeenCalledWith(expect.objectContaining({ accountType: 'reseller' })),
+    );
+    expect(await screen.findByRole('heading', { name: 'Reseller', level: 1 })).toBeVisible();
+  });
+
+  it('needs the terms tick; shows client rules, server field errors and a taken e-mail', async () => {
+    renderWithProviders({ route: '/signup' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Business' }));
     await userEvent.type(screen.getByLabelText('Password'), 'short');
     await userEvent.type(screen.getByLabelText('Phone (optional)'), '12345');
     await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
@@ -119,62 +146,36 @@ describe('SignupPage', () => {
     expect(
       screen.getByText('Use the international format, e.g. +919876543210'),
     ).toBeInTheDocument();
-
+    expect(screen.getByText('Accept the terms to continue')).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText('Phone (optional)'));
+    await userEvent.clear(screen.getByLabelText('Password'));
+    await fill();
+    api.signup.mockRejectedValueOnce(httpError(409, 'AUTH_EMAIL_TAKEN'));
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(await screen.findByRole('link', { name: 'Log in instead' })).toBeInTheDocument();
     api.signup.mockRejectedValueOnce(
       httpError(422, 'VALIDATION_FAILED', {
         details: [{ path: 'body.password', message: 'This password is too common.' }],
       }),
     );
-    await userEvent.clear(screen.getByLabelText('Phone (optional)'));
-    await userEvent.type(screen.getByLabelText('Business name'), 'Demo');
-    await userEvent.type(screen.getByLabelText('Your name'), 'Asha');
-    await userEvent.type(screen.getByLabelText('Work email'), 'a@example.com');
-    await userEvent.clear(screen.getByLabelText('Password'));
-    await userEvent.type(screen.getByLabelText('Password'), 'passwordpassword');
     await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
     expect(await screen.findByText('This password is too common.')).toBeInTheDocument();
   });
-});
 
-describe('VerifyEmailPage', () => {
-  it('fills all boxes on paste and verifies automatically', async () => {
-    api.verifyEmail.mockResolvedValue(fakeSession('owner'));
-    renderWithProviders({ route: '/verify-email?email=asha%40example.com' });
-    fireEvent.paste(screen.getByLabelText('Digit 1'), {
-      clipboardData: { getData: () => '04 29 17' },
-    });
-    await waitFor(() =>
-      expect(api.verifyEmail).toHaveBeenCalledWith({ email: 'asha@example.com', code: '042917' }),
-    );
-    await waitFor(() => expect(useAuthStore.getState().status).toBe('authenticated'));
+  it('closed states: reseller card hidden; all signups closed', async () => {
+    api.signupOptions.mockResolvedValueOnce({ open: true, resellerSignup: 'closed' });
+    const { unmount } = renderWithProviders({ route: '/signup' });
+    expect(await screen.findByRole('button', { name: 'Business' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reseller' })).not.toBeInTheDocument();
+    unmount();
+    api.signupOptions.mockResolvedValueOnce({ open: false, resellerSignup: 'open' });
+    renderWithProviders({ route: '/signup' });
+    expect(await screen.findByText(/Signups are closed/)).toBeInTheDocument();
   });
 
-  it('auto-advances while typing and shows a wrong-code message', async () => {
-    api.verifyEmail.mockRejectedValue(httpError(422, 'AUTH_CODE_INVALID'));
-    renderWithProviders({ route: '/verify-email?email=asha%40example.com' });
-    const first = screen.getByLabelText('Digit 1');
-    await userEvent.click(first);
-    await userEvent.keyboard('123456');
-    expect(await screen.findByText('That code is wrong or has expired.')).toBeInTheDocument();
-    expect(api.verifyEmail).toHaveBeenCalledWith({ email: 'asha@example.com', code: '123456' });
-  });
-
-  it('enables resend after the 60 s countdown', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    api.resendVerification.mockResolvedValue({ message: 'ok' });
-    renderWithProviders({ route: '/verify-email?email=asha%40example.com' });
-    expect(screen.getByRole('button', { name: 'Resend code in 60s' })).toBeDisabled();
-    for (let i = 0; i < 60; i += 1) {
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1000);
-      });
-    }
-    const resend = screen.getByRole('button', { name: 'Resend code' });
-    fireEvent.click(resend);
-    await waitFor(() => expect(api.resendVerification).toHaveBeenCalledWith('asha@example.com'));
-    expect(
-      await screen.findByText('If your email still needs verifying, a new code is on its way.'),
-    ).toBeInTheDocument();
+  it('/verify-email now goes to sign in', async () => {
+    renderWithProviders({ route: '/verify-email?email=a%40b.co' });
+    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeInTheDocument();
   });
 });
 

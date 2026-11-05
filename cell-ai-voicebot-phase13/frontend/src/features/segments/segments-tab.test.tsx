@@ -347,7 +347,13 @@ describe('Segments tab', () => {
     expect(screen.queryByRole('link', { name: 'Create campaign' })).not.toBeInTheDocument();
     unmount();
     signInAs('owner', {
-      impersonation: { impersonatorId: 'p1', expiresAt: '2026-10-09T01:00:00Z' },
+      impersonation: {
+        impersonatorId: 'p1',
+        expiresAt: '2026-10-09T01:00:00Z',
+        mode: 'view',
+        kind: 'superadmin',
+        returnTo: '/admin/accounts/a1',
+      },
     });
     renderWithProviders({ route: '/contacts/segments' });
     await screen.findByText('Overdue > 30 days');

@@ -17,6 +17,7 @@ Source of truth for plans, decisions and conventions. (PDF exports are kept outs
 
 ## Key files
 
+- [prompts/PHASE_19_CONTINUATION_PROMPT.md](prompts/PHASE_19_CONTINUATION_PROMPT.md) — active Phase 19 resume prompt: remaining work, three campaign types, 18/75 messaging speed, WhatsApp AI and number-aware actions
 - [plans/BUILD_PLAN.md](plans/BUILD_PLAN.md) — phase-wise build plan (v2, SIP based)
 - [plans/OVERVIEW_PLAN.md](plans/OVERVIEW_PLAN.md) — v1 overview (archived)
 - [phases/PHASE_0_PLAN.md](phases/PHASE_0_PLAN.md) — Phase 0 detailed plan
@@ -46,3 +47,5 @@ Source of truth for plans, decisions and conventions. (PDF exports are kept outs
 - [cost/cost-model.md](cost/cost-model.md) — per-minute cost model draft
 - [compliance/compliance-notes.md](compliance/compliance-notes.md) — TRAI / RBI / DPDP research notes
 - [poc/README.md](poc/README.md) · [cost/README.md](cost/README.md) · [compliance/README.md](compliance/README.md)
+
+- [Phase 19 sign-off](phases/PHASE_19_SIGNOFF.md) — local implementation evidence, failed checkpoint/reruns, coverage and outstanding live-provider checks.

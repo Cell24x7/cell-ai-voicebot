@@ -287,6 +287,7 @@ export function TemplateBuilder({
         t = await edit.mutateAsync({
           id,
           body: {
+            channelId,
             name: form.name,
             language: form.language,
             category: form.category,
@@ -301,6 +302,7 @@ export function TemplateBuilder({
         t = await edit.mutateAsync({
           id,
           body: {
+            channelId,
             ...(approved ? {} : { category: form.category }),
             components: components as WhatsAppTemplate['components'],
             ttlSeconds: form.ttlSeconds,
@@ -315,7 +317,7 @@ export function TemplateBuilder({
         t = await uploadFile(t.id, file);
         setFile(null);
       }
-      if (andSubmit && t.status === 'DRAFT') t = await submit.mutateAsync(t.id);
+      if (andSubmit && t.status === 'DRAFT') t = await submit.mutateAsync({ id: t.id, channelId });
       finish(t, andSubmit ? 'Sent to WhatsApp for review' : 'Draft saved');
     } catch (e) {
       fail(e);
@@ -331,7 +333,13 @@ export function TemplateBuilder({
     setProgress(0);
     const t = await upload.mutateAsync({
       id,
-      input: { file: f, fileName: f.name, onProgress: setProgress, signal: abort.current.signal },
+      input: {
+        channelId,
+        file: f,
+        fileName: f.name,
+        onProgress: setProgress,
+        signal: abort.current.signal,
+      },
     });
     setProgress(null);
     return t;

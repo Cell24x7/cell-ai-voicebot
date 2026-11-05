@@ -14,9 +14,11 @@ import Typography from '@mui/material/Typography';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { enqueueSnackbar } from 'notistack';
 import { useState, type ReactNode } from 'react';
+import { Link as RouterLink } from 'react-router';
 
 import { useConfirm } from '@/components/confirm-context';
 import { useCan, useSession } from '@/features/auth/hooks';
+import { useCanWriteWaCampaigns } from '@/features/whatsapp-campaigns/permissions';
 import { contactsApi, type BulkAction, type BulkRequest } from '@/services/api/contacts';
 import { getErrorMessage } from '@/services/api/errors';
 import type { ContactFilter } from '@/services/api/types';
@@ -58,6 +60,7 @@ export function BulkActionsBar({
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const can = useCan();
+  const canWaCampaign = useCanWriteWaCampaigns();
   const session = useSession();
   const canErase = can('contacts.erase') && !session?.impersonation;
   const [erasing, setErasing] = useState(false);
@@ -146,6 +149,14 @@ export function BulkActionsBar({
         <Button onClick={(e) => setAnchor(e.currentTarget)} disabled={run.isPending}>
           Actions
         </Button>
+        {canWaCampaign && !allMatching && selectedIds.length > 0 && selectedIds.length <= 5000 && (
+          <Button
+            component={RouterLink}
+            to={`/campaigns/whatsapp/new?${new URLSearchParams({ contactIds: selectedIds.join(',') })}`}
+          >
+            Send WhatsApp campaign
+          </Button>
+        )}
         {extraActions}
         <Button onClick={onClear}>Clear</Button>
       </Stack>

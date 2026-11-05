@@ -15,15 +15,19 @@ export function ProgramPicker({
   onChange,
   disabled = false,
   error,
+  campaign = false,
 }: {
   value: WhatsAppCallProgram | null;
   onChange: (program: WhatsAppCallProgram | null) => void;
   disabled?: boolean;
   error?: string | null;
+  campaign?: boolean;
 }) {
   const flows = useFlows({ status: 'published', limit: 100 });
   const agents = useAgents({ activeOnly: true, limit: 50 });
-  const runnableFlows = (flows.data?.data ?? []).filter((f) => f.publishedVersion);
+  const runnableFlows = (flows.data?.data ?? []).filter(
+    (f) => f.publishedVersion && (!campaign || f.triggers.includes('campaign')),
+  );
   const kind = value?.kind ?? 'flow';
   const options =
     kind === 'flow'

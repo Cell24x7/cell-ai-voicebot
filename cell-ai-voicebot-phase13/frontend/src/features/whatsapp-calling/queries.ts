@@ -141,3 +141,12 @@ export const usePermissionTemplates = (channelId: string) => {
   const rows = (q.data ?? []).filter((t) => t.status !== 'DELETED');
   return { ...q, rows, approved: rows.filter((t) => t.status === 'APPROVED') };
 };
+
+/** Recomputed for every selected sender/contact; displayed prices are account selling prices. */
+export const useCallPrice = (channelId: string, contactId: string) =>
+  useQuery({
+    queryKey: callingKeys.price(channelId, contactId),
+    queryFn: () => whatsappCallingApi.quote(channelId, contactId),
+    enabled: Boolean(channelId && contactId),
+    staleTime: 0,
+  });

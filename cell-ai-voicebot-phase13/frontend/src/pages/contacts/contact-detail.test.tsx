@@ -155,7 +155,10 @@ describe('contact detail: calling', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Call now' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/Simulated call/)).toBeInTheDocument();
+    expect(
+      await within(dialog).findByRole('combobox', { name: 'Call method' }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText(/Asha Verma/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     // agents can't edit contacts, so no More menu either

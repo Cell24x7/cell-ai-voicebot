@@ -11,6 +11,13 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Phase 19 — resellers and campaign channels** — 2026-11-05
+  - Open business/reseller signup, reseller customer accounts and atomic credit transfers, audited view/act sessions with sensitive actions blocked.
+  - SIP / Normal, bulk WhatsApp templates and WhatsApp call campaigns; published flows or active agents, per-number consent, ask-first permission runs and unanswered limits.
+  - Shared Redis sender pacing: Business App/coexistence/unknown 18/sec; confirmed regular Cloud API 75/sec; lower limits, tiers and wallet guards remain.
+  - Recurrence, durable header media/location, mixed-market/category estimates, transactional counters, retry-safe reports and formula-safe CSV exports.
+  - Same-WABA template approval/media scoping and sender/contact selling-price quotes. Additive migrations 0023/0024; see Phase 19 sign-off for local evidence and live checks.
+
 - **Phase 18B — WhatsApp calling go-live** — 2026-11-04
   - Calling on / off is read back from WhatsApp; a change it didn't apply answers `CALLING_SETTINGS_NOT_APPLIED`.
   - `GET /whatsapp/channels/:id/calling/readiness`: 10 checks (Cloud API, messaging limit, verification, `calls` webhook, app permission, Meta status, restrictions, last call event, call audio, prices); blocking items stop the switch.
@@ -410,3 +417,12 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ### Changed
 
 - Plan updates: Node 20 → 24 LTS (Node 20 EOL), MongoDB 8.0 → 8.2 (8.0 fails on Linux kernel ≥ 6.19), ports → 5100/3100/27018/6380, React 18 → 19, ESLint 10 → 9 (plugin peer compatibility), TypeScript 7 → 6.0 (typescript-eslint support); `openapi-typescript` runs on TS 6 via npm `overrides` (ADR 0029); lint-staged skips ESLint-ignored files (`--no-warn-ignored`).
+
+## Phase 19 continuation (candidate)
+
+- Three campaign types; WhatsApp flow/agent campaigns and consent-aware execution.
+- Shared per-number 18/75 pacing, conservative legacy classification and inbox priority.
+- Message recurrence, durable media/location, accurate estimates, live reports and ledger totals.
+- Number-scoped template management/approval, shared-WABA lists and media ownership checks.
+- Explicit SIP caller selection, restart tracking recovery and separate signup limiter store.
+- Additive migrations 0023/0024 and durable header cleanup during account purge.

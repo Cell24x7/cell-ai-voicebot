@@ -16,24 +16,29 @@ export function Banners() {
   const navigate = useNavigate();
   if (!session) return null;
   const stop = async () => {
-    const accountId = session.account.id;
+    const back = session.impersonation?.returnTo ?? `/admin/accounts/${session.account.id}`;
     await endImpersonation(queryClient);
-    void navigate(savedAccountId ? `/admin/accounts/${accountId}` : '/');
+    void navigate(savedAccountId ? back : '/');
   };
+  const imp = session.impersonation;
   return (
     <>
-      {session.impersonation && (
+      {imp && (
         <Alert
           severity="warning"
           sx={{ mb: 2 }}
           action={
             <Button color="inherit" size="small" onClick={() => void stop()}>
-              Stop
+              {imp.kind === 'reseller' ? 'Back to reseller panel' : 'Back to admin'}
             </Button>
           }
         >
-          Viewing as {session.user.name} ({session.account.name}). Actions are recorded in the audit
-          log.
+          {imp.mode === 'act' ? 'Logged in as' : 'Viewing as'} {session.user.name} (
+          {session.account.name}).{' '}
+          {imp.mode === 'act'
+            ? 'Password, sign-in, API keys and payments are blocked.'
+            : 'Read-only.'}{' '}
+          Actions are recorded in the audit log.
         </Alert>
       )}
       {session.account.status === 'suspended' && (

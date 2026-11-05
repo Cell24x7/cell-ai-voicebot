@@ -52,7 +52,9 @@ describe('nav config', () => {
       'admin-system',
       'admin-phone-numbers',
     ]);
-    expect(visibleNavItems(() => true, false, 99)).toHaveLength(NAV_ITEMS.length - 6);
+    expect(visibleNavItems(() => true, false, 99)).toHaveLength(NAV_ITEMS.length - 7);
+    // Phase 19: the reseller item only for reseller accounts
+    expect(visibleNavItems(() => true, false, 99, true).map((i) => i.key)).toContain('reseller');
     // Phase 3 builds did not show the wallet
     expect(visibleNavItems(() => true, false, 3).map((i) => i.key)).not.toContain('wallet');
     // Phase 4 builds hid AI agents and knowledge
@@ -278,14 +280,42 @@ describe('AppLayout', () => {
     useAuthStore.getState().startImpersonation(
       fakeSession('owner', {
         accessToken: 'imp',
-        impersonation: { impersonatorId: 'u1', expiresAt: '2026-10-08T01:00:00Z' },
+        impersonation: {
+          impersonatorId: 'u1',
+          expiresAt: '2026-10-08T01:00:00Z',
+          mode: 'view',
+          kind: 'superadmin',
+          returnTo: '/admin/accounts/a1',
+        },
       }),
     );
     renderWithProviders({ route: '/' });
-    expect(screen.getByText(/Viewing as Asha Verma \(Demo Finance\)/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(screen.getByText(/Viewing as Asha Verma/)).toBeInTheDocument();
+    expect(screen.getByText(/Read-only/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Back to admin' }));
     await waitFor(() => expect(useAuthStore.getState().session?.impersonation).toBeNull());
     expect(adminApi.stopImpersonation).toHaveBeenCalled();
+  });
+
+  it('act banner from a reseller: Logged in as + Back to reseller panel (Phase 19)', async () => {
+    signInAs('owner');
+    useAuthStore.getState().startImpersonation(
+      fakeSession('owner', {
+        accessToken: 'imp',
+        impersonation: {
+          impersonatorId: 'u9',
+          expiresAt: '2026-10-08T01:00:00Z',
+          mode: 'act',
+          kind: 'reseller',
+          returnTo: '/reseller/customers/a1',
+        },
+      }),
+    );
+    renderWithProviders({ route: '/' });
+    expect(screen.getByText(/Logged in as Asha Verma/)).toBeInTheDocument();
+    expect(screen.getByText(/API keys and payments are blocked/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Back to reseller panel' }));
+    await waitFor(() => expect(useAuthStore.getState().session?.impersonation).toBeNull());
   });
 
   it('redirects to 403 page content', () => {

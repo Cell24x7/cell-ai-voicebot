@@ -18,6 +18,8 @@ import Typography from '@mui/material/Typography';
 import { useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 
+import { useAuthStore } from '@/features/auth/store';
+import { useWalletProvider } from '@/features/resellers/queries';
 import { getErrorMessage } from '@/services/api/errors';
 import type { RateCardView, Wallet, WalletStatus } from '@/services/api/types';
 import { formatCurrencyMicros } from '@/utils/format';
@@ -160,7 +162,12 @@ function Cards({ wallet }: { wallet: Wallet }) {
 export function OverviewTab() {
   const wallet = useWallet();
   const rates = useRates();
-  const canTopUp = useCanTopUp();
+  const canTopUpRole = useCanTopUp();
+  // Phase 19: a reseller's customer may not be allowed to top up itself
+  const underReseller = useAuthStore((s) => Boolean(s.session?.account.parentAccountId));
+  const provider = useWalletProvider(underReseller);
+  const providerOnly = underReseller && provider.data?.topupAllowed === false;
+  const canTopUp = canTopUpRole && !providerOnly;
   const [params, setParams] = useSearchParams();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const addOpen = params.get('add') === '1' && canTopUp;
@@ -216,6 +223,12 @@ export function OverviewTab() {
             Add money
           </Button>
         </Stack>
+      )}
+      {providerOnly && (
+        <Alert severity="info">
+          Credit is added by {provider.data?.provider?.name ?? 'your provider'}. Contact them to add
+          more.
+        </Alert>
       )}
       <Cards wallet={w} />
       <Grid container spacing={2}>

@@ -117,3 +117,27 @@ Never log prompts, persona text, user / assistant messages, knowledge text, func
 - **API keys:** refused on all privacy and MFA routes. Limits per account in `accounts.apiLimits`, picked up within 30 s.
 - **Webhooks:** signed paths skip the global limit, because they all come from a few provider addresses. The signature and body size protect them.
 - **Logs:** never phones, names, texts, TOTP secrets, recovery codes or sensitive values.
+
+## 15. Open signup and resellers (Phase 19)
+
+- **Signup without e-mail:** `POST /auth/signup` creates a business or reseller account and a verified owner and returns a session; no e-mail or code. Protection: the auth limiter plus `signup-ip` (5 / hour per IP), a hidden honeypot field (`website`, any value → 422 + `signup_honeypot` log), the password policy, the superadmin switches `signup.open` / `signup.resellerSignup`. A taken e-mail answers `AUTH_EMAIL_TAKEN` (409) — an accepted enumeration trade-off for a form people must be able to recover from; rate limited.
+- The old e-mail code routes answer `AUTH_ROUTE_GONE` (410); login, refresh and `authenticate` no longer look at `emailVerifiedAt`.
+- **Log in as (view / act):** a superadmin logs in as an account's owner to **view** (every change refused, as before) or to **act**; a reseller logs in as its own customers (act only, approved reseller). Token claims `imp` (who), `imm` (mode), `imk` (`superadmin` / `reseller`), session `imp_…`, 1 h, no refresh, nested refused (`CONFLICT_INVALID_STATE`); audited in both accounts (`admin.impersonation_*` with `mode`, `reseller.login_as_started` / `_stopped`). `blockWhenImpersonating()` refuses **view** sessions; `blockSensitiveWhenImpersonating()` refuses **both** modes on:
+
+  | Area                  | Routes                                                                                                   |
+  | --------------------- | -------------------------------------------------------------------------------------------------------- |
+  | Own sign-in           | `POST /auth/change-password`, `POST /auth/logout-all`, `DELETE /auth/sessions/:id`, `POST /auth/mfa/*`   |
+  | Keys and integrations | `POST / PATCH /api-keys…`, `/webhook-endpoints` changes                                                  |
+  | Money                 | `POST /wallet/topups…` (create, verify, fake-complete), `PATCH /wallet/settings`, `PUT /billing/profile` |
+  | Ownership and data    | `POST /team/transfer-ownership`, `POST /account/export`, account delete / cancel, `POST /privacy/erase…` |
+
+  Every other `blockWhenImpersonating()` route (campaigns, inbox, templates, contacts, flows, agents, calls, WhatsApp settings, team invites, exports, reports, insights, knowledge, post-call rules, sheet imports, public messages) is allowed in **act** mode.
+
+## Phase 19 continuation guards
+
+Sending budgets are atomic Redis rolling windows per tenant/sender; Redis failure defers.
+Unknown number classification cannot gain 75/sec from legacy false defaults. Sender IDs
+remain account/WABA scoped, including approval/media. Consent is per sender/contact;
+program activity and number readiness are rechecked before calls. Selected SIP senders
+are carried to the backend; stale transport rejects rather than silently simulating.
+Signup now has its own `rl:signup:` Redis store, separate from `rl:auth:` and its window.

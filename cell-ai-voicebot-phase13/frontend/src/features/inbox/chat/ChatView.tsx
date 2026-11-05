@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography';
 import { useState } from 'react';
 
 import { usePermission } from '@/features/auth/hooks';
+import { CallAction } from '@/features/calls/CallMethodDialog';
 import { ContactFormDialog } from '@/features/contacts/ContactFormDialog';
 import { useCustomFields } from '@/features/contacts/queries';
 import { CallButton } from '@/features/whatsapp-calling/live/CallButton';
@@ -120,6 +121,17 @@ export function ChatView({
           <>
             {c.channel && !c.contact.deleted && (
               <CallButton
+                channelId={c.channelId}
+                contactId={c.contact.id}
+                phoneE164={c.phoneE164}
+                label={c.label}
+                conversationId={c.id}
+                windowExpiresAt={c.windowExpiresAt}
+              />
+            )}
+            {c.channel && !c.contact.deleted && (
+              <CallAction
+                buttonLabel="Call options"
                 channelId={c.channelId}
                 contactId={c.contact.id}
                 phoneE164={c.phoneE164}

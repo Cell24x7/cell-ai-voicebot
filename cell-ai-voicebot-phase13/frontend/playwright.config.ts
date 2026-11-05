@@ -98,6 +98,8 @@ export default defineConfig({
       env: {
         NODE_ENV: 'development',
         PORT: '5100',
+        // One trusted local Vite proxy hop; signup specs simulate distinct client IPs.
+        TRUST_PROXY: '1',
         LOG_LEVEL: backendLogs ? 'info' : 'warn',
         FRONTEND_URL,
         CORS_ORIGINS: FRONTEND_URL,

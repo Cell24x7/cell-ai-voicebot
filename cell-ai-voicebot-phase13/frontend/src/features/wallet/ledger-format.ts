@@ -14,6 +14,8 @@ export const LEDGER_TYPE_LABELS: Record<LedgerType, string> = {
   recording_charge: 'Recording storage',
   whatsapp_charge: 'WhatsApp message',
   whatsapp_call_charge: 'WhatsApp call',
+  credit_transfer_out: 'Credit given to a customer',
+  credit_transfer_in: 'Credit added by your provider',
 };
 
 export const LEDGER_STATUS_LABELS: Record<LedgerEntry['status'], string> = {

@@ -54,8 +54,18 @@ export function CampaignDetailPage() {
               label={CAMPAIGN_STATUS_LABELS[c.status]}
             />
             {c.mode === 'dry_run' && <Chip size="small" variant="outlined" label="Dry run" />}
-            <Link component={RouterLink} to={`/flows/${c.flow.id}`}>
-              {c.flow.name || 'Deleted flow'}
+            <Chip
+              size="small"
+              variant="outlined"
+              label={c.line === 'whatsapp' ? 'WhatsApp call' : 'SIP / Normal call'}
+            />
+            <Link
+              component={RouterLink}
+              to={c.program?.kind === 'agent' ? `/agents/${c.program.id}` : `/flows/${c.flow.id}`}
+            >
+              {c.program?.kind === 'agent'
+                ? c.program.name || 'AI agent'
+                : c.flow.name || 'Deleted flow'}
               {c.flow.version ? ` v${String(c.flow.version)}` : ''}
             </Link>
             {c.parentId && (

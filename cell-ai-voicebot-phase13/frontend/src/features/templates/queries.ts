@@ -135,7 +135,13 @@ export const useEditTemplate = () =>
     true,
   );
 export const useSubmitTemplate = () =>
-  useTemplateMutation((id: string) => templatesApi.submit(id), true);
+  useTemplateMutation(
+    (input: string | { id: string; channelId: string }) =>
+      typeof input === 'string'
+        ? templatesApi.submit(input)
+        : templatesApi.submit(input.id, input.channelId),
+    true,
+  );
 export const useSetVariableSources = () =>
   useTemplateMutation(({ id, sources }: { id: string; sources: WhatsAppVariableSourceInput[] }) =>
     templatesApi.setVariables(id, sources),

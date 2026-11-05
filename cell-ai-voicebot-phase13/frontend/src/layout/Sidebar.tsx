@@ -33,9 +33,14 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const { pathname } = useLocation();
   const platformAccount = useAuthStore((st) => Boolean(st.session?.account.isPlatform));
   // the platform account has no wallet (billing lives under /admin/billing)
+  const reseller = useAuthStore(
+    (st) => st.session?.account.kind === 'reseller' && !st.session.impersonation,
+  );
   const items = visibleNavItems(
     (perm) => can(perm) && !(platformAccount && perm.startsWith('wallet.')),
     platformAdmin,
+    undefined,
+    reseller,
   );
   const main = items.filter((i) => !i.platformOnly);
   const admin = items.filter((i) => i.platformOnly);

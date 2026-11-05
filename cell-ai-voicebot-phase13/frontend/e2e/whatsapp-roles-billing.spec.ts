@@ -72,11 +72,11 @@ test('superadmin: read only while impersonating; Meta billing → customer pays;
   const admin = await (await browser.newContext()).newPage();
   await signInAsSuperadmin(admin);
   await openAdminAccount(admin, account.businessName);
-  await admin.getByRole('button', { name: 'Impersonate' }).click();
+  await admin.getByRole('button', { name: 'View as' }).click();
   await admin.getByRole('dialog').getByRole('button', { name: 'Start viewing' }).click();
   await expect(admin.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
   await expectReadOnly(admin);
-  await admin.getByRole('button', { name: 'Stop' }).click();
+  await admin.getByRole('button', { name: 'Back to admin' }).click();
 
   // the account pays Meta itself from now on
   await openAdminAccount(admin, account.businessName);

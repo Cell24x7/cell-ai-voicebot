@@ -10,7 +10,7 @@ test('superadmin views an account as its owner and stops', async ({ page, browse
   await signInAsSuperadmin(admin);
   await openAdminAccount(admin, owner.businessName);
 
-  await admin.getByRole('button', { name: 'Impersonate' }).click();
+  await admin.getByRole('button', { name: 'View as' }).click();
   await admin.getByRole('dialog').getByRole('button', { name: 'Start viewing' }).click();
   await expect(admin.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
   await expect(
@@ -28,7 +28,7 @@ test('superadmin views an account as its owner and stops', async ({ page, browse
   await admin.getByRole('tab', { name: 'API keys' }).click();
   await expect(admin.getByRole('button', { name: 'Create API key' })).toHaveCount(0);
 
-  await admin.getByRole('button', { name: 'Stop' }).click();
+  await admin.getByRole('button', { name: 'Back to admin' }).click();
   await expect(admin.getByRole('heading', { level: 1, name: owner.businessName })).toBeVisible();
   await expect(admin.getByRole('link', { name: 'Accounts', exact: true })).toBeVisible();
 

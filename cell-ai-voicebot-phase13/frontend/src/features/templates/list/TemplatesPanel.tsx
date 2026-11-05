@@ -63,7 +63,11 @@ const STATUS_FILTERS: WhatsAppTemplateStatus[] = [
   'FLAGGED',
 ];
 
-type BuilderOpen = { template: WhatsAppTemplate | null; initial?: BuilderState } | null;
+type BuilderOpen = {
+  channelId: string;
+  template: WhatsAppTemplate | null;
+  initial?: BuilderState;
+} | null;
 
 /** Templates tab of the WhatsApp page (region **Templates**). */
 export function TemplatesPanel() {
@@ -76,21 +80,54 @@ export function TemplatesPanel() {
   const [status, setStatus] = useState<WhatsAppTemplateStatus | ''>('');
   const [category, setCategory] = useState<WhatsAppTemplateCategory | ''>('');
   const [language, setLanguage] = useState('');
-  const [channelId, setChannelId] = useState('');
   const [search, setSearch] = useState('');
   const q = useDebouncedValue(search.trim(), 300);
   const [details, setDetails] = useState<string | null>(null);
   // Phase 18B: `?create=call_permission[&lang=hi]` (Calling section / permission dialogs)
   const [params, setParams] = useSearchParams();
   const createParam = params.get('create');
-  const [builder, setBuilder] = useState<BuilderOpen>(() =>
-    createParam === 'call_permission' && canManage
-      ? { template: null, initial: callPermissionState(params.get('lang') ?? 'en') }
-      : null,
-  );
+  const [builder, setBuilder] = useState<BuilderOpen>(null);
   const [presetAnchor, setPresetAnchor] = useState<HTMLElement | null>(null);
+  const numbers = (channels.data?.items ?? []).filter((c) => c.status !== 'disconnected');
+  const channelId = params.get('channelId') ?? (numbers.length === 1 ? numbers[0]!.id : '');
+  const selected = numbers.find((c) => c.id === channelId);
+  const target =
+    selected && ['connected', 'action_needed', 'restricted'].includes(selected.status)
+      ? selected.id
+      : '';
+  const selectNumber = (id: string) => {
+    setDetails(null);
+    setLanguage('');
+    setParams((p) => {
+      p.set('channelId', id);
+      return p;
+    });
+  };
   useEffect(() => {
-    if (!createParam) return;
+    if (
+      !params.has('channelId') &&
+      channels.data?.items.filter((c) => c.status !== 'disconnected').length === 1
+    ) {
+      setParams(
+        (p) => {
+          p.set('channelId', channelId);
+          return p;
+        },
+        { replace: true },
+      );
+    }
+  }, [channelId, params, channels.data, setParams]);
+  const activeBuilder =
+    builder ??
+    (createParam === 'call_permission' && target && canManage
+      ? {
+          channelId: target,
+          template: null,
+          initial: callPermissionState(params.get('lang') ?? 'en'),
+        }
+      : null);
+  const closeBuilder = () => {
+    setBuilder(null);
     setParams(
       (p) => {
         p.delete('create');
@@ -99,10 +136,8 @@ export function TemplatesPanel() {
       },
       { replace: true },
     );
-  }, [createParam, setParams]);
+  };
 
-  const numbers = (channels.data?.items ?? []).filter((c) => c.status !== 'disconnected');
-  const target = channelId || numbers[0]?.id || '';
   const templates = useTemplates(
     {
       ...(channelId ? { channelId } : {}),
@@ -110,7 +145,7 @@ export function TemplatesPanel() {
       ...(category ? { category } : {}),
       ...(q.length >= 1 ? { q } : {}),
     },
-    enabled && numbers.length > 0,
+    enabled && numbers.length > 0 && (!channelId || Boolean(selected)),
   );
 
   const notSetUp =
@@ -145,8 +180,9 @@ export function TemplatesPanel() {
     return null;
   })();
 
-  const rows = (templates.data ?? []).filter((t) => !language || t.language === language);
-  const languages = [...new Set((templates.data ?? []).map((t) => t.language))].sort();
+  const visibleRows = channelId && !selected ? [] : (templates.data ?? []);
+  const rows = visibleRows.filter((t) => !language || t.language === language);
+  const languages = [...new Set(visibleRows.map((t) => t.language))].sort();
   const numberLabel = (ids: string[]) =>
     ids.map((id) => numbers.find((n) => n.id === id)?.label ?? '—').join(', ');
 
@@ -225,6 +261,7 @@ export function TemplatesPanel() {
                 </Button>
                 <Button
                   startIcon={<PhoneInTalkOutlined />}
+                  disabled={!target}
                   onClick={(e) => setPresetAnchor(e.currentTarget)}
                 >
                   Create call permission template
@@ -244,7 +281,11 @@ export function TemplatesPanel() {
                       key={lang}
                       onClick={() => {
                         setPresetAnchor(null);
-                        setBuilder({ template: null, initial: callPermissionState(lang) });
+                        setBuilder({
+                          channelId: target,
+                          template: null,
+                          initial: callPermissionState(lang),
+                        });
                       }}
                     >
                       {label}
@@ -254,7 +295,8 @@ export function TemplatesPanel() {
                 <Button
                   variant="contained"
                   startIcon={<Add />}
-                  onClick={() => setBuilder({ template: null })}
+                  disabled={!target}
+                  onClick={() => setBuilder({ channelId: target, template: null })}
                 >
                   Create template
                 </Button>
@@ -318,28 +360,33 @@ export function TemplatesPanel() {
                 </MenuItem>
               ))}
             </TextField>
-            {numbers.length > 1 && (
+            {
               <TextField
                 select
                 size="small"
-                label="Number"
+                label="WhatsApp number"
                 value={channelId}
-                onChange={(e) => setChannelId(e.target.value)}
+                onChange={(e) => selectNumber(e.target.value)}
                 sx={{ minWidth: 170 }}
               >
-                <MenuItem value="">All numbers</MenuItem>
+                <MenuItem value="">All WhatsApp numbers</MenuItem>
                 {numbers.map((n) => (
                   <MenuItem key={n.id} value={n.id}>
-                    {n.label}
+                    {n.label} · {n.phoneE164 ?? 'Number pending'}
                   </MenuItem>
                 ))}
               </TextField>
-            )}
+            }
           </Stack>
+          <Alert severity="info">
+            {target
+              ? 'Templates are shared by numbers in the same WhatsApp Business account. Approval and sync use the selected number.'
+              : 'Choose a connected WhatsApp number before creating, editing, syncing or submitting a template.'}
+          </Alert>
           <DataTable
             aria-label="Templates"
             columns={columns}
-            rows={templates.data ? rows : undefined}
+            rows={channelId && !selected ? [] : templates.data ? rows : undefined}
             getRowId={(t) => t.id}
             loading={templates.isLoading}
             error={templates.error}
@@ -360,21 +407,45 @@ export function TemplatesPanel() {
       <TemplateDrawer
         templateId={details}
         canManage={canManage}
+        channelId={target || null}
         onClose={() => setDetails(null)}
-        onEdit={(template) => setBuilder({ template })}
+        onEdit={(template) => {
+          if (target && template.channelIds.includes(target))
+            setBuilder({ channelId: target, template });
+        }}
       />
-      {builder && target && (
+      {activeBuilder && (
         <Suspense fallback={null}>
-          <TemplateBuilder
-            open
-            channelId={target}
-            template={builder.template}
-            {...(builder.initial ? { initial: builder.initial } : {})}
-            onClose={() => setBuilder(null)}
+          <FrozenBuilder
+            context={activeBuilder}
+            onClose={closeBuilder}
             onSaved={(t) => setDetails(t.id)}
           />
         </Suspense>
       )}
     </Stack>
+  );
+}
+
+/** Capture the approval sender for the lifetime of an open draft. */
+function FrozenBuilder({
+  context,
+  onClose,
+  onSaved,
+}: {
+  context: NonNullable<BuilderOpen>;
+  onClose: () => void;
+  onSaved: (template: WhatsAppTemplate) => void;
+}) {
+  const [initial] = useState(context);
+  return (
+    <TemplateBuilder
+      open
+      channelId={initial.channelId}
+      template={initial.template}
+      {...(initial.initial ? { initial: initial.initial } : {})}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
   );
 }

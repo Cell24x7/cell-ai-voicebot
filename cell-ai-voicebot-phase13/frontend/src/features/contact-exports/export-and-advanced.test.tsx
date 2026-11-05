@@ -293,7 +293,13 @@ describe('export dialog', () => {
     unmount();
 
     signInAs('owner', {
-      impersonation: { impersonatorId: 'p1', expiresAt: '2026-10-09T01:00:00Z' },
+      impersonation: {
+        impersonatorId: 'p1',
+        expiresAt: '2026-10-09T01:00:00Z',
+        mode: 'view',
+        kind: 'superadmin',
+        returnTo: '/admin/accounts/a1',
+      },
     });
     renderWithProviders({
       routes: [

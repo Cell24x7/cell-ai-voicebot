@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Request } from '@playwright/test';
 
 import { createAgentFromTemplate } from './agents';
 import { setAccountWindow } from './campaigns';
@@ -22,16 +22,6 @@ const openContact = async (name: string) => {
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 };
 
-const callNow = async () => {
-  await page.getByRole('button', { name: 'Call now' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Call now' });
-  await expect(dialog.getByText(/Simulated call — no phone line yet/)).toBeVisible();
-  await dialog.getByLabel('Flow', { exact: true }).click();
-  await page.getByRole('option', { name: `${FLOW} (v1)` }).click();
-  await dialog.getByRole('button', { name: 'Call', exact: true }).click();
-  return dialog;
-};
-
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(240_000);
   page = await browser.newPage();
@@ -52,30 +42,28 @@ test.afterAll(async () => {
   await page.close();
 });
 
-test('Call now → the simulated call completes → its page has the transcript and says "Simulated call"', async () => {
-  test.setTimeout(150_000);
+test('Call now without a connected SIP/WhatsApp calling number explains setup and makes no dial request', async () => {
   await openContact(BORROWER.name);
-  const dialog = await callNow();
-  await expect(dialog.getByText('Completed', { exact: true })).toBeVisible({ timeout: 120_000 });
-  await dialog.getByRole('link', { name: 'Open the call' }).click();
-  await page.waitForURL(/\/calls\/[0-9a-f]{24}$/);
-  await expect(page.getByText('Simulated call', { exact: true })).toBeVisible();
-  // the simulated customer varies (one hangs up early), the transcript is always there
-  await expect(page.getByRole('region', { name: 'Transcript' })).toBeVisible();
-  // the contact now has a call in its history
-  await openContact(BORROWER.name);
+  const dialRequests: string[] = [];
+  const capture = (request: Request) => {
+    if (
+      request.method() === 'POST' &&
+      /\/api\/v1\/(calls|whatsapp\/calls)$/.test(new URL(request.url()).pathname)
+    )
+      dialRequests.push(request.url());
+  };
+  page.on('request', capture);
+  await page.getByRole('button', { name: 'Call now' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Call now' });
   await expect(
-    page.getByRole('region', { name: 'Call history' }).getByText(/^1 call · last/),
+    dialog.getByText(
+      'Connect a SIP caller number or enable calling on a supported WhatsApp number.',
+    ),
   ).toBeVisible();
-});
-
-test('a do-not-call contact is refused in words', async () => {
-  await openContact(DND.name);
-  const dialog = await callNow();
-  await expect(
-    dialog.getByText("This contact can't be called right now. On the do-not-call list."),
-  ).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Phone setup' })).toBeVisible();
+  expect(dialRequests).toHaveLength(0);
   await dialog.getByRole('button', { name: 'Close' }).click();
+  page.off('request', capture);
 });
 
 test('"Test in browser" opens the tester with the contact selected', async () => {

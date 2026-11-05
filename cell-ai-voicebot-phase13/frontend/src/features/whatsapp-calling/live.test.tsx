@@ -49,6 +49,7 @@ import { newActiveCall, useLiveCallStore } from './live/store';
 vi.mock('@/services/api/whatsapp-calling', () => ({
   whatsappCallingApi: {
     permission: vi.fn(),
+    quote: vi.fn(),
     getSettings: vi.fn(),
     requestPermission: vi.fn(),
     setAvailability: vi.fn(),
@@ -140,6 +141,16 @@ beforeEach(() => {
   api.hold.mockResolvedValue({ held: true });
   api.transfer.mockResolvedValue({ callId: 'wc1', ringing: true });
   api.permission.mockResolvedValue(fakeCallPermission('temporary'));
+  api.quote.mockResolvedValue({
+    channelId: 'wa1',
+    contactId: 'c1',
+    senderLabel: 'Support',
+    senderPhone: '+919000000001',
+    market: 'IN',
+    callPerMinuteMicros: 450000,
+    aiPerMinuteMicros: 6000000,
+    pulseSec: 6,
+  });
   api.getSettings.mockResolvedValue(fakeCallingSettings());
   api.setAvailability.mockImplementation((s) => Promise.resolve({ status: s }));
   vi.mocked(flowsApi.list).mockResolvedValue(offset([fakeFlowRow()]));
