@@ -37,7 +37,11 @@ import { contactsApi } from '@/services/api/contacts';
 import { getErrorMessage } from '@/services/api/errors';
 import { inboxApi } from '@/services/api/inbox';
 import { templatesApi } from '@/services/api/templates';
-import type { WhatsAppCampaignEstimate, WhatsAppTemplateListItem } from '@/services/api/types';
+import type {
+  WhatsAppCampaignEstimate,
+  WhatsAppChannel,
+  WhatsAppTemplateListItem,
+} from '@/services/api/types';
 import { formatCurrencyMicros } from '@/utils/format';
 
 import type { VariableKind, WaWizardDraft } from './draft';
@@ -54,6 +58,7 @@ const templateLabel = (t: WhatsAppTemplateListItem) => `${t.name} (${t.category}
 export function NumberStep({ draft, onChange }: StepProps) {
   const channels = useChannels();
   const items = channels.data?.items ?? [];
+  const connected = items.filter((c) => c.status === 'connected');
   return (
     <Stack spacing={2}>
       <TextField
@@ -66,7 +71,9 @@ export function NumberStep({ draft, onChange }: StepProps) {
       <TextField
         select
         label="WhatsApp number"
-        value={draft.channelId}
+        value={connected.some((c) => c.id === draft.channelId) ? draft.channelId : ''}
+        disabled={channels.isPending || Boolean(channels.error)}
+        helperText="Choose the WhatsApp channel that will send this campaign."
         onChange={(e) =>
           // changing the number drops the templates / variables (they belong to a number)
           onChange({
@@ -79,15 +86,22 @@ export function NumberStep({ draft, onChange }: StepProps) {
           })
         }
       >
-        {items
-          .filter((c) => c.status === 'connected')
-          .map((c) => (
-            <MenuItem key={c.id} value={c.id}>
-              {c.displayPhoneNumber ?? c.phoneE164 ?? c.label}
-              {c.status !== 'connected' ? ` · ${c.status}` : ''}
-            </MenuItem>
-          ))}
+        {connected.map((c) => (
+          <MenuItem key={c.id} value={c.id}>
+            {c.displayPhoneNumber ?? c.phoneE164 ?? c.label}
+            {c.status !== 'connected' ? ` · ${c.status}` : ''}
+          </MenuItem>
+        ))}
       </TextField>
+      {channels.isPending && <LinearProgress aria-label="Loading WhatsApp numbers" />}
+      {channels.error && (
+        <Alert
+          severity="error"
+          action={<Button onClick={() => void channels.refetch()}>Retry</Button>}
+        >
+          {getErrorMessage(channels.error)}
+        </Alert>
+      )}
       {items.find((c) => c.id === draft.channelId) && (
         <Typography variant="body2">
           Up to {items.find((c) => c.id === draft.channelId)?.messageRateLimit ?? 18} messages/sec
@@ -95,8 +109,13 @@ export function NumberStep({ draft, onChange }: StepProps) {
           classification is unknown.
         </Typography>
       )}
-      {items.length === 0 && (
-        <Alert severity="info">No WhatsApp number yet — connect one first.</Alert>
+      {channels.isSuccess && connected.length === 0 && (
+        <Alert severity="info">
+          No connected WhatsApp number — connect or reconnect one first.{' '}
+          <Button component={RouterLink} to="/whatsapp/numbers">
+            WhatsApp numbers
+          </Button>
+        </Alert>
       )}
     </Stack>
   );
@@ -128,7 +147,9 @@ export function TemplateStep({ draft, onChange }: StepProps) {
     const variants = draft.variants.map((v, j) => (j === i ? { ...v, ...patch } : v));
     onChange({
       variants,
-      ...(patch.templateId !== undefined ? { variables: {}, headerMediaToken: null } : {}),
+      ...(patch.templateId !== undefined
+        ? { variables: {}, headerMediaToken: null, headerLocation: null }
+        : {}),
     });
   };
   const removeVariant = (i: number) =>
@@ -144,10 +165,34 @@ export function TemplateStep({ draft, onChange }: StepProps) {
         })),
       abWinner: draft.variants.length > 2 ? draft.abWinner : null,
       variables: {},
+      headerMediaToken: null,
+      headerLocation: null,
     });
   const sum = draft.variants.reduce((a, v) => a + v.splitPct, 0);
   return (
     <Stack spacing={2}>
+      {templates.isPending && <LinearProgress aria-label="Loading approved templates" />}
+      {templates.error && (
+        <Alert
+          severity="error"
+          action={<Button onClick={() => void templates.refetch()}>Retry</Button>}
+        >
+          {getErrorMessage(templates.error)}
+        </Alert>
+      )}
+      {templates.isSuccess && rows.length === 0 && (
+        <Alert severity="info">
+          No approved templates on this number.{' '}
+          <Button
+            component={RouterLink}
+            to={`/whatsapp/templates?channelId=${encodeURIComponent(draft.channelId)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Manage templates
+          </Button>
+        </Alert>
+      )}
       <Typography variant="subtitle2">
         Message variants (approved templates only; {String(rows.length)} available on this number)
       </Typography>
@@ -162,7 +207,8 @@ export function TemplateStep({ draft, onChange }: StepProps) {
           <TextField
             select
             label="Template"
-            value={v.templateId}
+            value={rows.some((t) => t.id === v.templateId) ? v.templateId : ''}
+            disabled={templates.isPending || Boolean(templates.error)}
             onChange={(e) => setVariant(i, { templateId: e.target.value })}
             sx={{ minWidth: 260 }}
           >
@@ -545,7 +591,12 @@ export function AudienceStep({ draft, onChange }: StepProps) {
       )}
       {draft.audienceMode === 'csv' && (
         <Stack spacing={1}>
-          <Button component={RouterLink} to="/contacts/imports/new" target="_blank">
+          <Button
+            component={RouterLink}
+            to="/contacts/import"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             Upload and import contacts
           </Button>
           <TextField
@@ -690,7 +741,14 @@ export function ScheduleStep({ draft, onChange }: StepProps) {
 
 /** Step 5 — cost preview + the Start button (one Idempotency-Key per attempt). */
 export interface ReviewStepProps extends StepProps {
-  estimate?: { data?: WhatsAppCampaignEstimate; isPending: boolean; error: unknown };
+  sender?: WhatsAppChannel | undefined;
+  templateNames?: string[];
+  estimate?: {
+    data?: WhatsAppCampaignEstimate;
+    isPending: boolean;
+    isFetching?: boolean;
+    error: unknown;
+  };
   onStart: () => void;
   starting: boolean;
   startError: unknown;
@@ -699,6 +757,8 @@ export interface ReviewStepProps extends StepProps {
 
 export function ReviewStep({
   draft,
+  sender,
+  templateNames,
   estimate,
   onStart,
   starting,
@@ -722,6 +782,18 @@ export function ReviewStep({
             : `${String(draft.contactIds.length)} picked contact(s)`;
   return (
     <Stack spacing={2}>
+      <Typography variant="h6">{draft.name}</Typography>
+      {sender && (
+        <Typography>
+          Sending number: {sender.label} · {sender.displayPhoneNumber ?? sender.phoneE164}
+          {' · '}up to {sender.messageRateLimit ?? 18} messages/sec
+        </Typography>
+      )}
+      {templateNames?.map((name, index) => (
+        <Typography key={draft.variants[index]?.key ?? name}>
+          Template {draft.variants[index]?.key}: {name} · {draft.variants[index]?.splitPct}%
+        </Typography>
+      ))}
       <Typography variant="subtitle2">
         {draft.variants.map((v) => v.key).join(' / ')} → {audience}
         {draft.scheduleMode === 'recurring'
@@ -814,7 +886,8 @@ export function ReviewStep({
             !e.enough ||
             !e.recipients ||
             Boolean(estimate?.error) ||
-            Boolean(estimate?.isPending)
+            Boolean(estimate?.isPending) ||
+            Boolean(estimate?.isFetching)
           }
           size="large"
         >

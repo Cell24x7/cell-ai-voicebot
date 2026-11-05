@@ -4,7 +4,7 @@ import type { WhatsAppChannel } from '@/services/api/types';
 export type CampaignType = 'phone' | 'whatsapp' | 'whatsapp-call';
 export const CAMPAIGN_TYPES: { value: CampaignType; label: string }[] = [
   { value: 'phone', label: 'SIP / Normal call' },
-  { value: 'whatsapp', label: 'WhatsApp message' },
+  { value: 'whatsapp', label: 'WhatsApp bulk campaign' },
   { value: 'whatsapp-call', label: 'WhatsApp call' },
 ];
 

@@ -4,9 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '@/services/api/errors';
 import { templatesApi } from '@/services/api/templates';
+import { whatsappApi } from '@/services/api/whatsapp';
 import { signInAs } from '@/test/auth';
 import { renderWithProviders } from '@/test/render';
-import { fakeWaEstimate } from '@/test/whatsapp-campaigns';
+import { fakeChannel } from '@/test/whatsapp';
+import { fakeWaCampaign, fakeWaEstimate } from '@/test/whatsapp-campaigns';
 
 import { api } from './test-setup';
 
@@ -39,16 +41,27 @@ vi.mock('@/services/api/contact-imports', () => ({ contactImportsApi: { list: vi
 
 const next = () => fireEvent.click(screen.getByRole('button', { name: 'Next' }));
 async function choose(label: string, option: string) {
-  fireEvent.mouseDown(screen.getByRole('combobox', { name: label }));
+  const select = await screen.findByRole('combobox', { name: label });
+  await waitFor(() => expect(select).not.toHaveAttribute('aria-disabled', 'true'));
+  fireEvent.mouseDown(select);
   fireEvent.click(await screen.findByRole('option', { name: option }));
 }
-async function toReview() {
+async function toReview(fromCall = false) {
   signInAs('manager');
-  renderWithProviders({ route: '/campaigns/whatsapp/new?listId=l1' });
+  renderWithProviders({
+    route: fromCall ? '/campaigns/new?listId=l1' : '/campaigns/whatsapp/new?listId=l1',
+  });
   await screen.findByLabelText(/Campaign name/);
   fireEvent.change(screen.getByLabelText(/Campaign name/), {
     target: { value: 'November reminders' },
   });
+  if (fromCall) {
+    await choose('Campaign type', 'WhatsApp bulk campaign');
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard' }));
+    await screen.findByRole('heading', { name: 'New WhatsApp bulk campaign' });
+    expect(screen.getByLabelText(/Campaign name/)).toHaveValue('November reminders');
+    expect(screen.queryByRole('radio', { name: 'Live calls' })).not.toBeInTheDocument();
+  }
   await choose('WhatsApp number', '+91 90000 12345');
   next();
   await choose('Template', 'emi_reminder (UTILITY)');
@@ -106,12 +119,14 @@ describe('WhatsApp campaign wizard', () => {
   });
 
   it('saves the selected audience and mappings, estimates by market, and starts with a stable retry key', async () => {
-    const start = await toReview();
+    const start = await toReview(true);
     await waitFor(() => expect(start).toBeEnabled());
     const body = api.create.mock.calls[0]?.[0];
     expect(body?.audience.listIds).toEqual(['l1']);
     expect(body?.variables).toEqual({ '1': { kind: 'contact.name', value: null } });
     expect(screen.getByText(/IN.*50/)).toBeInTheDocument();
+    expect(screen.getByText(/Sending number: Support line/)).toBeInTheDocument();
+    expect(screen.getByText(/Template A: emi_reminder/)).toBeInTheDocument();
     api.start.mockRejectedValueOnce(
       new ApiError({
         status: 0,
@@ -167,11 +182,96 @@ describe('WhatsApp campaign wizard', () => {
     signInAs('manager');
     renderWithProviders({ route: '/campaigns/whatsapp/wc1/edit' });
     await screen.findByRole('button', { name: 'Next' });
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'WhatsApp number' })).toHaveTextContent(
+        '+91 90000 12345',
+      ),
+    );
     next();
     next();
     await waitFor(() => expect(templatesApi.get).toHaveBeenCalled());
     next();
     expect(await screen.findByText(/Wait for the templates to load/)).toBeInTheDocument();
+    expect(api.update).not.toHaveBeenCalled();
+  });
+
+  it('shows bulk campaigns to WhatsApp-only writers without offering call campaigns', async () => {
+    signInAs('manager', {
+      permissions: [
+        'whatsapp.campaigns.read',
+        'whatsapp.campaigns.write',
+        'whatsapp.read',
+        'templates.read',
+        'contacts.read',
+      ],
+    });
+    renderWithProviders({ route: '/campaigns/whatsapp/new' });
+    await choose('Campaign type', 'WhatsApp bulk campaign');
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Campaign type' }));
+    expect(screen.queryByRole('option', { name: 'SIP / Normal call' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'WhatsApp call' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+  });
+
+  it.each(['phone', 'whatsapp'] as const)(
+    'returns from bulk to the %s call wizard with its audience',
+    async (line) => {
+      signInAs('manager');
+      renderWithProviders({ route: '/campaigns/whatsapp/new?listIds=l1,l2' });
+      await choose('Campaign type', line === 'phone' ? 'SIP / Normal call' : 'WhatsApp call');
+      await screen.findByRole('heading', { name: 'New campaign' });
+      const picker = await screen.findByRole('combobox', { name: 'Campaign type' });
+      expect(picker).toHaveTextContent(line === 'phone' ? 'SIP / Normal call' : 'WhatsApp call');
+      await choose('Campaign type', 'WhatsApp bulk campaign');
+      await screen.findByRole('heading', { name: 'New WhatsApp bulk campaign' });
+      expect(api.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps the engine fixed when editing a saved bulk draft', async () => {
+    signInAs('manager');
+    renderWithProviders({ route: '/campaigns/whatsapp/wc1/edit' });
+    expect(await screen.findByRole('combobox', { name: 'Campaign type' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
+  it('blocks a saved draft with a disconnected sender before loading templates', async () => {
+    vi.mocked(whatsappApi.channels).mockResolvedValue({
+      items: [fakeChannel({ status: 'disconnected' })],
+    } as never);
+    signInAs('manager');
+    renderWithProviders({ route: '/campaigns/whatsapp/wc1/edit' });
+    await screen.findByText(/No connected WhatsApp number/);
+    next();
+    expect(await screen.findByText('Choose a connected WhatsApp number')).toBeInTheDocument();
+    expect(api.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects stale or unapproved templates and offers recovery for a failed template request', async () => {
+    vi.mocked(templatesApi.list).mockRejectedValue(new Error('Templates unavailable'));
+    signInAs('manager');
+    api.get.mockResolvedValue(fakeWaCampaign());
+    renderWithProviders({ route: '/campaigns/whatsapp/wc1/edit' });
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'WhatsApp number' })).toHaveTextContent(
+        '+91 90000 12345',
+      ),
+    );
+    next();
+    const retry = await screen.findByRole('button', { name: 'Retry' });
+    next();
+    expect(
+      await screen.findByText('Load the approved templates before continuing'),
+    ).toBeInTheDocument();
+    vi.mocked(templatesApi.list).mockResolvedValue([]);
+    fireEvent.click(retry);
+    await screen.findByText(/No approved templates on this number/);
+    next();
+    expect(
+      await screen.findByText('Choose approved templates for the selected WhatsApp number'),
+    ).toBeInTheDocument();
     expect(api.update).not.toHaveBeenCalled();
   });
 });

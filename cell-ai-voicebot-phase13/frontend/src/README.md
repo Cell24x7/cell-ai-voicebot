@@ -79,7 +79,13 @@ Calling recovery: `live/queries.ts` polls active call status every 2 seconds and
 
 ## Phase 19 continuation (candidate)
 
-Campaigns expose SIP / Normal call, WhatsApp message and WhatsApp call tabs. The message
+Campaigns expose SIP / Normal call, WhatsApp bulk campaign and WhatsApp call tabs. Both
+creation wizards use the same permission-aware `CampaignTypeSelect`; selecting bulk
+opens the existing number/template wizard. New-campaign switches carry the campaign
+name and supported selected audience, with unsaved-change confirmation. Saved bulk
+drafts keep their engine. Sender/template requests expose retry and empty states;
+the wizard rejects disconnected senders and stale/unapproved template selections.
+The message
 wizard supports variables/A-B, uploads/location, recurrence, eligible cost estimates
 and live reports. WhatsApp call campaigns support published flows or active AI agents.
 Template management always shows a WhatsApp sender filter, preserves it in the URL and

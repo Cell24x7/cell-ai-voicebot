@@ -14,6 +14,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 
 import { whatsappCapabilities } from '@/features/calls/capabilities';
+import { CampaignTypeSelect } from '@/features/campaigns/CampaignTypeSelect';
 import { useFlows, useFlowVersions } from '@/features/flows/queries';
 import { useTemplates } from '@/features/templates/queries';
 import { useChannels } from '@/features/whatsapp/queries';
@@ -37,7 +38,12 @@ export interface StepProps {
 export const LOCKED_HINT = "Can't change this once the campaign started";
 
 /** Name, mode (live needs the account on the phone line), flow and version. */
-export function BasicsStep({ draft, onChange, lock }: StepProps) {
+export function BasicsStep({
+  draft,
+  onChange,
+  lock,
+  onBulkCampaign,
+}: StepProps & { onBulkCampaign?: (() => void) | undefined }) {
   const flows = useFlows({ status: 'published', limit: 100 });
   const usable = (flows.data?.data ?? []).filter(
     (f) => f.publishedVersion && f.triggers.includes('campaign'),
@@ -61,26 +67,26 @@ export function BasicsStep({ draft, onChange, lock }: StepProps) {
     onChange({ phoneLine: { ...line, ...patch } });
   return (
     <Stack spacing={3}>
-      <TextField
-        select
-        label="Call type"
-        value={draft.line}
+      <CampaignTypeSelect
+        value={draft.line === 'whatsapp' ? 'whatsapp-call' : 'phone'}
         disabled={isLocked(lock, 'mode')}
-        onChange={(e) =>
+        bulkDisabled={!onBulkCampaign}
+        onChange={(type) => {
+          if (type === 'whatsapp') {
+            onBulkCampaign?.();
+            return;
+          }
           onChange({
-            line: e.target.value as WizardDraft['line'],
+            line: type === 'whatsapp-call' ? 'whatsapp' : 'phone',
             channelId: '',
             program: null,
             flowId: '',
             chosenVersion: null,
             askPermissionFirst: false,
             askPermissionTemplateId: '',
-          })
-        }
-      >
-        <MenuItem value="phone">SIP / Normal call</MenuItem>
-        <MenuItem value="whatsapp">WhatsApp call</MenuItem>
-      </TextField>
+          });
+        }}
+      />
       {draft.line === 'whatsapp' && (
         <Stack spacing={2}>
           <TextField

@@ -68,10 +68,12 @@ export const emptyDraft = (): WaWizardDraft => ({
 export const prefill = (draft: WaWizardDraft, params: URLSearchParams): WaWizardDraft => {
   const next = { ...draft };
   const listId = params.get('listId');
+  const listIds = params.get('listIds')?.split(',').filter(Boolean);
   const segmentId = params.get('segmentId');
   const contactIds = params.get('contactIds');
   const csvUploadId = params.get('csvUploadId');
   if (listId) Object.assign(next, { audienceMode: 'lists', listIds: [listId] });
+  if (listIds?.length) Object.assign(next, { audienceMode: 'lists', listIds });
   if (segmentId) Object.assign(next, { audienceMode: 'segment', segmentId });
   if (contactIds)
     Object.assign(next, {

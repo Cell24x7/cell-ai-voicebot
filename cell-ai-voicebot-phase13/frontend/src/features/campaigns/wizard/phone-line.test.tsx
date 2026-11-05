@@ -140,7 +140,7 @@ it('configures a WhatsApp campaign agent and an approved ask-first template with
   ]);
   wrap({ name: 'WhatsApp follow-up' });
   const user = userEvent.setup();
-  await user.click(screen.getByRole('combobox', { name: 'Call type' }));
+  await user.click(screen.getByRole('combobox', { name: 'Campaign type' }));
   await user.click(screen.getByRole('option', { name: 'WhatsApp call' }));
   await user.click(screen.getByRole('combobox', { name: 'WhatsApp calling number' }));
   await user.click(await screen.findByRole('option', { name: /Support line/ }));

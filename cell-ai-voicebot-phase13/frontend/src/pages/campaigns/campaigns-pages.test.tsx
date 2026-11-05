@@ -426,7 +426,7 @@ it('separates WhatsApp call campaigns and exposes all three campaign types', asy
     await screen.findByRole('heading', { name: 'WhatsApp call campaigns' }),
   ).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'SIP / Normal call' })).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: 'WhatsApp message' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'WhatsApp bulk campaign' })).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'WhatsApp call' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'New campaign' })).toHaveAttribute(
     'href',

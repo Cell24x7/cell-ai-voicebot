@@ -5,12 +5,23 @@ import { expect, it, vi } from 'vitest';
 import { contactImportsApi } from '@/services/api/contact-imports';
 import { inboxApi } from '@/services/api/inbox';
 import { templatesApi } from '@/services/api/templates';
+import { whatsappApi } from '@/services/api/whatsapp';
 import { renderWithProviders } from '@/test/render';
 import { fakeTemplate } from '@/test/templates';
+import { fakeChannel } from '@/test/whatsapp';
+import { fakeWaEstimate } from '@/test/whatsapp-campaigns';
 
 import './test-setup';
 import { emptyDraft, toCreateInput, type WaWizardDraft } from './draft';
-import { TemplateStep, VariablesStep, AudienceStep, ScheduleStep, type StepProps } from './steps';
+import {
+  TemplateStep,
+  VariablesStep,
+  AudienceStep,
+  ScheduleStep,
+  NumberStep,
+  ReviewStep,
+  type StepProps,
+} from './steps';
 
 vi.mock('@/services/api/whatsapp-campaigns', () => ({
   waCampaignsApi: {
@@ -63,9 +74,66 @@ const mount = (Step: React.ComponentType<StepProps>, initial: Partial<WaWizardDr
     routes: [{ path: '/', element: <Harness Step={Step} initial={initial} /> }],
   });
 async function choose(label: string, option: string) {
-  fireEvent.mouseDown(screen.getByRole('combobox', { name: label }));
+  const select = await screen.findByRole('combobox', { name: label });
+  await waitFor(() => expect(select).not.toHaveAttribute('aria-disabled', 'true'));
+  fireEvent.mouseDown(select);
   fireEvent.click(await screen.findByRole('option', { name: option }));
 }
+
+it('switches sending channels without retaining another number’s templates, variables or header', async () => {
+  vi.mocked(whatsappApi.channels).mockResolvedValue({
+    items: [
+      fakeChannel(),
+      fakeChannel({ id: 'wa2', displayPhoneNumber: '+91 90000 22222', messageRateLimit: 75 }),
+    ],
+  } as never);
+  mount(NumberStep, {
+    channelId: 'wa1',
+    variants: [{ key: 'A', templateId: 't1', splitPct: 100 }],
+    variables: { '1': { kind: 'static', value: 'old value' } },
+    headerMediaToken: 'old-upload',
+    headerLocation: { latitude: 28.6, longitude: 77.2 },
+  });
+  await choose('WhatsApp number', '+91 90000 22222');
+  expect(saved()).toMatchObject({
+    channelId: 'wa2',
+    variants: [{ key: 'A', templateId: '', splitPct: 100 }],
+    headerMediaToken: null,
+    headerLocation: null,
+  });
+  expect(saved()).not.toHaveProperty('variables');
+  expect(screen.getByText(/Up to 75 messages\/sec/)).toBeInTheDocument();
+});
+
+it('offers retry when sending numbers fail to load', async () => {
+  vi.mocked(whatsappApi.channels).mockRejectedValueOnce(new Error('Numbers unavailable'));
+  mount(NumberStep);
+  const retry = await screen.findByRole('button', { name: 'Retry' });
+  expect(screen.getByRole('combobox', { name: 'WhatsApp number' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  fireEvent.click(retry);
+  await choose('WhatsApp number', '+91 90000 12345');
+  expect(saved()).toHaveProperty('channelId', 'wa1');
+});
+
+it('blocks start while a cached wallet estimate is being refreshed', () => {
+  mount(
+    (props) => (
+      <ReviewStep
+        {...props}
+        estimate={{ data: fakeWaEstimate(), isPending: false, isFetching: true, error: null }}
+        canRun
+        onStart={vi.fn()}
+        starting={false}
+        startError={null}
+      />
+    ),
+    { channelId: 'wa1' },
+  );
+  expect(screen.getByRole('button', { name: 'Start campaign' })).toBeDisabled();
+});
 
 it('edits and removes A/B variants while preserving a valid split and winner settings', async () => {
   mount(TemplateStep, { channelId: 'wa1' });
@@ -139,6 +207,10 @@ it('switches audience sources without including stale selections and edits recen
   const option = await screen.findByRole('option', { name: /customers.csv/ });
   fireEvent.click(option);
   expect(saved().audience).toMatchObject({ csvUploadId: 'csv1', tags: null, listIds: [] });
+  expect(screen.getByRole('link', { name: 'Upload and import contacts' })).toHaveAttribute(
+    'href',
+    '/contacts/import',
+  );
 });
 
 it('saves template header coordinates and resets media to its approved example', async () => {

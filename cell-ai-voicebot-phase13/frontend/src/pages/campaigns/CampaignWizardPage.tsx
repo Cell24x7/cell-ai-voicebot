@@ -17,11 +17,18 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { enqueueSnackbar } from 'notistack';
 import { useRef, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router';
+import {
+  Link as RouterLink,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router';
 
 import { useUnsavedChangesGuard } from '@/components/fields/useUnsavedChangesGuard';
 import { PageHeader } from '@/components/PageHeader';
 import { useSession } from '@/features/auth/hooks';
+import { campaignCreatePath } from '@/features/campaigns/create-path';
 import { campaignKeys } from '@/features/campaigns/keys';
 import { useCampaign, useCampaignEstimate, useCanRunCampaigns } from '@/features/campaigns/queries';
 import { AudienceStep } from '@/features/campaigns/wizard/AudienceStep';
@@ -57,6 +64,7 @@ const savedOf = (c: Campaign): Saved => ({ id: c.id, revision: c.revision, statu
 export function CampaignWizardPage() {
   const { id = '' } = useParams();
   const [params] = useSearchParams();
+  const location = useLocation();
   const account = useSession()?.account;
   const existing = useCampaign(id);
   if (!account) return null;
@@ -76,6 +84,8 @@ export function CampaignWizardPage() {
         emptyDraft({ timezone: account.timezone, window: account.settings.callingWindow }),
         params,
       );
+  const carriedName = (location.state as { campaignName?: unknown } | null)?.campaignName;
+  if (!id && typeof carriedName === 'string') initial.name = carriedName;
   return (
     <WizardForm
       // the form keeps its own revision after saves — remount only for another campaign
@@ -92,10 +102,14 @@ const prefill = (draft: WizardDraft, params: URLSearchParams): WizardDraft => {
   if (params.get('line') === 'whatsapp') next.line = 'whatsapp';
   const flowId = params.get('flowId');
   const listId = params.get('listId');
+  const listIds = params.get('listIds')?.split(',').filter(Boolean);
   const segmentId = params.get('segmentId');
+  const contactIds = params.get('contactIds')?.split(',').filter(Boolean);
   if (flowId) next.flowId = flowId;
   if (listId) Object.assign(next, { audienceMode: 'lists', listIds: [listId] });
+  if (listIds?.length) Object.assign(next, { audienceMode: 'lists', listIds });
   if (segmentId) Object.assign(next, { audienceMode: 'segment', segmentId });
+  if (contactIds?.length) Object.assign(next, { audienceMode: 'pick', contactIds });
   return next;
 };
 
@@ -107,6 +121,7 @@ function WizardForm({
   saved: Saved | null;
 }) {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const queryClient = useQueryClient();
   const canRun = useCanRunCampaigns();
   const [draft, setDraft] = useState(initial);
@@ -126,6 +141,12 @@ function WizardForm({
   const onChange = (patch: Partial<WizardDraft>) => {
     setDraft((d) => ({ ...d, ...patch }));
     setProblems([]);
+    if (patch.line && !saved) {
+      const next = new URLSearchParams(params);
+      if (patch.line === 'whatsapp') next.set('line', 'whatsapp');
+      else next.delete('line');
+      setParams(next, { replace: true });
+    }
   };
 
   const save = useMutation({
@@ -263,7 +284,26 @@ function WizardForm({
             {getErrorMessage(start.error)}
           </Alert>
         )}
-        {step === 0 && <BasicsStep draft={draft} onChange={onChange} lock={lock} />}
+        {step === 0 && (
+          <BasicsStep
+            draft={draft}
+            onChange={onChange}
+            lock={lock}
+            onBulkCampaign={
+              saved
+                ? undefined
+                : () =>
+                    void navigate(
+                      campaignCreatePath('whatsapp', {
+                        ...(draft.audienceMode === 'lists' ? { listIds: draft.listIds } : {}),
+                        ...(draft.audienceMode === 'segment' ? { segmentId: draft.segmentId } : {}),
+                        ...(draft.audienceMode === 'pick' ? { contactIds: draft.contactIds } : {}),
+                      }),
+                      { state: { campaignName: draft.name } },
+                    )
+            }
+          />
+        )}
         {step === 1 && <AudienceStep draft={draft} onChange={onChange} lock={lock} />}
         {step === 2 && <ScheduleStep draft={draft} onChange={onChange} lock={lock} />}
         {step === 3 && <RetriesStep draft={draft} onChange={onChange} lock={lock} />}

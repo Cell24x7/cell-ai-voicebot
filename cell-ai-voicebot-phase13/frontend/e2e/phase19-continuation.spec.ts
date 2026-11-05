@@ -67,7 +67,7 @@ test('number-scoped template builder → approval → shared sender list', async
 
 test('three campaign types stay in URL; message wizard reaches an actual completed report', async () => {
   await page.goto('/campaigns');
-  for (const type of ['SIP / Normal call', 'WhatsApp message', 'WhatsApp call'])
+  for (const type of ['SIP / Normal call', 'WhatsApp bulk campaign', 'WhatsApp call'])
     await expect(page.getByRole('tab', { name: type, exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'WhatsApp call', exact: true }).click();
   await expect(page).toHaveURL(/line=whatsapp-call/);
@@ -76,7 +76,10 @@ test('three campaign types stay in URL; message wizard reaches an actual complet
     'aria-selected',
     'true',
   );
-  await page.goto(`/campaigns/whatsapp/new?contactIds=${contactId}`);
+  await page.goto(`/campaigns/new?contactIds=${contactId}`);
+  await page.getByRole('combobox', { name: 'Campaign type' }).click();
+  await page.getByRole('option', { name: 'WhatsApp bulk campaign', exact: true }).click();
+  await expect(page).toHaveURL(/\/campaigns\/whatsapp\/new\?contactIds=/);
   await page.getByLabel('Campaign name').fill('Browser message campaign');
   await page.getByRole('combobox', { name: 'WhatsApp number' }).click();
   await page.getByRole('option').first().click();

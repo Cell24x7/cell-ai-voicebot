@@ -10,11 +10,21 @@ import {
 } from '@mui/material';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router';
+import {
+  Link as RouterLink,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router';
 
 import { useUnsavedChangesGuard } from '@/components/fields/useUnsavedChangesGuard';
 import { PageHeader } from '@/components/PageHeader';
+import { CampaignTypeSelect } from '@/features/campaigns/CampaignTypeSelect';
+import { campaignCreatePath } from '@/features/campaigns/create-path';
 import { templateKeys } from '@/features/templates/keys';
+import { useTemplates } from '@/features/templates/queries';
+import { useChannels } from '@/features/whatsapp/queries';
 import {
   draftFromCampaign,
   emptyDraft,
@@ -47,6 +57,7 @@ import { waCampaignsApi } from '@/services/api/whatsapp-campaigns';
 export function WhatsAppCampaignWizardPage() {
   const { id = '' } = useParams();
   const [params] = useSearchParams();
+  const location = useLocation();
   const campaign = useWaCampaign(id);
   const canWrite = useCanWriteWaCampaigns();
   if (!canWrite)
@@ -61,13 +72,10 @@ export function WhatsAppCampaignWizardPage() {
         <RouterLink to={`/campaigns/whatsapp/${id}`}>View campaign</RouterLink>
       </Alert>
     );
-  return (
-    <WizardForm
-      key={id || 'new'}
-      initial={campaign.data ? draftFromCampaign(campaign.data) : prefill(emptyDraft(), params)}
-      initialId={id}
-    />
-  );
+  const initial = campaign.data ? draftFromCampaign(campaign.data) : prefill(emptyDraft(), params);
+  const carriedName = (location.state as { campaignName?: unknown } | null)?.campaignName;
+  if (!id && typeof carriedName === 'string') initial.name = carriedName;
+  return <WizardForm key={id || 'new'} initial={initial} initialId={id} />;
 }
 
 function WizardForm({ initial, initialId }: { initial: WaWizardDraft; initialId: string }) {
@@ -81,6 +89,11 @@ function WizardForm({ initial, initialId }: { initial: WaWizardDraft; initialId:
   const [baseline, setBaseline] = useState(JSON.stringify(initial));
   const [leaving, setLeaving] = useState(false);
   const startKey = useRef<string | null>(null);
+  const channels = useChannels();
+  const approvedTemplates = useTemplates(
+    { channelId: draft.channelId || undefined },
+    Boolean(draft.channelId),
+  );
   const templates = useQueries({
     queries: draft.variants.map((v) => ({
       queryKey: templateKeys.detail(v.templateId),
@@ -115,6 +128,25 @@ function WizardForm({ initial, initialId }: { initial: WaWizardDraft; initialId:
   };
   const next = () => {
     const issues = stepProblems(step, draft);
+    if (step === 0 && draft.channelId) {
+      if (channels.isPending || channels.error)
+        issues.push('Load the WhatsApp numbers before continuing');
+      else if (
+        !channels.data?.items.some((c) => c.id === draft.channelId && c.status === 'connected')
+      )
+        issues.push('Choose a connected WhatsApp number');
+    }
+    if (step === 1 && draft.variants.every((v) => v.templateId)) {
+      if (approvedTemplates.isPending || approvedTemplates.error)
+        issues.push('Load the approved templates before continuing');
+      else if (
+        draft.variants.some(
+          (v) =>
+            !approvedTemplates.data?.some((t) => t.id === v.templateId && t.status === 'APPROVED'),
+        )
+      )
+        issues.push('Choose approved templates for the selected WhatsApp number');
+    }
     if (step === 2) {
       if (templates.some((t) => t.isPending || t.error))
         issues.push('Wait for the templates to load, or go back and select a template again');
@@ -146,7 +178,7 @@ function WizardForm({ initial, initialId }: { initial: WaWizardDraft; initialId:
   return (
     <>
       <PageHeader
-        title="New WhatsApp campaign"
+        title={initialId ? 'Edit WhatsApp bulk campaign' : 'New WhatsApp bulk campaign'}
         subtitle="Send an approved template to a contact audience"
         actions={
           <Button component={RouterLink} to="/campaigns?line=whatsapp">
@@ -170,7 +202,26 @@ function WizardForm({ initial, initialId }: { initial: WaWizardDraft; initialId:
               </Alert>
             ))}
             {save.error && <Alert severity="error">{getErrorMessage(save.error)}</Alert>}
-            {step === 0 && <NumberStep {...props} />}
+            {step === 0 && (
+              <>
+                <CampaignTypeSelect
+                  value="whatsapp"
+                  disabled={Boolean(id)}
+                  onChange={(type) => {
+                    if (type === 'whatsapp') return;
+                    void navigate(
+                      campaignCreatePath(type, {
+                        ...(draft.audienceMode === 'lists' ? { listIds: draft.listIds } : {}),
+                        ...(draft.audienceMode === 'segment' ? { segmentId: draft.segmentId } : {}),
+                        ...(draft.audienceMode === 'pick' ? { contactIds: draft.contactIds } : {}),
+                      }),
+                      { state: { campaignName: draft.name } },
+                    );
+                  }}
+                />
+                <NumberStep {...props} />
+              </>
+            )}
             {step === 1 && <TemplateStep {...props} />}
             {step === 2 && <VariablesStep {...props} />}
             {step === 3 && <AudienceStep {...props} />}
@@ -178,6 +229,10 @@ function WizardForm({ initial, initialId }: { initial: WaWizardDraft; initialId:
             {step === 5 && (
               <ReviewStep
                 {...props}
+                sender={channels.data?.items.find((c) => c.id === draft.channelId)}
+                templateNames={templates.flatMap((t) =>
+                  t.data ? [`${t.data.name} (${t.data.language})`] : [],
+                )}
                 estimate={estimate}
                 onStart={onStart}
                 starting={start.isPending}
