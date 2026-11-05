@@ -1,6 +1,8 @@
 import type {
+  CampaignLine,
   CampaignSettingsInput,
   CreateCampaignInput,
+  VoiceRetryInterval,
   DryRunOutcome,
   RetryOn,
   ScenarioKey,
@@ -38,9 +40,27 @@ export const LIMITS = {
 /** Everything the wizard edits (one object, saved as create / update bodies). */
 export type AmdMode = 'off' | 'hangup' | 'leave_message';
 
+/** Recorded voice (Cell24x7): the account's audio or an assigned IVR, and Cell24x7's redials. */
+export interface VoiceDraft {
+  kind: 'audio' | 'ivr';
+  flowAudioId: string;
+  ivrId: number | null;
+  retries: number;
+  retryIntervalMin: VoiceRetryInterval;
+}
+
+export const emptyVoice = (): VoiceDraft => ({
+  kind: 'audio',
+  flowAudioId: '',
+  ivrId: null,
+  retries: 0,
+  retryIntervalMin: 30,
+});
+
 export interface WizardDraft {
   name: string;
-  line: 'phone' | 'whatsapp';
+  line: CampaignLine;
+  voice: VoiceDraft;
   channelId: string;
   program: { kind: 'flow' | 'agent'; id: string } | null;
   askPermissionTemplateId: string;
@@ -97,6 +117,7 @@ export const DEFAULT_SCENARIOS: Record<ScenarioKey, number> = {
 export const emptyDraft = (account: { timezone: string; window: CampaignWindow }): WizardDraft => ({
   name: '',
   line: 'phone',
+  voice: emptyVoice(),
   channelId: '',
   program: null,
   askPermissionTemplateId: '',
@@ -137,6 +158,15 @@ const audienceModeOf = (a: Campaign['audience']): AudienceMode => {
 export const draftFromCampaign = (c: Campaign): WizardDraft => ({
   name: c.name,
   line: c.line ?? 'phone',
+  voice: c.voiceApi
+    ? {
+        kind: c.voiceApi.content?.kind ?? 'audio',
+        flowAudioId: c.voiceApi.content?.flowAudioId ?? '',
+        ivrId: c.voiceApi.content?.ivrId ?? null,
+        retries: c.voiceApi.retries,
+        retryIntervalMin: c.voiceApi.retryIntervalMin as VoiceRetryInterval,
+      }
+    : emptyVoice(),
   channelId: c.channelId ?? '',
   program: c.program ?? null,
   askPermissionTemplateId: c.askPermissionFirst?.templateId ?? '',
@@ -185,25 +215,57 @@ const audienceOf = (d: WizardDraft): NonNullable<CampaignSettingsInput['audience
   skipIfMissing: d.skipIfMissing,
 });
 
+/** The voice content the API takes (`null` until chosen). */
+export const voiceContentOf = (v: VoiceDraft) =>
+  v.kind === 'audio'
+    ? v.flowAudioId
+      ? { kind: 'audio' as const, flowAudioId: v.flowAudioId }
+      : null
+    : v.ivrId
+      ? { kind: 'ivr' as const, ivrId: v.ivrId }
+      : null;
+
 /** The audience preview body (`null` when nothing is chosen yet). */
 export const previewBody = (d: WizardDraft) =>
-  (d.line === 'whatsapp' ? d.channelId && d.program?.id : d.flowId) && !audienceProblems(d).length
-    ? {
-        ...(d.flowId ? { flowId: d.flowId } : {}),
-        ...(d.line === 'whatsapp'
-          ? {
-              line: d.line,
-              channelId: d.channelId,
-              program: d.program,
-              askPermissionFirst: d.askPermissionFirst,
-            }
-          : {}),
-        chosenVersion: d.chosenVersion,
-        audience: audienceOf(d),
-      }
-    : null;
+  d.line === 'voice_api'
+    ? audienceProblems(d).length
+      ? null
+      : { line: 'voice_api' as const, audience: audienceOf(d) }
+    : (d.line === 'whatsapp' ? d.channelId && d.program?.id : d.flowId) &&
+        !audienceProblems(d).length
+      ? {
+          ...(d.flowId ? { flowId: d.flowId } : {}),
+          ...(d.line === 'whatsapp'
+            ? {
+                line: d.line,
+                channelId: d.channelId,
+                program: d.program,
+                askPermissionFirst: d.askPermissionFirst,
+              }
+            : {}),
+          chosenVersion: d.chosenVersion,
+          audience: audienceOf(d),
+        }
+      : null;
 
-const settingsOf = (d: WizardDraft): CampaignSettingsInput => ({
+/** Recorded voice: Cell24x7 plays the audio — no flow, dry run, caller ID or our retries. */
+const voiceSettingsOf = (d: WizardDraft): CampaignSettingsInput => ({
+  line: 'voice_api',
+  voiceApi: {
+    content: voiceContentOf(d.voice),
+    retries: d.voice.retries,
+    retryIntervalMin: d.voice.retryIntervalMin,
+  },
+  audience: audienceOf(d),
+  schedule: { ...d.schedule, timezone: d.timezone },
+  window: d.window,
+  autoResume: d.autoResume,
+});
+
+const settingsOf = (d: WizardDraft): CampaignSettingsInput =>
+  d.line === 'voice_api' ? voiceSettingsOf(d) : phoneSettingsOf(d);
+
+const phoneSettingsOf = (d: WizardDraft): CampaignSettingsInput => ({
   ...(d.line === 'whatsapp'
     ? {
         line: 'whatsapp',
@@ -234,8 +296,8 @@ const settingsOf = (d: WizardDraft): CampaignSettingsInput => ({
 
 export const toCreateInput = (d: WizardDraft): CreateCampaignInput => ({
   name: d.name.trim(),
-  mode: d.mode,
-  ...(d.flowId ? { flowId: d.flowId } : {}),
+  mode: d.line === 'voice_api' ? 'live' : d.mode,
+  ...(d.flowId && d.line !== 'voice_api' ? { flowId: d.flowId } : {}),
   ...settingsOf(d),
 });
 
@@ -251,14 +313,18 @@ export const toUpdateInput = (
       name: d.name.trim(),
       schedule: { endAt: d.schedule.endAt ?? null },
       window: d.window,
-      retry: d.retry,
-      followUps: d.followUps,
-      pacing: d.pacing,
+      ...(d.line === 'voice_api'
+        ? {}
+        : { retry: d.retry, followUps: d.followUps, pacing: d.pacing }),
       autoResume: d.autoResume,
     };
   }
   const { mode: _mode, ...rest } = toCreateInput(d);
-  return { revision, ...rest, ...(status === 'draft' ? { mode: d.mode } : {}) };
+  return {
+    revision,
+    ...rest,
+    ...(status === 'draft' && d.line !== 'voice_api' ? { mode: d.mode } : {}),
+  };
 };
 
 /** Which fields a status locks (plan §1e): `null` = all editable. */
@@ -308,6 +374,11 @@ export const stepProblems = (step: StepIndex, d: WizardDraft, now = new Date()):
     if (d.line === 'whatsapp' && !d.channelId) p.push('Choose a WhatsApp calling number');
     if (d.line === 'whatsapp' && d.askPermissionFirst && !d.askPermissionTemplateId)
       p.push('Choose an approved call permission template');
+    if (d.line === 'voice_api') {
+      if (!voiceContentOf(d.voice))
+        p.push(d.voice.kind === 'audio' ? 'Choose or upload the audio' : 'Choose an IVR menu');
+      return p;
+    }
     if (!d.flowId && !(d.line === 'whatsapp' && d.program?.id)) p.push('Choose a published flow');
     if (
       d.mode === 'live' &&
@@ -323,6 +394,11 @@ export const stepProblems = (step: StepIndex, d: WizardDraft, now = new Date()):
     if (d.window.start >= d.window.end) p.push('The window must end after it starts');
     if (!d.window.days.length) p.push('Pick at least one calling day');
     return p;
+  }
+  if (step === 3 && d.line === 'voice_api') {
+    return Number.isInteger(d.voice.retries) && d.voice.retries >= 0 && d.voice.retries <= 3
+      ? []
+      : ['Redials: 0 to 3'];
   }
   if (step === 3) {
     const p: string[] = [];
@@ -358,6 +434,7 @@ export const stepOfPath = (path: string): StepIndex => {
   const p = path.replace(/^(body|query|params)\./, '');
   if (/^(audience|skipIfMissing)/.test(p)) return 1;
   if (/^(schedule|window)/.test(p)) return 2;
+  if (/^voiceApi\.(retries|retryIntervalMin)/.test(p)) return 3;
   if (/^(retry|followUps|pacing|dryRun|autoResume)/.test(p)) return 3;
   return 0;
 };

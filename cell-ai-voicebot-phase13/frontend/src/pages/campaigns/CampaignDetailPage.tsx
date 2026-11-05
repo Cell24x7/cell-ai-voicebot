@@ -10,6 +10,7 @@ import { ActivityTab, LiveCallsPanel, RunsTab } from '@/features/campaigns/detai
 import { ProgressPanel } from '@/features/campaigns/detail/ProgressPanel';
 import { ResultsTab } from '@/features/campaigns/detail/ResultsTab';
 import { StatusBanner } from '@/features/campaigns/detail/StatusBanner';
+import { VoiceBatchesPanel } from '@/features/campaigns/detail/VoiceBatchesPanel';
 import { useCampaignEta } from '@/features/campaigns/eta';
 import {
   ACTIVE_CAMPAIGN_STATUSES,
@@ -57,17 +58,25 @@ export function CampaignDetailPage() {
             <Chip
               size="small"
               variant="outlined"
-              label={c.line === 'whatsapp' ? 'WhatsApp call' : 'SIP / Normal call'}
+              label={
+                c.line === 'whatsapp'
+                  ? 'WhatsApp call'
+                  : c.line === 'voice_api'
+                    ? 'SIP / Normal call · Recorded voice'
+                    : 'SIP / Normal call'
+              }
             />
-            <Link
-              component={RouterLink}
-              to={c.program?.kind === 'agent' ? `/agents/${c.program.id}` : `/flows/${c.flow.id}`}
-            >
-              {c.program?.kind === 'agent'
-                ? c.program.name || 'AI agent'
-                : c.flow.name || 'Deleted flow'}
-              {c.flow.version ? ` v${String(c.flow.version)}` : ''}
-            </Link>
+            {c.line !== 'voice_api' && (
+              <Link
+                component={RouterLink}
+                to={c.program?.kind === 'agent' ? `/agents/${c.program.id}` : `/flows/${c.flow.id}`}
+              >
+                {c.program?.kind === 'agent'
+                  ? c.program.name || 'AI agent'
+                  : c.flow.name || 'Deleted flow'}
+                {c.flow.version ? ` v${String(c.flow.version)}` : ''}
+              </Link>
+            )}
             {c.parentId && (
               <Link component={RouterLink} to={`/campaigns/${c.parentId}`}>
                 Run #{c.runNumber} of a repeating campaign
@@ -85,6 +94,7 @@ export function CampaignDetailPage() {
       <Stack spacing={2}>
         <StatusBanner campaign={c} timezone={timezone} />
         {!recurringParent && <ProgressPanel campaign={c} eta={eta} />}
+        {c.line === 'voice_api' && <VoiceBatchesPanel campaign={c} timezone={timezone} />}
         <LiveCallsPanel
           campaignId={c.id}
           enabled={c.status === 'running' || c.status === 'paused'}

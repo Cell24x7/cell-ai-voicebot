@@ -72,6 +72,7 @@ const RATES: RateCardView = {
   aiTextPer1kTokensMicros: 200_000,
   embeddingPer1kTokensMicros: 10_000,
   sttPerMinuteMicros: 500_000,
+  voiceApiPulseMicros: 0,
   billUnansweredAttempts: false,
   source: 'default',
   effectiveFrom: '2026-10-01T00:00:00Z',

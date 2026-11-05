@@ -90,7 +90,17 @@ export function ResultsTab({ campaignId, live = false }: { campaignId: string; l
     {
       key: 'disposition',
       header: 'Outcome',
-      render: (r) => dispositionLabel(r.disposition) ?? '—',
+      render: (r) =>
+        r.voice
+          ? [
+              r.voice.providerStatus ?? 'Waiting',
+              r.voice.durationSec ? `${String(r.voice.durationSec)} s` : null,
+              r.voice.dtmf ? `key ${r.voice.dtmf}` : null,
+              r.voice.retryCount ? `${String(r.voice.retryCount)} redials` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')
+          : (dispositionLabel(r.disposition) ?? '—'),
     },
     { key: 'promise', header: 'Promise', render: promiseText },
     { key: 'callback', header: 'Callback', render: callbackText },

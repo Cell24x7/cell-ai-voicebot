@@ -10,6 +10,8 @@ import { ExportJobModel } from '../../src/db/models/export-job.model';
 import { MessageModel } from '../../src/db/models/message.model';
 import { WebhookDeliveryModel } from '../../src/db/models/webhook-delivery.model';
 import { WebhookEndpointModel } from '../../src/db/models/webhook-endpoint.model';
+import { WhatsAppCampaignModel } from '../../src/db/models/whatsapp-campaign.model';
+import { WhatsAppChannelModel } from '../../src/db/models/whatsapp-channel.model';
 import { generateApiKey, PREFIX_LENGTH } from '../../src/modules/api-keys/api-keys.service';
 import { API_KEY_SCOPES, type ApiKeyScope } from '../../src/modules/api-keys/scopes';
 import { sha256Hex } from '../../src/modules/auth/hmac';
@@ -55,6 +57,12 @@ const BODIES: Record<string, object> = {
   'patch /api/v1/contacts/{id}': { name: 'Changed' },
   'patch /api/v1/webhook-endpoints/{id}': { description: 'Changed' },
   'post /api/v1/webhook-endpoints/{id}/test': { type: 'call.completed' },
+  'patch /api/v1/whatsapp-campaigns/{id}': {
+    name: 'Changed',
+    channelId: '6720f0a1b2c3d4e5f6a7b8d1',
+    variants: [{ key: 'A', templateId: '6720f0a1b2c3d4e5f6a7b8d2', splitPct: 100 }],
+    audience: { contactIds: ['6720f0a1b2c3d4e5f6a7b8d3'] },
+  },
 };
 
 const makeKey = async (account: TestAccount, scopes: ApiKeyScope[]) => {
@@ -70,8 +78,15 @@ const makeKey = async (account: TestAccount, scopes: ApiKeyScope[]) => {
   return key;
 };
 
+/** Query strings valid enough to pass validation (the answer is about access only). */
+const QUERIES: Record<string, () => string> = {
+  'get /api/v1/whatsapp/channels/{id}/calling/quote': () => `?contactId=${ids.contact}`,
+};
+
 const send = (key: string, route: Route, id: (path: string) => string) => {
-  const url = route.path.replace('{id}', id(route.path));
+  const url =
+    route.path.replace('{id}', id(route.path)) +
+    (QUERIES[`${route.method} ${route.path}`]?.() ?? '');
   const req = request(app)
     [route.method](url)
     .set('X-API-Key', key)
@@ -83,7 +98,15 @@ const send = (key: string, route: Route, id: (path: string) => string) => {
 let a: TestAccount;
 let b: TestAccount;
 const ids = {} as Record<
-  'call' | 'contact' | 'campaign' | 'message' | 'exportJob' | 'endpoint' | 'delivery',
+  | 'call'
+  | 'contact'
+  | 'campaign'
+  | 'message'
+  | 'exportJob'
+  | 'endpoint'
+  | 'delivery'
+  | 'channel'
+  | 'waCampaign',
   string
 >;
 
@@ -96,6 +119,8 @@ const idFor = (path: string): string => {
   if (path.startsWith('/api/v1/exports/')) return ids.exportJob;
   if (path.startsWith('/api/v1/webhook-endpoints/')) return ids.endpoint;
   if (path.startsWith('/api/v1/webhook-deliveries/')) return ids.delivery;
+  if (path.startsWith('/api/v1/whatsapp/channels/')) return ids.channel;
+  if (path.startsWith('/api/v1/whatsapp-campaigns/')) return ids.waCampaign;
   throw new Error(`no record kind for ${path}`);
 };
 
@@ -158,6 +183,12 @@ beforeAll(async () => {
     secretSealed: 'v1:x:y:z',
   });
   ids.endpoint = endpoint._id.toString();
+  ids.waCampaign = (
+    await WhatsAppCampaignModel.collection.insertOne({ accountId, name: 'Iso', status: 'draft' })
+  ).insertedId.toString();
+  ids.channel = (
+    await WhatsAppChannelModel.collection.insertOne({ accountId, status: 'connected' })
+  ).insertedId.toString();
   ids.delivery = (
     await WebhookDeliveryModel.collection.insertOne({
       accountId,

@@ -16,6 +16,7 @@ describe('API key helpers', () => {
       'WhatsApp',
       'Reports',
       'Webhooks',
+      'Account',
     ]);
     expect(groups.flatMap((g) => g.scopes)).toHaveLength(API_KEY_SCOPES.length);
     expect(groups[0]?.scopes.map((s) => s.key)).toEqual([

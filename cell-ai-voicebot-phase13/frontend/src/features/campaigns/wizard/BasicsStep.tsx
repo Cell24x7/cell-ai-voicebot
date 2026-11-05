@@ -21,7 +21,15 @@ import { useChannels } from '@/features/whatsapp/queries';
 import { ProgramPicker } from '@/features/whatsapp-calling/ProgramPicker';
 import { phoneNumberKeys, phoneNumbersApi } from '@/services/api/phone-numbers';
 
-import { isLocked, LIMITS, type AmdMode, type LockRule, type WizardDraft } from './draft';
+import {
+  emptyVoice,
+  isLocked,
+  LIMITS,
+  type AmdMode,
+  type LockRule,
+  type WizardDraft,
+} from './draft';
+import { VoiceContentFields } from './VoiceFields';
 
 const AMD_LABELS: Record<AmdMode, string> = {
   off: 'Off — every answer goes to the flow',
@@ -62,6 +70,8 @@ export function BasicsStep({
     draft.line === 'whatsapp'
       ? ready.some((c) => c.id === draft.channelId)
       : phone.data?.line === 'sip';
+  const voiceOn = phone.data?.voiceApi?.enabled === true;
+  const voice = draft.line === 'voice_api';
   const line = draft.phoneLine;
   const setLine = (patch: Partial<WizardDraft['phoneLine']>) =>
     onChange({ phoneLine: { ...line, ...patch } });
@@ -84,9 +94,43 @@ export function BasicsStep({
             chosenVersion: null,
             askPermissionFirst: false,
             askPermissionTemplateId: '',
+            voice: emptyVoice(),
           });
         }}
       />
+      {draft.line !== 'whatsapp' && (voiceOn || voice) && (
+        <div>
+          <Typography variant="subtitle2">How the calls are made</Typography>
+          <RadioGroup
+            value={voice ? 'voice_api' : 'phone'}
+            aria-label="How the calls are made"
+            onChange={(e) =>
+              onChange({
+                line: e.target.value as WizardDraft['line'],
+                flowId: '',
+                chosenVersion: null,
+                program: null,
+                voice: emptyVoice(),
+                ...(e.target.value === 'voice_api' ? { mode: 'live' as const } : {}),
+              })
+            }
+          >
+            <FormControlLabel
+              value="phone"
+              control={<Radio />}
+              disabled={isLocked(lock, 'mode')}
+              label="AI flow or agent — the bot talks with the customer"
+            />
+            <FormControlLabel
+              value="voice_api"
+              control={<Radio />}
+              disabled={isLocked(lock, 'mode') || (!voiceOn && !voice)}
+              label="Recorded voice or IVR — the same message to everyone"
+            />
+          </RadioGroup>
+        </div>
+      )}
+      {voice && <VoiceContentFields draft={draft} onChange={onChange} lock={lock} />}
       {draft.line === 'whatsapp' && (
         <Stack spacing={2}>
           <TextField
@@ -156,39 +200,41 @@ export function BasicsStep({
         onChange={(e) => onChange({ name: e.target.value })}
         slotProps={{ htmlInput: { maxLength: LIMITS.nameMax } }}
       />
-      <div>
-        <Typography variant="subtitle2">Mode</Typography>
-        <RadioGroup
-          row
-          value={draft.mode}
-          onChange={(e) => onChange({ mode: e.target.value as WizardDraft['mode'] })}
-          aria-label="Mode"
-        >
-          <FormControlLabel
-            value="dry_run"
-            control={<Radio />}
-            label="Dry run (simulated calls)"
-            disabled={isLocked(lock, 'mode')}
-          />
-          <Tooltip
-            title={onSip ? '' : 'This account is on the test line — ask support to switch it'}
+      {!voice && (
+        <div>
+          <Typography variant="subtitle2">Mode</Typography>
+          <RadioGroup
+            row
+            value={draft.mode}
+            onChange={(e) => onChange({ mode: e.target.value as WizardDraft['mode'] })}
+            aria-label="Mode"
           >
-            <span>
-              <FormControlLabel
-                value="live"
-                control={<Radio />}
-                label="Live calls"
-                disabled={!onSip || isLocked(lock, 'mode')}
-              />
-            </span>
-          </Tooltip>
-        </RadioGroup>
-        <FormHelperText>
-          A dry run goes through the real flow with simulated customers and virtual time — no phone
-          is called and nothing is charged.
-        </FormHelperText>
-      </div>
-      {draft.mode === 'live' && draft.line !== 'whatsapp' && (
+            <FormControlLabel
+              value="dry_run"
+              control={<Radio />}
+              label="Dry run (simulated calls)"
+              disabled={isLocked(lock, 'mode')}
+            />
+            <Tooltip
+              title={onSip ? '' : 'This account is on the test line — ask support to switch it'}
+            >
+              <span>
+                <FormControlLabel
+                  value="live"
+                  control={<Radio />}
+                  label="Live calls"
+                  disabled={!onSip || isLocked(lock, 'mode')}
+                />
+              </span>
+            </Tooltip>
+          </RadioGroup>
+          <FormHelperText>
+            A dry run goes through the real flow with simulated customers and virtual time — no
+            phone is called and nothing is charged.
+          </FormHelperText>
+        </div>
+      )}
+      {draft.mode === 'live' && draft.line === 'phone' && (
         <Stack spacing={2} component="section" aria-label="Phone line">
           <TextField
             select
@@ -236,7 +282,7 @@ export function BasicsStep({
           )}
         </Stack>
       )}
-      {draft.line !== 'whatsapp' && (
+      {draft.line === 'phone' && (
         <Tooltip title={flowLocked ? LOCKED_HINT : ''}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
@@ -283,7 +329,7 @@ export function BasicsStep({
           </Stack>
         </Tooltip>
       )}
-      {selected && (
+      {selected && !voice && (
         <Alert severity="info">
           {selected.name}: {selected.nodesCount} steps
           {selected.agents.length

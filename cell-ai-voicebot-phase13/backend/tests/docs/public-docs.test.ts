@@ -3,10 +3,11 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { runInNewContext } from 'node:vm';
 
+import * as prettier from 'prettier';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
-import { renderGuidesModule } from '../../scripts/generate-docs-guides';
+import { renderGuideBlocks, renderGuidesModule } from '../../scripts/generate-docs-guides';
 import { GUIDE_ORDER, guidesMarkdown } from '../../src/modules/docs/guides';
 import {
   buildPublicSpec,
@@ -73,11 +74,20 @@ describe('public API docs (plan §7 #6)', () => {
     expect(description).toBe(guidesMarkdown());
     for (const heading of [
       '## Getting started',
+      '## Authentication',
+      '## Conventions',
       '## Errors',
       '## Idempotency',
       '## Rate limits',
       '## Pagination',
+      '## WhatsApp messages',
+      '## Calls',
+      '## WhatsApp calls',
+      '## Campaigns',
+      '## Reports and exports',
       '## Webhooks',
+      '## Versioning',
+      '## Troubleshooting',
       '## API changelog',
     ])
       expect(description).toContain(heading);
@@ -91,13 +101,38 @@ describe('public API docs (plan §7 #6)', () => {
     expect(Object.keys(res.body.paths)).toEqual(Object.keys(pub.paths));
   });
 
+  it('serves a Postman collection with one request per public route', async () => {
+    const res = await request(buildTestApp()).get('/api/v1/postman.json');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toContain('postman_collection.json');
+    const folders = res.body.item as {
+      name: string;
+      item: { request: { url: { raw: string } } }[];
+    }[];
+    expect(folders.flatMap((f) => f.item)).toHaveLength(operations(pub).length);
+    expect(folders.map((f) => f.name)).toEqual((pub.tags ?? []).map((t) => t.name));
+    expect(res.body.auth.apikey).toEqual(
+      expect.arrayContaining([{ key: 'key', value: 'X-API-Key', type: 'string' }]),
+    );
+  });
+
   it('guides.gen.ts matches docs/api/*.md (run `npm run gen:guides`)', async () => {
     const committed = readFileSync(
       path.join(root, 'src', 'modules', 'docs', 'guides.gen.ts'),
       'utf8',
     );
     expect(committed).toBe(await renderGuidesModule(root));
-    expect(GUIDE_ORDER).toHaveLength(7);
+    expect(GUIDE_ORDER).toHaveLength(16);
+    // generated tables (scopes, error codes) match the code
+    for (const name of GUIDE_ORDER) {
+      const file = path.join(root, 'docs', 'api', `${name}.md`);
+      const md = readFileSync(file, 'utf8');
+      const fresh = await prettier.format(renderGuideBlocks(md), {
+        ...((await prettier.resolveConfig(file)) ?? {}),
+        parser: 'markdown',
+      });
+      expect(md, name).toBe(fresh);
+    }
   });
 });
 

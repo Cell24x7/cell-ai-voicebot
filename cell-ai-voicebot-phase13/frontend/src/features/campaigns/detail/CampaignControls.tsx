@@ -134,12 +134,16 @@ export function CampaignControls({ campaign }: { campaign: Campaign }) {
         <DialogTitle>Cancel “{campaign.name}”?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            No more calls are made; waiting contacts are canceled. This can’t be undone.
+            {campaign.line === 'voice_api'
+              ? 'Numbers not yet sent are canceled. Numbers already sent to the provider keep ringing — it cannot stop them. This can’t be undone.'
+              : 'No more calls are made; waiting contacts are canceled. This can’t be undone.'}
           </DialogContentText>
-          <FormControlLabel
-            control={<Checkbox checked={hangUp} onChange={(e) => setHangUp(e.target.checked)} />}
-            label="Also hang up calls in progress"
-          />
+          {campaign.line !== 'voice_api' && (
+            <FormControlLabel
+              control={<Checkbox checked={hangUp} onChange={(e) => setHangUp(e.target.checked)} />}
+              label="Also hang up calls in progress"
+            />
+          )}
           {act.error && <Alert severity="error">{getErrorMessage(act.error)}</Alert>}
         </DialogContent>
         <DialogActions>

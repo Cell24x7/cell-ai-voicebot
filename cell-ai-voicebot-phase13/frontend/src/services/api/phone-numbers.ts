@@ -8,6 +8,8 @@ export interface PhoneLine {
   /** `sip` = real phones over the trunk; `dryrun` = the simulated test line. */
   line: 'sip' | 'dryrun';
   numbers: PhoneNumber[];
+  /** Recorded-voice / IVR campaigns over Cell24x7 (superadmin turns it on per account). */
+  voiceApi?: { enabled: boolean };
 }
 
 export const phoneNumbersApi = {

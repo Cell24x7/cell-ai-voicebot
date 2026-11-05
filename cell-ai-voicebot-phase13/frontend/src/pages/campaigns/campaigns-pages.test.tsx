@@ -162,10 +162,10 @@ describe('/campaigns list', () => {
     await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(await screen.findByText('No campaigns yet')).toBeInTheDocument();
     expect(screen.getByText(/start with a dry run/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'New campaign' })).toHaveAttribute(
-      'href',
-      '/campaigns/new',
-    );
+    // New campaign: pick one of the three types first
+    await user.click(screen.getByRole('button', { name: 'New campaign' }));
+    expect(screen.getByRole('button', { name: 'SIP / Normal call' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'WhatsApp call' })).toBeEnabled();
   });
 
   it('viewers and agents read only: no New, no row actions; managers get pause / duplicate / delete', async () => {
@@ -428,9 +428,6 @@ it('separates WhatsApp call campaigns and exposes all three campaign types', asy
   expect(screen.getByRole('tab', { name: 'SIP / Normal call' })).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'WhatsApp bulk campaign' })).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'WhatsApp call' })).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'New campaign' })).toHaveAttribute(
-    'href',
-    '/campaigns/new?line=whatsapp',
-  );
+  expect(screen.getByRole('button', { name: 'New campaign' })).toBeEnabled();
   expect(api.list).toHaveBeenCalledWith({ limit: 25, line: 'whatsapp' });
 });

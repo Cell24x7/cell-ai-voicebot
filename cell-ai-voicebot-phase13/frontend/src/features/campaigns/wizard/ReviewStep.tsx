@@ -8,12 +8,13 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 import { useListOptions, useSegments } from '@/features/contacts/queries';
-import { useFlows } from '@/features/flows/queries';
+import { useFlowAudio, useFlows } from '@/features/flows/queries';
 import { useChannels } from '@/features/whatsapp/queries';
-import type { DryRunOutcome, ScenarioKey } from '@/services/api/campaigns';
+import { campaignsApi, type DryRunOutcome, type ScenarioKey } from '@/services/api/campaigns';
 import { getErrorMessage } from '@/services/api/errors';
 import type { CampaignEstimate } from '@/services/api/types';
 import { formatCurrencyMicros } from '@/utils/format';
@@ -27,6 +28,7 @@ import {
   SCENARIO_LABELS,
 } from '../labels';
 import { formatInZone } from '../time';
+import { durationText, voiceIvrKeys } from '../voice';
 
 import type { StepIndex, WizardDraft } from './draft';
 
@@ -79,6 +81,17 @@ export function ReviewStep({ draft, onEdit, estimate }: ReviewStepProps) {
   const numbers = useChannels(draft.line === 'whatsapp');
   const number = numbers.data?.items.find((n) => n.id === draft.channelId);
   const flow = flows.data?.data.find((f) => f.id === draft.flowId);
+  const voice = draft.line === 'voice_api';
+  const audioList = useFlowAudio();
+  const ivrs = useQuery({
+    queryKey: voiceIvrKeys.list,
+    queryFn: () => campaignsApi.voiceIvrs(),
+    enabled: voice && draft.voice.kind === 'ivr',
+  });
+  const voiceName =
+    draft.voice.kind === 'audio'
+      ? (audioList.data?.find((a) => a.id === draft.voice.flowAudioId)?.name ?? 'Audio')
+      : (ivrs.data?.find((i) => i.id === draft.voice.ivrId)?.name ?? 'IVR menu');
   const e = estimate?.data;
   const wallet = e?.walletAvailableMicros;
   const short = e !== undefined && wallet !== undefined && e.maxMicros > wallet;
@@ -98,15 +111,23 @@ export function ReviewStep({ draft, onEdit, estimate }: ReviewStepProps) {
           : `${String(draft.contactIds.length)} picked contacts`;
   return (
     <Stack spacing={2}>
-      <Section title="Basics" step={0} onEdit={onEdit}>
-        {draft.name} · {draft.mode === 'dry_run' ? 'Dry run' : 'Live'} ·{' '}
-        {draft.program?.kind === 'agent' ? 'AI agent' : (flow?.name ?? 'Flow')}{' '}
-        {draft.program?.kind === 'agent'
-          ? ''
-          : draft.chosenVersion
-            ? `v${String(draft.chosenVersion)}`
-            : `latest (v${String(flow?.publishedVersion ?? '?')})`}
-      </Section>
+      {voice && (
+        <Section title="Basics" step={0} onEdit={onEdit}>
+          {draft.name} · Recorded voice · {draft.voice.kind === 'audio' ? 'Audio' : 'IVR'}:{' '}
+          {voiceName}
+        </Section>
+      )}
+      {!voice && (
+        <Section title="Basics" step={0} onEdit={onEdit}>
+          {draft.name} · {draft.mode === 'dry_run' ? 'Dry run' : 'Live'} ·{' '}
+          {draft.program?.kind === 'agent' ? 'AI agent' : (flow?.name ?? 'Flow')}{' '}
+          {draft.program?.kind === 'agent'
+            ? ''
+            : draft.chosenVersion
+              ? `v${String(draft.chosenVersion)}`
+              : `latest (v${String(flow?.publishedVersion ?? '?')})`}
+        </Section>
+      )}
       {draft.line === 'whatsapp' && (
         <Alert severity="info">
           WhatsApp call ·{' '}
@@ -135,36 +156,92 @@ export function ReviewStep({ draft, onEdit, estimate }: ReviewStepProps) {
         <br />
         Calls {draft.window.start}–{draft.window.end}, {days(draft.window.days)} ({draft.timezone})
       </Section>
-      <Section title="Retries & pacing" step={3} onEdit={onEdit}>
-        Up to {draft.retry.maxAttempts} attempts, {draft.retry.intervalMinutes} min apart, on{' '}
-        {draft.retry.retryOn.map((r) => RETRY_ON_LABELS[r].toLowerCase()).join(', ') || 'nothing'}
-        {draft.followUps.callbacks
-          ? ` · callbacks within ${String(draft.followUps.callbackMaxDays)} days`
-          : ''}
-        {draft.followUps.promiseCheck.enabled
-          ? ` · follow-up ${String(draft.followUps.promiseCheck.daysAfter)} days after a promise`
-          : ''}
-        <br />
-        {draft.pacing.concurrency} at once, {draft.pacing.dialsPerMinute} dials / min,{' '}
-        {PRIORITY_LABELS[draft.pacing.priority].toLowerCase()} priority
-        {draft.mode === 'dry_run' && (
-          <>
-            <br />
-            Dry run ×{draft.dryRun.speed}:{' '}
-            {(Object.keys(OUTCOME_LABELS) as DryRunOutcome[])
-              .map((k) => `${OUTCOME_LABELS[k]} ${String(draft.dryRun.mix[k] / 100)}%`)
-              .join(', ')}
-            <br />
-            Customers:{' '}
-            {(Object.keys(SCENARIO_LABELS) as ScenarioKey[])
-              .filter((k) => draft.dryRun.scenarios[k] > 0)
-              .map((k) => `${SCENARIO_LABELS[k]} ${String(draft.dryRun.scenarios[k])}%`)
-              .join(', ')}
-          </>
-        )}
-      </Section>
+      {voice && (
+        <Section title="Retries & pacing" step={3} onEdit={onEdit}>
+          {draft.voice.retries === 0
+            ? 'No redial'
+            : `Up to ${String(draft.voice.retries)} redials, ${String(draft.voice.retryIntervalMin)} min apart`}{' '}
+          · sent in batches by the provider
+        </Section>
+      )}
+      {!voice && (
+        <Section title="Retries & pacing" step={3} onEdit={onEdit}>
+          Up to {draft.retry.maxAttempts} attempts, {draft.retry.intervalMinutes} min apart, on{' '}
+          {draft.retry.retryOn.map((r) => RETRY_ON_LABELS[r].toLowerCase()).join(', ') || 'nothing'}
+          {draft.followUps.callbacks
+            ? ` · callbacks within ${String(draft.followUps.callbackMaxDays)} days`
+            : ''}
+          {draft.followUps.promiseCheck.enabled
+            ? ` · follow-up ${String(draft.followUps.promiseCheck.daysAfter)} days after a promise`
+            : ''}
+          <br />
+          {draft.pacing.concurrency} at once, {draft.pacing.dialsPerMinute} dials / min,{' '}
+          {PRIORITY_LABELS[draft.pacing.priority].toLowerCase()} priority
+          {draft.mode === 'dry_run' && (
+            <>
+              <br />
+              Dry run ×{draft.dryRun.speed}:{' '}
+              {(Object.keys(OUTCOME_LABELS) as DryRunOutcome[])
+                .map((k) => `${OUTCOME_LABELS[k]} ${String(draft.dryRun.mix[k] / 100)}%`)
+                .join(', ')}
+              <br />
+              Customers:{' '}
+              {(Object.keys(SCENARIO_LABELS) as ScenarioKey[])
+                .filter((k) => draft.dryRun.scenarios[k] > 0)
+                .map((k) => `${SCENARIO_LABELS[k]} ${String(draft.dryRun.scenarios[k])}%`)
+                .join(', ')}
+            </>
+          )}
+        </Section>
+      )}
 
-      {estimate && (
+      {estimate && voice && (
+        <Paper variant="outlined" sx={{ p: 2 }} aria-label="Estimate">
+          <Typography variant="subtitle2" gutterBottom>
+            Estimated cost
+          </Typography>
+          {estimate.isPending && <CircularProgress size={20} />}
+          {Boolean(estimate.error) && (
+            <Alert severity="error">{getErrorMessage(estimate.error)}</Alert>
+          )}
+          {e && (
+            <Stack spacing={1}>
+              <Typography variant="h6">{formatCurrencyMicros(e.totalMicros)}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {e.contacts} numbers × {formatCurrencyMicros(e.perCallMicros)} (
+                {e.voice?.pulsesPerNumber ?? 1} × 15 s) · dialing takes{' '}
+                {durationText(e.voice?.etaSec ?? 0)}
+              </Typography>
+              {(e.voice?.notIndianMobile ?? 0) > 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  {e.voice?.notIndianMobile} contacts are skipped: not an Indian mobile.
+                </Typography>
+              )}
+              {wallet !== undefined && (
+                <Typography variant="body2">
+                  Wallet available: {formatCurrencyMicros(wallet)}
+                </Typography>
+              )}
+              {e.voice?.notPriced && (
+                <Alert severity="warning">
+                  Recorded voice has no price on this account yet — ask support before starting.
+                </Alert>
+              )}
+              {wallet !== undefined && e.totalMicros > wallet && (
+                <Alert severity="warning">
+                  The estimate is higher than the wallet — the campaign pauses when money runs out.
+                </Alert>
+              )}
+              <Typography variant="caption" color="text.secondary">
+                Charged when each batch is sent, answered or not. Stop holds back numbers not yet
+                sent; numbers already sent keep ringing.
+              </Typography>
+            </Stack>
+          )}
+        </Paper>
+      )}
+
+      {estimate && !voice && (
         <Paper variant="outlined" sx={{ p: 2 }} aria-label="Estimate">
           <Typography variant="subtitle2" gutterBottom>
             {draft.mode === 'dry_run' ? 'What it would cost' : 'Estimated cost'}
@@ -209,9 +286,9 @@ export function ReviewStep({ draft, onEdit, estimate }: ReviewStepProps) {
       )}
       <Divider />
       <Alert severity="info">
-        Do-not-call numbers and opted-out contacts are always skipped; each contact is called at
-        most as often as the account’s call limits allow. The flow opens with the AI disclosure
-        line.
+        {voice
+          ? 'Do-not-call numbers, opted-out contacts and numbers that are not Indian mobiles are skipped. Calls go out only inside the calling window (09:00–21:00 at most).'
+          : 'Do-not-call numbers and opted-out contacts are always skipped; each contact is called at most as often as the account’s call limits allow. The flow opens with the AI disclosure line.'}
       </Alert>
     </Stack>
   );

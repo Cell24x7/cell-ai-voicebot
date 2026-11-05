@@ -31,6 +31,7 @@ import {
   campaignStatusColor,
   PAUSE_REASON_LABELS,
 } from '@/features/campaigns/labels';
+import { NewCampaignDialog } from '@/features/campaigns/NewCampaignDialog';
 import {
   useCampaignLiveUpdates,
   useCampaigns,
@@ -120,6 +121,7 @@ function PhoneCampaignsPage({ whatsapp }: { whatsapp: boolean }) {
   const timezone = useAuthStore((s) => s.session?.account.timezone ?? 'Asia/Kolkata');
   const canWrite = useCanWriteCampaigns();
   const [params, setParams] = useSearchParams();
+  const [choosing, setChoosing] = useState(false);
   useCampaignLiveUpdates();
   const flows = useFlows({ limit: 100 });
 
@@ -168,12 +170,17 @@ function PhoneCampaignsPage({ whatsapp }: { whatsapp: boolean }) {
               {c.name}
             </Link>
             {c.mode === 'dry_run' && <Chip size="small" variant="outlined" label="Dry run" />}
+            {c.line === 'voice_api' && (
+              <Chip size="small" variant="outlined" label="Recorded voice" />
+            )}
             {c.recurring && <Chip size="small" variant="outlined" label="Repeats" />}
           </Stack>
           <Typography variant="caption" color="text.secondary">
-            {c.program?.kind === 'agent'
-              ? c.program.name || 'AI agent'
-              : c.flow.name || 'Deleted flow'}
+            {c.line === 'voice_api'
+              ? `${c.voice?.kind === 'ivr' ? 'IVR' : 'Audio'}: ${c.voice?.name || '—'}`
+              : c.program?.kind === 'agent'
+                ? c.program.name || 'AI agent'
+                : c.flow.name || 'Deleted flow'}
             {c.flow.version ? ` · v${String(c.flow.version)}` : ''}
           </Typography>
         </Stack>
@@ -231,20 +238,24 @@ function PhoneCampaignsPage({ whatsapp }: { whatsapp: boolean }) {
     <>
       <PageHeader
         title={whatsapp ? 'WhatsApp call campaigns' : 'Campaigns'}
-        subtitle="Call lists of contacts with a flow, inside your calling window"
+        subtitle={
+          whatsapp
+            ? 'WhatsApp calls with a flow or AI agent, inside your calling window'
+            : 'Phone calls with a flow or AI agent, or a recorded voice / IVR message'
+        }
         actions={
           canWrite ? (
             <Button
               variant="contained"
               startIcon={<AddOutlined />}
-              component={RouterLink}
-              to={whatsapp ? '/campaigns/new?line=whatsapp' : '/campaigns/new'}
+              onClick={() => setChoosing(true)}
             >
               New campaign
             </Button>
           ) : undefined
         }
       />
+      <NewCampaignDialog open={choosing} onClose={() => setChoosing(false)} />
       <Stack spacing={2}>
         <Stack
           direction={{ xs: 'column', md: 'row' }}

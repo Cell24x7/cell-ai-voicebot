@@ -59,9 +59,13 @@ describe('API keys tab (Phase 15)', () => {
     expect(within(row('Old key')).getByText('Expired')).toBeInTheDocument();
     expect(within(row('Gone key')).getByText('Revoked')).toBeInTheDocument();
     expect(within(row('Gone key')).queryByRole('button', { name: 'Change' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Try it in the API docs' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open the API docs' })).toHaveAttribute(
       'href',
       '/api/docs',
+    );
+    expect(screen.getByRole('link', { name: 'Download the Postman collection' })).toHaveAttribute(
+      'href',
+      '/api/v1/postman.json',
     );
   });
 

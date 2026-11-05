@@ -60,6 +60,7 @@ const USAGE_KIND_LABELS: Record<
   whatsapp_call: 'WhatsApp call',
   insights: 'Call insights (AI)',
   stt: 'Call transcription',
+  voice_broadcast: 'Recorded voice calls',
   chat_summary: 'Chat summary (AI)',
 };
 

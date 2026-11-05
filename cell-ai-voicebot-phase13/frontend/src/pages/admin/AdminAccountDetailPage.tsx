@@ -35,6 +35,9 @@ import { formatInAccountTz } from '@/utils/datetime';
 const RetentionCapCard = lazy(async () => ({
   default: (await import('@/features/admin/RetentionCapCard')).RetentionCapCard,
 }));
+const VoiceApiCard = lazy(async () => ({
+  default: (await import('@/features/admin/VoiceApiCard')).VoiceApiCard,
+}));
 const PhoneLineCard = lazy(async () => ({
   default: (await import('@/features/admin/PhoneLineCard')).PhoneLineCard,
 }));
@@ -139,6 +142,7 @@ function Overview({ detail }: { detail: AdminAccountDetail }) {
           key={`${detail.voiceLine}:${JSON.stringify(detail.sipSettings)}`}
           detail={detail}
         />
+        <VoiceApiCard key={JSON.stringify(detail.voiceApi)} detail={detail} />
       </Suspense>
       <Suspense fallback={<Skeleton variant="rounded" height={160} />}>
         <WhatsAppCard detail={detail} />

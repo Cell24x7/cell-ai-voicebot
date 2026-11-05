@@ -28,9 +28,21 @@ export type ScenarioKey =
   | 'hangup_early'
   | 'wrong_keys';
 
+/** `voice_api` = recorded voice / IVR played by Cell24x7 (no flow, always real phones). */
+export type CampaignLine = 'phone' | 'whatsapp' | 'voice_api';
+export const VOICE_RETRY_INTERVALS = [5, 10, 30, 60, 180, 300] as const;
+export type VoiceRetryInterval = (typeof VOICE_RETRY_INTERVALS)[number];
+export type VoiceContentInput =
+  { kind: 'audio'; flowAudioId: string } | { kind: 'ivr'; ivrId: number };
+
 /** Settings groups — every one optional (create fills defaults, update merges). */
 export interface CampaignSettingsInput {
-  line?: 'phone' | 'whatsapp';
+  line?: CampaignLine;
+  voiceApi?: {
+    content?: VoiceContentInput | null;
+    retries?: number;
+    retryIntervalMin?: VoiceRetryInterval;
+  } | null;
   channelId?: string | null;
   program?: { kind: 'flow' | 'agent'; id: string } | null;
   askPermissionFirst?: { templateId: string } | null;
@@ -92,7 +104,7 @@ export interface UpdateCampaignInput extends CampaignSettingsInput {
 }
 
 export interface ListCampaignsQuery {
-  line?: 'phone' | 'whatsapp';
+  line?: CampaignLine;
   cursor?: string;
   limit?: number;
   status?: CampaignStatus[];
@@ -116,7 +128,7 @@ export interface ListCampaignContactsQuery {
 export interface AudiencePreviewInput {
   channelId?: string;
   askPermissionFirst?: boolean;
-  line?: 'phone' | 'whatsapp';
+  line?: CampaignLine;
   program?: { kind: 'flow' | 'agent'; id: string } | null;
   flowId?: string;
   chosenVersion?: number | null;
@@ -172,6 +184,9 @@ export const campaignsApi = {
     ).data,
   runs: (id: string) =>
     unwrap(apiClient.get<SuccessEnvelope<CampaignListItem[]>>(`/campaigns/${id}/runs`)),
+  /** VAPI: IVR menus a superadmin assigned to this account. */
+  voiceIvrs: () =>
+    unwrap(apiClient.get<SuccessEnvelope<{ id: number; name: string }[]>>('/voice-api/ivrs')),
   /** Results export job; download through `GET /contact-exports/:id`. */
   exportResults: (id: string, format: 'csv' | 'xlsx') =>
     unwrap(apiClient.post<SuccessEnvelope<ExportJob>>(`/campaigns/${id}/export`, { format })),

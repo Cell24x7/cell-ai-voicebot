@@ -16,6 +16,7 @@ import type { ReactNode } from 'react';
 
 import { PageHeader } from '@/components/PageHeader';
 import { RelativeTime } from '@/components/RelativeTime';
+import { VoiceProviderSection } from '@/features/admin/VoiceProviderSection';
 import { adminSystemApi } from '@/services/api/admin-system';
 import type { SystemStatus } from '@/services/api/types';
 
@@ -236,6 +237,9 @@ export function AdminSystemPage() {
               </Section>
             </Grid>
           )}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <VoiceProviderSection />
+          </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <Section title="Queues">
               <Table size="small" aria-label="Queues">

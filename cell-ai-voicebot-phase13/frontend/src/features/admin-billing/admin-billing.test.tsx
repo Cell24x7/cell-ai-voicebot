@@ -81,6 +81,7 @@ const DETAIL: AdminAccountDetail = {
   apiLimits: null,
   voiceLine: 'dryrun',
   sipSettings: { pulseSec: null, spendMinutesPerHour: null },
+  voiceApi: { enabled: false, ivrIds: [], ivrEstimateSec: 60 },
   usersByStatus: { active: 3, invited: 0, disabled: 0 },
   retention: fakeRetention(),
   limits: { maxConcurrentCalls: 10, dialsPerMinute: 60 },
@@ -105,6 +106,7 @@ const CARD = {
   aiTextPer1kTokensMicros: 200_000,
   embeddingPer1kTokensMicros: 10_000,
   sttPerMinuteMicros: 500_000,
+  voiceApiPulseMicros: 0,
 };
 const VERSION = (overrides: Partial<RateCardVersion> = {}): RateCardVersion => ({
   id: 'rc1',
@@ -239,6 +241,7 @@ describe('account rates tab', () => {
       aiTextPer1kTokensMicros: 250_000,
       embeddingPer1kTokensMicros: 10_000,
       sttPerMinuteMicros: 500_000,
+      voiceApiPulseMicros: 0,
       note: 'Festive offer',
     });
     expect(await screen.findByText('New prices saved for Demo Finance')).toBeInTheDocument();

@@ -19,6 +19,8 @@ export const WEBHOOK_EVENTS = [
   { key: 'whatsapp.call.missed', label: 'WhatsApp call missed' },
   { key: 'contact.opted_out', label: 'Contact opted out' },
   { key: 'contact.opted_in', label: 'Contact opted in' },
+  { key: 'whatsapp_campaign.completed', label: 'WhatsApp bulk campaign finished' },
+  { key: 'whatsapp_campaign.paused', label: 'WhatsApp bulk campaign paused' },
 ] as const;
 export type WebhookEventType = (typeof WEBHOOK_EVENTS)[number]['key'];
 

@@ -96,3 +96,10 @@ Backend-derived messaging caps are 18/sec for Business App/coexistence/unknown a
 See the backend channel guide and Phase 19 sign-off for validation and live checks.
 
 Phase 19 continuation: `features/calls/CallMethodDialog` is shared across call entry points; sender/contact keys isolate WhatsApp permission and price previews. `features/whatsapp-campaigns` contains message campaign drafts, steps, queries and reports; call campaigns keep the existing engine with an explicit transport/program. Template builders retain their chosen sender.
+
+## Recorded voice (Cell24x7)
+
+`features/campaigns/NewCampaignDialog` is the three-type picker. The SIP / Normal call
+wizard has a `voice_api` line (`wizard/VoiceFields.tsx`, draft `voice`); the detail page shows
+`detail/VoiceBatchesPanel`. Admin: `features/admin/VoiceApiCard`, `VoiceProviderSection`,
+`services/api/voice-api.ts`.

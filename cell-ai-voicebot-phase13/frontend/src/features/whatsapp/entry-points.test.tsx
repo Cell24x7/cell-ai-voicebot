@@ -61,6 +61,7 @@ const detail = (over: Partial<AdminAccountDetail> = {}): AdminAccountDetail => (
   apiLimits: null,
   voiceLine: 'dryrun',
   sipSettings: { pulseSec: null, spendMinutesPerHour: null },
+  voiceApi: { enabled: false, ivrIds: [], ivrEstimateSec: 60 },
   usersByStatus: { active: 1, invited: 0, disabled: 0 },
   retention: fakeRetention(),
   limits: { maxConcurrentCalls: 10, dialsPerMinute: 60 },

@@ -41,6 +41,8 @@ export const PAUSE_REASON_LABELS: Record<CampaignPauseReason, string> = {
   too_many_failures: 'Too many calls failed in a row',
   admin: 'Paused by the platform team',
   flow_not_runnable: 'Its flow can no longer run (an AI agent is off or audio is missing)',
+  provider_error: 'The recorded-voice provider refused a batch',
+  provider_uncertain: 'The recorded-voice provider did not answer',
 };
 
 /** What to do about a pause (shown under the banner). */
@@ -51,6 +53,9 @@ export const PAUSE_REASON_HINTS: Partial<Record<CampaignPauseReason, string>> = 
   admin: 'Only the platform team can resume it.',
   flow_not_runnable: 'Switch the flow’s AI agent back on (or restore its audio), then resume.',
   account_suspended: 'The account has to be enabled again by the platform team.',
+  provider_error: 'Support has been told. Resume once the audio, IVR or price is fixed.',
+  provider_uncertain:
+    'Support checks whether the last batch went out — it resumes after that, never sent twice.',
 };
 
 export const CONTACT_STATUS_LABELS: Record<CampaignContactStatus, string> = {
@@ -85,6 +90,7 @@ export const SKIP_REASON_LABELS: Record<string, string> = {
   missing_values: 'Missing values',
   cap_reached: 'Call limit reached',
   campaign_ended: 'Campaign ended',
+  not_indian_mobile: 'Not an Indian mobile (recorded voice)',
 };
 /** Why a contact waits for its next attempt (the dispatcher's dial guard). */
 export const WAIT_REASON_LABELS: Record<NonNullable<CampaignContactRow['waitReason']>, string> = {

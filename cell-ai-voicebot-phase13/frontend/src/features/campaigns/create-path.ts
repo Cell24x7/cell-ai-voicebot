@@ -2,7 +2,7 @@ import type { CampaignType } from '@/features/calls/capabilities';
 
 /** Carry only the selected audience across engines, never a call program or template. */
 export const campaignCreatePath = (
-  type: CampaignType,
+  type: CampaignType | 'voice',
   audience: {
     listIds?: string[];
     segmentId?: string | null;
@@ -12,6 +12,7 @@ export const campaignCreatePath = (
 ): string => {
   const params = new URLSearchParams();
   if (type === 'whatsapp-call') params.set('line', 'whatsapp');
+  if (type === 'voice') params.set('line', 'voice_api');
   if (audience.listIds?.length) params.set('listIds', audience.listIds.join(','));
   if (audience.segmentId) params.set('segmentId', audience.segmentId);
   if (audience.contactIds?.length) params.set('contactIds', audience.contactIds.join(','));

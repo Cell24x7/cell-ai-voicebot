@@ -167,3 +167,16 @@ pacing lives in `modules/whatsapp/message-pacer.ts`; number policy is derived by
 `whatsapp-campaigns/pacing.ts`. Call campaigns reuse WhatsApp calling runtime and
 per-channel consent. Templates remain shared by WABA. See the channel guide and
 continuation progress/sign-off for contracts, migrations, tests and remaining checks.
+
+## Recorded voice (VAPI)
+
+`core/voice-api/` is the Cell24x7 client (`cell24x7.client.ts`, lenient list parsing) and
+its fake. `modules/voice-api/` holds superadmin settings, status and routes (incl. the
+public result webhook). `modules/campaigns/voice-api/` runs `line: 'voice_api'` campaigns:
+`settings.ts` (validation, price, ETA), `batch.ts` (hold → submit → capture under a Redis
+lock; uncertain submits are never resent), `results.ts` (webhook + polling, idempotent
+counters, call rows), `jobs.ts` (`voice.batch` / `voice.poll` / `voice.result`).
+
+## Public API docs (DOCS)
+
+`modules/docs/`: `public-spec.ts` (public routes + `documentOp` fills ids, descriptions, examples, errors; servers, tag order), `public-docs.ts` (docs of the older public routes), `sample.ts` (examples from schemas), `quality.ts` (audit rules), `postman.ts` (collection), `public-errors.ts` (errors guide table). `modules/public-api/resources.*` serves `/resources/*`. Checks: `npm run docs:audit`, `npm run docs:smoke`.

@@ -31,6 +31,22 @@ export const API_KEY_SCOPES = [
   { key: 'reports:read', group: 'Reports', description: 'Read report numbers' },
   { key: 'exports:write', group: 'Reports', description: 'Create and download exports' },
   { key: 'webhooks:manage', group: 'Webhooks', description: 'Manage outbound webhooks' },
+  {
+    key: 'whatsapp-campaigns:read',
+    group: 'WhatsApp',
+    description: 'Read WhatsApp bulk campaigns, recipients and reports',
+  },
+  {
+    key: 'whatsapp-campaigns:write',
+    group: 'WhatsApp',
+    description: 'Create, start and control WhatsApp bulk campaigns',
+  },
+  {
+    key: 'resources:read',
+    group: 'Account',
+    description:
+      'Read flows, AI agents, WhatsApp numbers, lists, segments, caller numbers, IVRs and the wallet balance',
+  },
 ] as const;
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number]['key'];
 export const SCOPE_GROUPS = [
@@ -40,6 +56,7 @@ export const SCOPE_GROUPS = [
   'WhatsApp',
   'Reports',
   'Webhooks',
+  'Account',
 ] as const;
 
 export interface ApiKeyInput {

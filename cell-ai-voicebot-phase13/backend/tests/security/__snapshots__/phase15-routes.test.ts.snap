@@ -5,6 +5,9 @@ exports[`Phase 15 public API routes (security) > scope × route matrix (each rou
   "DELETE /api/v1/webhook-endpoints/{id}": [
     "webhooks:manage",
   ],
+  "DELETE /api/v1/whatsapp-campaigns/{id}": [
+    "whatsapp-campaigns:write",
+  ],
   "GET /api/v1/api-keys/whoami": [
     "calls:read",
     "calls:write",
@@ -19,6 +22,9 @@ exports[`Phase 15 public API routes (security) > scope × route matrix (each rou
     "reports:read",
     "exports:write",
     "webhooks:manage",
+    "whatsapp-campaigns:read",
+    "whatsapp-campaigns:write",
+    "resources:read",
   ],
   "GET /api/v1/calls": [
     "calls:read",
@@ -83,6 +89,30 @@ exports[`Phase 15 public API routes (security) > scope × route matrix (each rou
   "GET /api/v1/reports/whatsapp": [
     "reports:read",
   ],
+  "GET /api/v1/resources/agents": [
+    "resources:read",
+  ],
+  "GET /api/v1/resources/contact-lists": [
+    "resources:read",
+  ],
+  "GET /api/v1/resources/flows": [
+    "resources:read",
+  ],
+  "GET /api/v1/resources/ivrs": [
+    "resources:read",
+  ],
+  "GET /api/v1/resources/phone-line": [
+    "resources:read",
+  ],
+  "GET /api/v1/resources/segments": [
+    "resources:read",
+  ],
+  "GET /api/v1/resources/wallet": [
+    "resources:read",
+  ],
+  "GET /api/v1/resources/whatsapp-numbers": [
+    "resources:read",
+  ],
   "GET /api/v1/webhook-endpoints": [
     "webhooks:manage",
   ],
@@ -91,6 +121,24 @@ exports[`Phase 15 public API routes (security) > scope × route matrix (each rou
   ],
   "GET /api/v1/webhook-endpoints/{id}/deliveries": [
     "webhooks:manage",
+  ],
+  "GET /api/v1/whatsapp-campaigns": [
+    "whatsapp-campaigns:read",
+  ],
+  "GET /api/v1/whatsapp-campaigns/{id}": [
+    "whatsapp-campaigns:read",
+  ],
+  "GET /api/v1/whatsapp-campaigns/{id}/export": [
+    "whatsapp-campaigns:read",
+  ],
+  "GET /api/v1/whatsapp-campaigns/{id}/recipients": [
+    "whatsapp-campaigns:read",
+  ],
+  "GET /api/v1/whatsapp-campaigns/{id}/report": [
+    "whatsapp-campaigns:read",
+  ],
+  "GET /api/v1/whatsapp/channels/{id}/calling/quote": [
+    "calls:write",
   ],
   "GET /api/v1/whatsapp/templates": [
     "templates:read",
@@ -101,6 +149,9 @@ exports[`Phase 15 public API routes (security) > scope × route matrix (each rou
   "PATCH /api/v1/webhook-endpoints/{id}": [
     "webhooks:manage",
   ],
+  "PATCH /api/v1/whatsapp-campaigns/{id}": [
+    "whatsapp-campaigns:write",
+  ],
   "POST /api/v1/calls": [
     "calls:write",
   ],
@@ -109,6 +160,9 @@ exports[`Phase 15 public API routes (security) > scope × route matrix (each rou
   ],
   "POST /api/v1/campaigns/{id}/cancel": [
     "campaigns:write",
+  ],
+  "POST /api/v1/campaigns/{id}/estimate": [
+    "campaigns:read",
   ],
   "POST /api/v1/campaigns/{id}/pause": [
     "campaigns:write",
@@ -154,6 +208,27 @@ exports[`Phase 15 public API routes (security) > scope × route matrix (each rou
   ],
   "POST /api/v1/webhook-endpoints/{id}/test": [
     "webhooks:manage",
+  ],
+  "POST /api/v1/whatsapp-campaigns": [
+    "whatsapp-campaigns:write",
+  ],
+  "POST /api/v1/whatsapp-campaigns/{id}/estimate": [
+    "whatsapp-campaigns:read",
+  ],
+  "POST /api/v1/whatsapp-campaigns/{id}/pause": [
+    "whatsapp-campaigns:write",
+  ],
+  "POST /api/v1/whatsapp-campaigns/{id}/resume": [
+    "whatsapp-campaigns:write",
+  ],
+  "POST /api/v1/whatsapp-campaigns/{id}/retry-failed": [
+    "whatsapp-campaigns:write",
+  ],
+  "POST /api/v1/whatsapp-campaigns/{id}/start": [
+    "whatsapp-campaigns:write",
+  ],
+  "POST /api/v1/whatsapp-campaigns/{id}/stop": [
+    "whatsapp-campaigns:write",
   ],
   "POST /api/v1/whatsapp/calls": [
     "whatsapp-calls:write",

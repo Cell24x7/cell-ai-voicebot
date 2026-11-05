@@ -32,6 +32,8 @@ export interface RateCardInput {
   embeddingPer1kTokensMicros: number;
   /** Phase 14 — transcribing recorded human calls, per minute. */
   sttPerMinuteMicros: number;
+  /** VAPI: recorded voice per 15 s per number (0 = not priced). */
+  voiceApiPulseMicros?: number;
   note?: string | null;
 }
 

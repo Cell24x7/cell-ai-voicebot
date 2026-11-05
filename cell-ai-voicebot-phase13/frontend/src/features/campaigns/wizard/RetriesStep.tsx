@@ -16,11 +16,19 @@ import { PRIORITY_LABELS, RETRY_ON_LABELS } from '../labels';
 
 import type { StepProps } from './BasicsStep';
 import { DRY_RUN_SPEEDS, isLocked, LIMITS } from './draft';
+import { VoiceRetryFields } from './VoiceFields';
 
 const num = (v: string) => (v === '' ? 0 : Math.trunc(Number(v)));
 
 /** Retries, callbacks / promise follow-ups, pacing and the dry-run simulation. */
 export function RetriesStep({ draft, onChange, lock }: StepProps) {
+  if (draft.line === 'voice_api') {
+    return <VoiceRetryFields draft={draft} onChange={onChange} lock={lock} />;
+  }
+  return <PhoneRetries draft={draft} onChange={onChange} lock={lock} />;
+}
+
+function PhoneRetries({ draft, onChange, lock }: StepProps) {
   const { retry, followUps, pacing, dryRun } = draft;
   const retryLocked = isLocked(lock, 'retry');
   const followLocked = isLocked(lock, 'followUps');

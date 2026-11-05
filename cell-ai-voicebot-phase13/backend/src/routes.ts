@@ -39,6 +39,7 @@ import { createDevJobsRouter } from './modules/dev-jobs/dev-jobs.routes';
 import { createDndRouter, createOptOutRouter } from './modules/dnd/dnd.routes';
 import {
   createOpenApiHandler,
+  createPostmanHandler,
   createPublicOpenApiHandler,
 } from './modules/docs/openapi.controller';
 import { createFlowAudioRouter } from './modules/flow-audio/flow-audio.routes';
@@ -66,6 +67,7 @@ import {
   createContactEraseRouter,
 } from './modules/privacy/privacy.routes';
 import { createMessagesRouter } from './modules/public-api/messages.routes';
+import { createResourcesRouter } from './modules/public-api/resources.routes';
 import { createRbacRouter } from './modules/rbac/rbac.routes';
 import { createWsTicketsRouter } from './modules/realtime-tickets/tickets.routes';
 import { createRecordExportsRouter } from './modules/record-exports/record-exports.routes';
@@ -84,6 +86,11 @@ import { createSystemRouter } from './modules/system/system.routes';
 import { createTeamRouter } from './modules/team/team.routes';
 import { unavailableTemplateJobs, type TemplateJobs } from './modules/templates/jobs';
 import { createTemplatesRouter } from './modules/templates/templates.routes';
+import {
+  createVoiceApiAdminRouter,
+  createVoiceApiRouter,
+  createVoiceWebhookRouter,
+} from './modules/voice-api/voice-api.routes';
 import { createWalletRouter } from './modules/wallet/wallet.routes';
 import { webhookRuntime, type WebhookHooks } from './modules/webhooks/deliver.job';
 import {
@@ -254,6 +261,12 @@ export const createApiRouter = ({
   router.use('/admin', createAdminComplianceRouter());
   router.use('/admin', createAdminPhoneNumbersRouter());
   router.use('/', createPhoneNumbersRouter());
+  // VAPI: recorded-voice / IVR campaigns over Cell24x7
+  router.use('/admin', createVoiceApiAdminRouter());
+  router.use('/', createVoiceApiRouter());
+  router.use('/', createVoiceWebhookRouter());
+  // DOCS-T2: read-only ids and balances for API clients
+  router.use('/resources', createResourcesRouter());
   router.use('/account', createRetentionRouter());
   router.use('/account', createAccountRouter());
   router.use('/inbox', createChatSummaryRouter({ jobs: ai.jobs ?? unavailableAiJobs }));
@@ -284,6 +297,7 @@ export const createApiRouter = ({
   router.use('/ws', createWsTicketsRouter());
   router.get('/openapi.json', createOpenApiHandler(env.APP_URL, env.API_DOCS_ENABLED));
   router.get('/openapi.public.json', createPublicOpenApiHandler(env.APP_URL));
+  router.get('/postman.json', createPostmanHandler(env.APP_URL));
   router.use('/system', createSystemRouter());
   router.use('/csp-report', createCspReportRouter());
   router.use('/rbac', createRbacRouter());

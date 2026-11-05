@@ -100,6 +100,7 @@ export function CampaignWizardPage() {
 const prefill = (draft: WizardDraft, params: URLSearchParams): WizardDraft => {
   const next = { ...draft };
   if (params.get('line') === 'whatsapp') next.line = 'whatsapp';
+  if (params.get('line') === 'voice_api') Object.assign(next, { line: 'voice_api', mode: 'live' });
   const flowId = params.get('flowId');
   const listId = params.get('listId');
   const listIds = params.get('listIds')?.split(',').filter(Boolean);
@@ -143,8 +144,8 @@ function WizardForm({
     setProblems([]);
     if (patch.line && !saved) {
       const next = new URLSearchParams(params);
-      if (patch.line === 'whatsapp') next.set('line', 'whatsapp');
-      else next.delete('line');
+      if (patch.line === 'phone') next.delete('line');
+      else next.set('line', patch.line);
       setParams(next, { replace: true });
     }
   };
@@ -256,7 +257,9 @@ function WizardForm({
         subtitle={
           lock === 'live'
             ? 'Running campaign — the name, end, window, retries and pacing can change'
-            : 'Dry-run campaigns go through the real flow with simulated customers'
+            : draft.line === 'voice_api'
+              ? 'Recorded voice or an IVR menu, played to every number by the provider'
+              : 'Dry-run campaigns go through the real flow with simulated customers'
         }
       />
       <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>

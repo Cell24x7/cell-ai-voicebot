@@ -323,7 +323,11 @@ export function ApiKeysTab() {
         <Typography variant="body2" color="text.secondary">
           Keys let your systems use the public API (header <code>X-API-Key</code>).{' '}
           <Link href="/api/docs" target="_blank" rel="noopener">
-            Try it in the API docs
+            Open the API docs
+          </Link>{' '}
+          ·{' '}
+          <Link href="/api/v1/postman.json" download="notifynow-api.postman_collection.json">
+            Download the Postman collection
           </Link>
         </Typography>
         <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>

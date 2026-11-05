@@ -18,10 +18,23 @@ export const API_KEY_SCOPE_INFO = {
   'reports:read': { group: 'Reports', description: 'Read report numbers' },
   'exports:write': { group: 'Reports', description: 'Create and download exports' },
   'webhooks:manage': { group: 'Webhooks', description: 'Manage outbound webhooks' },
+  'whatsapp-campaigns:read': {
+    group: 'WhatsApp',
+    description: 'Read WhatsApp bulk campaigns, recipients and reports',
+  },
+  'whatsapp-campaigns:write': {
+    group: 'WhatsApp',
+    description: 'Create, start and control WhatsApp bulk campaigns',
+  },
+  'resources:read': {
+    group: 'Account',
+    description:
+      'Read flows, AI agents, WhatsApp numbers, lists, segments, caller numbers, IVRs and the wallet balance',
+  },
 } as const satisfies Record<string, { group: ApiKeyScopeGroup; description: string }>;
 
 export type ApiKeyScopeGroup =
-  'Calls' | 'Contacts' | 'Campaigns' | 'WhatsApp' | 'Reports' | 'Webhooks';
+  'Calls' | 'Contacts' | 'Campaigns' | 'WhatsApp' | 'Reports' | 'Webhooks' | 'Account';
 export type ApiKeyScope = keyof typeof API_KEY_SCOPE_INFO;
 export const API_KEY_SCOPES = Object.keys(API_KEY_SCOPE_INFO) as [ApiKeyScope, ...ApiKeyScope[]];
 
@@ -45,6 +58,16 @@ export const SCOPE_PERMISSIONS: Record<ApiKeyScope, readonly Permission[]> = {
   'reports:read': ['reports.read'],
   'exports:write': ['calls.export', 'reports.export'],
   'webhooks:manage': ['integrations.manage'],
+  'whatsapp-campaigns:read': ['whatsapp.campaigns.read'],
+  'whatsapp-campaigns:write': ['whatsapp.campaigns.read', 'whatsapp.campaigns.write'],
+  'resources:read': [
+    'flows.read',
+    'agents.read',
+    'whatsapp.read',
+    'contacts.read',
+    'account.read',
+    'wallet.read',
+  ],
 };
 
 /** The service-level permissions of a key's scopes (unknown scopes give nothing). */

@@ -11,6 +11,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **API docs links and scopes** — Settings → API keys offers `resources:read` and the WhatsApp bulk campaign scopes (new "Account" group), links the API docs and the Postman collection; webhook endpoints can subscribe to WhatsApp bulk campaign events.
+
+- **Recorded-voice / IVR campaigns (Cell24x7)** — New campaign opens a three-type picker (SIP / Normal call, WhatsApp call, WhatsApp bulk message). SIP / Normal call can use **Recorded voice or IVR**: audio from the library or an assigned IVR, redials, review with per-number price, ETA and skipped non-mobiles; detail shows batches and provider results. Admin: account Recorded voice card, rate card price per 15 s, System → Cell24x7 status, webhook registration and uncertain-batch resolve. Ledger label "Recorded voice calls".
+
 - **Phase 19 — resellers and campaign channels** — 2026-11-05
   - Business/reseller signup, reseller customer/credit panels and audited view/act entry points.
   - Three campaign tabs with sender-aware creation: SIP / Normal, WhatsApp messages and WhatsApp calls using flows or AI agents.
