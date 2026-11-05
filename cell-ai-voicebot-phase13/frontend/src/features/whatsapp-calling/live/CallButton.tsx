@@ -1,5 +1,6 @@
 import ArrowDropDown from '@mui/icons-material/ArrowDropDown';
 import CallOutlined from '@mui/icons-material/CallOutlined';
+import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
@@ -47,7 +48,7 @@ export function CallButton({
   const session = useSession();
   const live = useLiveCallStore((s) => isLive(s.active));
   const [menu, setMenu] = useState<HTMLElement | null>(null);
-  const [dialog, setDialog] = useState<'ai' | 'request' | null>(null);
+  const [dialog, setDialog] = useState<'ai' | 'human' | 'request' | null>(null);
   const key = useRef<string | null>(null);
   if (!canCall) return null;
   const p = permission.data;
@@ -125,8 +126,21 @@ export function CallButton({
   return (
     <>
       {button}
+      {permission.isError && (
+        <Alert
+          severity="error"
+          action={<Button onClick={() => void permission.refetch()}>Retry</Button>}
+        >
+          Call permission could not be checked. Retry before calling.
+        </Alert>
+      )}
       <Menu anchorEl={menu} open={Boolean(menu)} onClose={() => setMenu(null)}>
-        <MenuItem onClick={() => call('human')}>
+        <MenuItem
+          onClick={() => {
+            setMenu(null);
+            setDialog('human');
+          }}
+        >
           <ListItemText primary="Call yourself" secondary="Talk from this browser" />
         </MenuItem>
         <MenuItem
@@ -138,14 +152,15 @@ export function CallButton({
           <ListItemText primary="Call with AI" secondary="A flow or an AI agent talks" />
         </MenuItem>
       </Menu>
-      {dialog === 'ai' && (
+      {(dialog === 'ai' || dialog === 'human') && (
         <CallWithAiDialog
           key={`${channelId}:${contactId}`}
+          mode={dialog}
           channelId={channelId}
           contactId={contactId}
           contactLabel={label}
           phoneE164={phoneE164}
-          onCall={(program) => call('ai', program)}
+          onCall={(program) => call(dialog, program)}
           onClose={() => setDialog(null)}
         />
       )}

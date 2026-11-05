@@ -34,6 +34,7 @@ import {
   onCallEnded,
   onCallStatus,
   placeCall,
+  placePhoneCall,
   pressKey,
   reconnectCall,
   setHeld,
@@ -461,6 +462,11 @@ describe('call button states', () => {
     button();
     await userEvent.click(await screen.findByRole('button', { name: 'Call' }));
     await userEvent.click(screen.getByRole('menuitem', { name: /Call yourself/ }));
+    const confirm = await screen.findByRole('dialog', { name: 'Call yourself' });
+    await waitFor(() =>
+      expect(within(confirm).getByRole('button', { name: 'Call yourself' })).toBeEnabled(),
+    );
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Call yourself' }));
     await waitFor(() => expect(api.start).toHaveBeenCalled());
     const bar = await screen.findByRole('region', { name: 'WhatsApp call' });
     expect(within(bar).getByText('Asha Verma')).toBeInTheDocument();
@@ -738,4 +744,91 @@ describe('call availability', () => {
     show();
     expect(screen.queryByRole('button', { name: /Call availability/ })).not.toBeInTheDocument();
   });
+});
+
+describe('direct SIP browser calling', () => {
+  const input = {
+    contactId: 'k1',
+    callerNumberId: 'sip1',
+    label: 'Asha',
+    idempotencyKey: 'sip-key',
+    recording: false,
+  };
+  const phoneApi = () => ({
+    start: vi.fn().mockResolvedValue({ id: 'sip-call' }),
+    mediaTicket: vi.fn().mockResolvedValue({ ...TICKET, callId: 'sip-call' }),
+    hold: vi.fn().mockResolvedValue({ on: true }),
+  });
+
+  it('uses the selected SIP sender, microphone, bridge, phone hold and reconnect routes', async () => {
+    const phone = phoneApi();
+    const { deps } = make({ phoneApi: phone });
+    const pending = placePhoneCall(input);
+    await waitFor(() => expect(FakeMediaWs.instances).toHaveLength(1));
+    expect(deps.requestMic).toHaveBeenCalledOnce();
+    expect(phone.start).toHaveBeenCalledWith(
+      { contactId: 'k1', callerNumberId: 'sip1', mode: 'human' },
+      'sip-key',
+    );
+    expect(api.start).not.toHaveBeenCalled();
+    act(() => FakeMediaWs.last().serverOpen());
+    await pending;
+    expect(active()).toMatchObject({ callId: 'sip-call', transport: 'sip', mode: 'human' });
+    await setHeld(true);
+    expect(phone.hold).toHaveBeenCalledWith('sip-call', true);
+    expect(api.hold).not.toHaveBeenCalled();
+    act(() => FakeMediaWs.last().serverClose(1006));
+    const reconnect = reconnectCall();
+    await waitFor(() => expect(FakeMediaWs.instances).toHaveLength(2));
+    act(() => FakeMediaWs.last().serverOpen());
+    await reconnect;
+    expect(phone.mediaTicket).toHaveBeenCalledTimes(2);
+    expect(api.mediaTicket).not.toHaveBeenCalled();
+  });
+
+  it('does not create a call when the microphone is denied', async () => {
+    const phone = phoneApi();
+    make({ phoneApi: phone, requestMic: vi.fn().mockRejectedValue(new MicError('mic_denied')) });
+    await placePhoneCall(input);
+    expect(phone.start).not.toHaveBeenCalled();
+    expect(active()?.phase).toBe('failed');
+  });
+
+  it('double clicks create one call and a failed media ticket hangs it up', async () => {
+    const phone = phoneApi();
+    phone.mediaTicket.mockRejectedValue(new Error('Connection lost'));
+    const { hangup, stop } = make({ phoneApi: phone });
+    await Promise.all([placePhoneCall(input), placePhoneCall(input)]);
+    expect(phone.start).toHaveBeenCalledOnce();
+    expect(hangup).toHaveBeenCalledWith('sip-call');
+    expect(stop).toHaveBeenCalled();
+    expect(active()).toMatchObject({
+      phase: 'failed',
+      failure: 'Something went wrong. Please try again.',
+    });
+  });
+});
+
+it('ends a WhatsApp human call if browser audio setup fails after the provider call was created', async () => {
+  const { hangup, stop } = make({
+    createEngine: vi.fn().mockRejectedValue(new Error('Audio unavailable')),
+  });
+  await place();
+  expect(hangup).toHaveBeenCalledWith('wc1');
+  expect(stop).toHaveBeenCalled();
+  expect(active()).toMatchObject({
+    callId: 'wc1',
+    phase: 'failed',
+    failure: MIC_ERROR_TEXT.mic_failed,
+  });
+});
+
+it('permission lookup errors offer retry before enabling a WhatsApp dial', async () => {
+  api.permission
+    .mockRejectedValueOnce(http('META_API_ERROR', 502))
+    .mockResolvedValue(fakeCallPermission('temporary'));
+  button();
+  await userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+  expect(await screen.findByRole('button', { name: 'Call' })).toBeEnabled();
+  expect(api.start).not.toHaveBeenCalled();
 });

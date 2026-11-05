@@ -78,7 +78,19 @@ export function CallMethodContent(target: CallTarget) {
         {target.label} · {target.phoneE164}
       </Typography>
       {(phoneLine.isError || channels.isError) && (
-        <Alert severity="warning">
+        <Alert
+          severity="warning"
+          action={
+            <Button
+              onClick={() => {
+                if (phoneLine.isError) void phoneLine.refetch();
+                if (channels.isError) void channels.refetch();
+              }}
+            >
+              Retry
+            </Button>
+          }
+        >
           Some connected numbers could not be loaded. Retry before choosing that method.
         </Alert>
       )}
@@ -178,6 +190,8 @@ export function CallMethodContent(target: CallTarget) {
       {normalOpen && phone && (
         <CallNowDialog
           contactId={target.contactId}
+          contactLabel={`${target.label} · ${target.phoneE164}`}
+          onStarted={target.onStarted}
           timezone={timezone}
           callerNumberId={phone.id}
           callerLabel={`${phone.label} · ${phone.number}`}

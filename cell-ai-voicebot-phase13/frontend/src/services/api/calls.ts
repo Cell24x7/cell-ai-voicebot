@@ -8,6 +8,7 @@ import type {
   CursorPageMeta,
   ListEnvelope,
   StartedWebCall,
+  WhatsAppCallMediaTicket,
   SuccessEnvelope,
 } from './types';
 
@@ -22,6 +23,7 @@ export interface StartWebCallInput {
 
 /** `POST /calls` — one contact now (dry-run line until phone lines exist). */
 export interface StartCallInput {
+  mode?: 'human' | 'ai';
   callerNumberId?: string;
   contactId: string;
   flowId?: string;
@@ -81,6 +83,12 @@ export const callsApi = {
       apiClient.post<SuccessEnvelope<Call>>('/calls', body, {
         headers: { 'Idempotency-Key': idempotencyKey },
       }),
+    ),
+  mediaTicket: (id: string) =>
+    unwrap(apiClient.post<SuccessEnvelope<WhatsAppCallMediaTicket>>(`/calls/${id}/media-ticket`)),
+  hold: (id: string, on: boolean) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<{ callId: string; on: boolean }>>(`/calls/${id}/hold`, { on }),
     ),
   list: async (query: ListCallsQuery) =>
     (

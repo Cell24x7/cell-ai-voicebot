@@ -71,7 +71,7 @@ export default function CallBar() {
   return (
     <Paper
       role="region"
-      aria-label="WhatsApp call"
+      aria-label={call.transport === 'sip' ? 'Normal call' : 'WhatsApp call'}
       elevation={6}
       sx={{
         position: 'fixed',
@@ -121,7 +121,7 @@ export default function CallBar() {
             <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
               {running ? 'AI is talking' : 'The AI will talk when the customer answers'}
             </Typography>
-            {canTakeOver && running && session && (
+            {canTakeOver && running && session && call.transport !== 'sip' && (
               <Button
                 size="small"
                 variant="outlined"

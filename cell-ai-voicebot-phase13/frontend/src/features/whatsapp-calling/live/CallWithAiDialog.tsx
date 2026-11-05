@@ -18,6 +18,7 @@ import { useCallPrice } from '../queries';
 
 /** "Call with AI": the program (published flow / active AI agent) and the cost per minute. */
 export function CallWithAiDialog({
+  mode = 'ai',
   phoneE164,
   channelId,
   contactId,
@@ -25,11 +26,12 @@ export function CallWithAiDialog({
   onCall,
   onClose,
 }: {
+  mode?: 'ai' | 'human';
   phoneE164: string;
   channelId: string;
   contactId: string;
   contactLabel: string;
-  onCall: (program: WhatsAppCallProgram) => void;
+  onCall: (program?: WhatsAppCallProgram) => void;
   onClose: () => void;
 }) {
   const [program, setProgram] = useState<WhatsAppCallProgram | null>(null);
@@ -37,14 +39,17 @@ export function CallWithAiDialog({
   const cost = quote.data
     ? { call: quote.data.callPerMinuteMicros, ai: quote.data.aiPerMinuteMicros }
     : null;
+  const human = mode === 'human';
+  const title = human ? 'Call yourself' : 'Call with AI';
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Call with AI</DialogTitle>
+      <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            The AI program talks to the customer on WhatsApp. You can take the call over from the
-            call bar.
+            {human
+              ? 'Talk using this browser’s microphone and speaker. Allow microphone access before the customer is called.'
+              : 'The AI program talks to the customer on WhatsApp. You can take the call over from the call bar.'}
           </Typography>
           <Typography>
             {contactLabel} · {phoneE164}
@@ -63,12 +68,12 @@ export function CallWithAiDialog({
               {getErrorMessage(quote.error)}
             </Alert>
           )}
-          <ProgramPicker value={program} onChange={setProgram} />
+          {!human && <ProgramPicker value={program} onChange={setProgram} />}
           {cost && (
             <Typography variant="body2" aria-label="Estimated cost">
-              About {formatCurrencyMicros(cost.call + cost.ai)} a minute (call{' '}
-              {formatCurrencyMicros(cost.call)} + AI {formatCurrencyMicros(cost.ai)}), charged in
-              6-second steps.
+              {human
+                ? `About ${formatCurrencyMicros(cost.call)} a minute, charged in 6-second steps.`
+                : `About ${formatCurrencyMicros(cost.call + cost.ai)} a minute (call ${formatCurrencyMicros(cost.call)} + AI ${formatCurrencyMicros(cost.ai)}), charged in 6-second steps.`}
             </Typography>
           )}
         </Stack>
@@ -77,12 +82,15 @@ export function CallWithAiDialog({
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="contained"
-          disabled={!program?.id || !quote.data || quote.isFetching || Boolean(quote.error)}
+          disabled={
+            (!human && !program?.id) || !quote.data || quote.isFetching || Boolean(quote.error)
+          }
           onClick={() => {
-            if (program?.id) onCall(program);
+            if (human) onCall();
+            else if (program?.id) onCall(program);
           }}
         >
-          Call with AI
+          {title}
         </Button>
       </DialogActions>
     </Dialog>

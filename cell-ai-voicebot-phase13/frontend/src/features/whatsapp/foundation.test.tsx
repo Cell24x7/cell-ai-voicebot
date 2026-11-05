@@ -344,10 +344,11 @@ describe('Meta SDK loader', () => {
     vi.advanceTimersByTime(101);
     await expect(slow).rejects.toThrow(SDK_FAILED_MESSAGE);
     vi.useRealTimers();
-    document.getElementById(META_SDK_SCRIPT_ID)?.remove();
+    expect(document.getElementById(META_SDK_SCRIPT_ID)).toBeNull();
     const broken = loadMetaSdk({ appId: '1', version: 'v26.0' });
     document.getElementById(META_SDK_SCRIPT_ID)?.dispatchEvent(new Event('error'));
     await expect(broken).rejects.toThrow(SDK_FAILED_MESSAGE);
+    expect(document.getElementById(META_SDK_SCRIPT_ID)).toBeNull();
     const empty = loadMetaSdk({ appId: '1', version: 'v26.0' });
     window.fbAsyncInit?.();
     await expect(empty).rejects.toThrow(SDK_FAILED_MESSAGE);
@@ -516,6 +517,20 @@ describe('Embedded Signup run', () => {
     await vi.advanceTimersByTimeAsync(16_000);
     expect(await failed).toEqual({ kind: 'sdk_failed', message: SDK_FAILED_MESSAGE });
     vi.useRealTimers();
+  });
+
+  it('returns an error when FB.login throws and always removes the session listener', async () => {
+    const removed = vi.spyOn(window, 'removeEventListener');
+    login.mockImplementationOnce(() => {
+      throw new Error('SDK configuration rejected');
+    });
+    expect(await runEmbeddedSignup(config, 'cloud_api')).toEqual({
+      kind: 'error',
+      message:
+        'Meta signup could not be opened. Try again or ask an admin to check the Meta app setup.',
+    });
+    expect(removed).toHaveBeenCalledWith('message', expect.any(Function));
+    removed.mockRestore();
   });
 
   it('the hook waits for the config', async () => {

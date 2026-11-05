@@ -96,6 +96,12 @@ export const runEmbeddedSignup = async (
     if (msg?.kind === 'cancel') return { kind: 'cancelled', step: msg.step };
     if (now() - started < POPUP_BLOCKED_MS) return { kind: 'popup_blocked' };
     return { kind: 'cancelled', step: null };
+  } catch {
+    return {
+      kind: 'error',
+      message:
+        'Meta signup could not be opened. Try again or ask an admin to check the Meta app setup.',
+    };
   } finally {
     window.removeEventListener('message', listener);
   }

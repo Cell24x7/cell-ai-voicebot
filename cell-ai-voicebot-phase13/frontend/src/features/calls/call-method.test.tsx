@@ -126,3 +126,21 @@ it('a contact-row call action opens the shared chooser and closes on Close', asy
   await user.click(screen.getByRole('button', { name: 'Close' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });
+
+it('retries failed connection readiness and then restores the SIP action', async () => {
+  signInAs('owner');
+  vi.spyOn(phoneNumbersApi, 'line')
+    .mockRejectedValueOnce(new Error('Offline'))
+    .mockResolvedValue({ line: 'sip', numbers: [phone] });
+  vi.spyOn(whatsappApi, 'channels').mockResolvedValue({ items: [], counts: {}, limit: 10 });
+  renderWithProviders({
+    routes: [
+      {
+        path: '/',
+        element: <CallMethodContent contactId="k1" phoneE164="+919000000099" label="Asha" />,
+      },
+    ],
+  });
+  await userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+  expect(await screen.findByRole('button', { name: 'Continue with normal call' })).toBeEnabled();
+});

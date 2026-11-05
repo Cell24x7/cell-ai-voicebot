@@ -101,3 +101,35 @@ it('keeps dial disabled on a quote error and lets the user retry without losing 
   await user.click(dialog.getByRole('button', { name: 'Cancel' }));
   expect(close).toHaveBeenCalledOnce();
 });
+
+it('human confirmation shows sender, target and carrier-only price without requiring an AI program', async () => {
+  quote.mockResolvedValue(price);
+  const call = vi.fn();
+  renderWithProviders({
+    routes: [
+      {
+        path: '/',
+        element: (
+          <CallWithAiDialog
+            mode="human"
+            channelId="wa2"
+            contactId="k2"
+            contactLabel="Asha"
+            phoneE164="+12025550100"
+            onCall={call}
+            onClose={vi.fn()}
+          />
+        ),
+      },
+    ],
+  });
+  const dialog = within(screen.getByRole('dialog', { name: 'Call yourself' }));
+  const go = dialog.getByRole('button', { name: 'Call yourself' });
+  await waitFor(() => expect(go).toBeEnabled());
+  expect(dialog.getByText('WhatsApp from Sales · +919000000002')).toBeVisible();
+  expect(dialog.getByLabelText('Estimated cost')).toHaveTextContent('₹2');
+  expect(dialog.getByLabelText('Estimated cost')).not.toHaveTextContent('₹8');
+  expect(dialog.queryByRole('button', { name: 'Choose agent' })).not.toBeInTheDocument();
+  await userEvent.click(go);
+  expect(call).toHaveBeenCalledWith();
+});

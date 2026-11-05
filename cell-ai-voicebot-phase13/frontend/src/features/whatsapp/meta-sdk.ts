@@ -79,6 +79,7 @@ export const loadMetaSdk = ({
     const fail = () => {
       clearTimeout(timer);
       loading = null;
+      document.getElementById(META_SDK_SCRIPT_ID)?.remove();
       reject(new Error(SDK_FAILED_MESSAGE));
     };
     const timer = setTimeout(fail, timeoutMs);

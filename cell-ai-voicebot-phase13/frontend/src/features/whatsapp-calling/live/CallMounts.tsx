@@ -31,10 +31,11 @@ export function CallMounts() {
   const canAnswer = useCanAnswer();
   const { ring, taken, stopRinging } = useLiveCallStore.getState();
   useWsEvent('call.status', (e) => {
-    if (e.data.provider === 'whatsapp') onCallStatus(e.data.callId, e.data.status);
+    if (e.data.provider === 'whatsapp' || e.data.provider === 'sip')
+      onCallStatus(e.data.callId, e.data.status);
   });
   useWsEvent('call.ended', (e) => {
-    if (e.data.provider === 'whatsapp')
+    if (e.data.provider === 'whatsapp' || e.data.provider === 'sip')
       onCallEnded(e.data.callId, { endReason: e.data.endReason, durationSec: e.data.durationSec });
   });
   useWsEvent('whatsapp.call.incoming', (e) => {

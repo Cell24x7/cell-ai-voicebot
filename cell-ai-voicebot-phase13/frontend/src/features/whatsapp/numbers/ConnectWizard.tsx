@@ -10,7 +10,7 @@ import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { toApiError } from '@/services/api/errors';
 import type { WhatsAppChannel, WhatsAppConfig, WhatsAppMode } from '@/services/api/types';
@@ -18,6 +18,7 @@ import type { ChannelOutcome } from '@/services/api/whatsapp';
 
 import { useEmbeddedSignup, type SignupOutcome } from '../embedded-signup';
 import { CONNECT_PROGRESS, whatsappErrorMessage } from '../labels';
+import { loadMetaSdk } from '../meta-sdk';
 import { useConnectWhatsApp } from '../queries';
 import { TestSignupDialog } from '../TestSignupDialog';
 
@@ -100,10 +101,27 @@ export function ConnectWizard({
   const [step, setStep] = useState<Step>('choose');
   const [result, setResult] = useState<Result | null>(null);
   const [testOpen, setTestOpen] = useState(false);
+  const attempt = useRef(0);
   const launch = useEmbeddedSignup(config);
   const connect = useConnectWhatsApp();
 
+  // Preload while the user chooses the number kind: login can then open from the click.
+  useEffect(() => {
+    if (open && config.provider !== 'fake' && config.appId)
+      void loadMetaSdk({ appId: config.appId, version: config.graphVersion }).catch(
+        () => undefined,
+      );
+  }, [open, config.provider, config.appId, config.graphVersion]);
+
+  useEffect(
+    () => () => {
+      attempt.current += 1;
+    },
+    [],
+  );
+
   const close = () => {
+    attempt.current += 1;
     setStep('choose');
     setResult(null);
     setTestOpen(false);
@@ -138,12 +156,14 @@ export function ConnectWizard({
   };
 
   const start = async () => {
+    const generation = ++attempt.current;
     setStep('signing');
     if (config.provider === 'fake') {
       setTestOpen(true);
       return;
     }
-    await onOutcome(await launch(mode));
+    const outcome = await launch(mode);
+    if (generation === attempt.current) await onOutcome(outcome);
   };
 
   const title = reconnect ? `Reconnect ${reconnect.label}` : 'Connect WhatsApp';
@@ -211,6 +231,7 @@ export function ConnectWizard({
           {step === 'result' && result && <ResultView result={result} />}
         </DialogContent>
         <DialogActions>
+          {step === 'signing' && <Button onClick={close}>Cancel signup</Button>}
           {step === 'choose' && (
             <>
               <Button onClick={close}>Cancel</Button>

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -213,6 +213,29 @@ describe('connect wizard (real Meta provider)', () => {
     expect(screen.queryByText('Test mode — Meta signup is simulated.')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(api.signup).not.toHaveBeenCalled();
+  });
+
+  it('closing signup prevents a late popup result from connecting a number', async () => {
+    open([]);
+    let done!: (value: SignupOutcome) => void;
+    launch.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          done = resolve;
+        }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Connect WhatsApp' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText(/Finish the signup in Meta's window/)).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel signup' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Connect WhatsApp' })).not.toBeInTheDocument(),
+    );
+    await act(async () => {
+      done({ kind: 'finished', code: 'STALE', sessionInfo: {} });
+      await Promise.resolve();
+    });
     expect(api.signup).not.toHaveBeenCalled();
   });
 

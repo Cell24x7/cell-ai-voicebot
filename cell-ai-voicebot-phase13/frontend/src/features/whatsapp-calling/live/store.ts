@@ -7,6 +7,7 @@ export type LivePhase =
 
 /** The WhatsApp call this browser is on (agent) or watching (AI call it placed). */
 export interface ActiveWaCall {
+  transport?: 'whatsapp' | 'sip';
   callId: string | null;
   mode: 'human' | 'ai';
   direction: 'outbound' | 'inbound';
@@ -71,11 +72,13 @@ export const useLiveCallStore = create<LiveCallState>((set) => ({
 export const newActiveCall = (input: {
   mode: 'human' | 'ai';
   direction: 'outbound' | 'inbound';
+  transport?: 'whatsapp' | 'sip';
   label: string;
   conversationId: string | null;
   callId?: string | null;
 }): ActiveWaCall => ({
   callId: input.callId ?? null,
+  transport: input.transport ?? 'whatsapp',
   mode: input.mode,
   direction: input.direction,
   label: input.label,

@@ -8,6 +8,8 @@ import { CallNowDialog } from '@/features/calls/CallNowDialog';
 import { ContactCallsCard } from '@/features/calls/ContactCallsCard';
 import { CallSetup } from '@/features/calls/tester/CallSetup';
 import { NotificationsBell } from '@/features/notifications/NotificationsBell';
+import { placePhoneCall } from '@/features/whatsapp-calling/live/controller';
+import { useLiveCallStore } from '@/features/whatsapp-calling/live/store';
 import { agentsApi } from '@/services/api/agents';
 import { callsApi } from '@/services/api/calls';
 import { campaignsApi } from '@/services/api/campaigns';
@@ -32,6 +34,7 @@ vi.mock('@/services/api/calls', () => ({
 vi.mock('@/services/api/campaigns', () => ({
   campaignsApi: { list: vi.fn(), summary: vi.fn() },
 }));
+vi.mock('@/features/whatsapp-calling/live/controller', () => ({ placePhoneCall: vi.fn() }));
 vi.mock('@/services/api/flows', () => ({
   flowsApi: { list: vi.fn(), variables: vi.fn(() => Promise.resolve([])) },
 }));
@@ -366,4 +369,39 @@ describe('campaign notifications', () => {
     await user.click(within(menu).getAllByRole('menuitem')[1] as HTMLElement);
     expect(await screen.findByText('campaign page')).toBeInTheDocument();
   });
+});
+
+it('normal SIP contact call offers flow, agent and direct self calling with the chosen sender', async () => {
+  signInAs('agent');
+  useLiveCallStore.setState({ active: null });
+  const close = vi.fn();
+  renderWithProviders({
+    routes: routes(
+      <CallNowDialog
+        contactId="k1"
+        callerNumberId="sip1"
+        callerLabel="Office · +911600000001"
+        contactLabel="Asha · +919000000099"
+        timezone="Asia/Kolkata"
+        onClose={close}
+      />,
+    ),
+  });
+  expect(screen.getByRole('radio', { name: 'A flow' })).toBeEnabled();
+  expect(screen.getByText('A flow')).toBeVisible();
+  expect(screen.getByRole('radio', { name: 'An agent' })).toBeEnabled();
+  expect(screen.getByText('An agent')).toBeVisible();
+  expect(screen.getByText('Asha · +919000000099')).toBeVisible();
+  await userEvent.click(screen.getByRole('radio', { name: 'Call yourself' }));
+  expect(screen.queryByRole('combobox', { name: 'Flow' })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Call' }));
+  expect(placePhoneCall).toHaveBeenCalledWith(
+    expect.objectContaining({
+      contactId: 'k1',
+      callerNumberId: 'sip1',
+      label: 'Asha · +919000000099',
+      idempotencyKey: expect.any(String) as unknown as string,
+    }),
+  );
+  expect(close).toHaveBeenCalledOnce();
 });
