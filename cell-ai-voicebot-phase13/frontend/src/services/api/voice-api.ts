@@ -6,6 +6,9 @@ type Schemas = components['schemas'];
 export type AccountVoiceApi = Schemas['AccountVoiceApi'];
 export type AdminVoiceStatus = Schemas['AdminVoiceStatus'];
 export type AdminVoiceIvr = Schemas['AdminVoiceIvr'];
+/** Which Cell24x7 login an account uses (never the token). */
+export type VoiceCredentials = Schemas['VoiceCredentials'];
+export type VoiceCredentialsInput = Schemas['VoiceCredentialsBody'];
 
 export const voiceApiKeys = {
   status: ['admin', 'voice-api', 'status'] as const,
@@ -19,6 +22,21 @@ export const voiceAdminApi = {
       apiClient.patch<SuccessEnvelope<AccountVoiceApi>>(
         `/admin/accounts/${accountId}/voice-api`,
         body,
+      ),
+    ),
+  /** The account's own Cell24x7 token + caller ID (checked first), or back to the platform token. */
+  setCredentials: (accountId: string, body: VoiceCredentialsInput) =>
+    unwrap(
+      apiClient.put<SuccessEnvelope<VoiceCredentials>>(
+        `/admin/accounts/${accountId}/voice-api/credentials`,
+        body,
+      ),
+    ),
+  /** Points the account's own Cell24x7 login at its own result webhook. */
+  registerAccountWebhook: (accountId: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<VoiceCredentials>>(
+        `/admin/accounts/${accountId}/voice-api/webhook`,
       ),
     ),
   status: () => unwrap(apiClient.get<SuccessEnvelope<AdminVoiceStatus>>('/admin/voice-api/status')),

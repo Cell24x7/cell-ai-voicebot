@@ -11,6 +11,8 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Cell24x7 login per account** — Admin → account → Recorded voice → **Cell24x7 login**: the platform token or the account's own token (checked, shown as ••••last 4) with its own caller ID; Register webhook for that login. Own-token accounts use all IVRs of their login.
+
 - **Incoming phone calls (Phase 20)** — Settings → **Phone numbers**: turn a number on, choose who answers (AI, team, AI then team, team then AI), greeting, ring list and time, call hours and after-hours behaviour, with a readiness list. Incoming phone calls ring in the call popup (contact or number, number called) and connect on the phone line; Calls → **Missed** lists calls nobody took with Call back / Mark done; a Direction filter works for every line; call detail shows the number called, route and missed reason. Admin: a number's use (outgoing / incoming / both) and the incoming minute price. Bell "Missed phone call", webhook event "Incoming phone call missed".
 
 - **API docs links and scopes** — Settings → API keys offers `resources:read` and the WhatsApp bulk campaign scopes (new "Account" group), links the API docs and the Postman collection; webhook endpoints can subscribe to WhatsApp bulk campaign events.

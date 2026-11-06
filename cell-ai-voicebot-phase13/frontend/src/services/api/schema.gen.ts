@@ -3301,6 +3301,686 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/accounts/{id}/voice-api': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Turn recorded-voice campaigns on / off, assign Cell24x7 IVRs (superadmin) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            enabled?: boolean;
+            ivrIds?: number[];
+            ivrEstimateSec?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['AccountVoiceApi'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/admin/accounts/{id}/voice-api/credentials': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** The account's Cell24x7 login: the platform token, or its own token + caller ID (checked with Cell24x7 first, sealed; superadmin) — a refused token answers VOICE_API_AUTH */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['VoiceCredentialsBody'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['VoiceCredentials'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/accounts/{id}/voice-api/webhook': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Register the account's own result webhook with its Cell24x7 login (one URL per token; superadmin) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['VoiceCredentials'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/voice-api/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Cell24x7 status: token set, webhook registered, last result and error (superadmin) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['AdminVoiceStatus'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/voice-api/webhook': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Register this server's result webhook with Cell24x7 (superadmin) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                registered: boolean;
+                matches: boolean;
+              };
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/voice-api/ivrs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Every IVR on the platform's Cell24x7 account (superadmin) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['AdminVoiceIvr'][];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/campaigns/{id}/voice-batches/{no}/resolve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Decide an uncertain Cell24x7 submit: it reached Cell24x7, or it did not (superadmin) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+          no: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json':
+            | {
+                /** @enum {string} */
+                outcome: 'submitted';
+                requestId: string;
+              }
+            | {
+                /** @enum {string} */
+                outcome: 'not_submitted';
+              };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                batchNo: number;
+                state: string;
+              };
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/voice-api/ivrs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** IVR menus this account may use in a recorded-voice campaign */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['VoiceIvr'][];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/voice-api/a/{account}/{key}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cell24x7 call results from an account's own login (secret path per account; answered at once) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          account: string;
+          key: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            event?: string;
+            request_id: string;
+            receiver: string | number;
+            status: string;
+            duration?: number | string | null;
+            retry_count?: number | string | null;
+            ivr?:
+              | ({
+                  digits_pressed?: string | null;
+                  disposition?: string | null;
+                } & {
+                  [key: string]: unknown;
+                })
+              | null;
+          } & {
+            [key: string]: unknown;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                received: boolean;
+              };
+            };
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/webhooks/voice-api/{secret}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cell24x7 call results (secret path; answered at once, processed in the background) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          secret: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            event?: string;
+            request_id: string;
+            receiver: string | number;
+            status: string;
+            duration?: number | string | null;
+            retry_count?: number | string | null;
+            ivr?:
+              | ({
+                  digits_pressed?: string | null;
+                  disposition?: string | null;
+                } & {
+                  [key: string]: unknown;
+                })
+              | null;
+          } & {
+            [key: string]: unknown;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                received: boolean;
+              };
+            };
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/accounts': {
     parameters: {
       query?: never;
@@ -26275,460 +26955,6 @@ export interface paths {
     };
     trace?: never;
   };
-  '/api/v1/admin/accounts/{id}/voice-api': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Turn recorded-voice campaigns on / off, assign Cell24x7 IVRs (superadmin) */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            enabled?: boolean;
-            ivrIds?: number[];
-            ivrEstimateSec?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @enum {boolean} */
-              success: true;
-              data: components['schemas']['AccountVoiceApi'];
-            };
-          };
-        };
-        /** @description Missing permission, disabled user, suspended account or impersonation block */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
-        422: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/admin/voice-api/status': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Cell24x7 status: token set, webhook registered, last result and error (superadmin) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @enum {boolean} */
-              success: true;
-              data: components['schemas']['AdminVoiceStatus'];
-            };
-          };
-        };
-        /** @description Missing permission, disabled user, suspended account or impersonation block */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/voice-api/webhook': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Register this server's result webhook with Cell24x7 (superadmin) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @enum {boolean} */
-              success: true;
-              data: {
-                registered: boolean;
-                matches: boolean;
-              };
-            };
-          };
-        };
-        /** @description Missing permission, disabled user, suspended account or impersonation block */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/voice-api/ivrs': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Every IVR on the platform's Cell24x7 account (superadmin) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @enum {boolean} */
-              success: true;
-              data: components['schemas']['AdminVoiceIvr'][];
-            };
-          };
-        };
-        /** @description Missing permission, disabled user, suspended account or impersonation block */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/campaigns/{id}/voice-batches/{no}/resolve': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Decide an uncertain Cell24x7 submit: it reached Cell24x7, or it did not (superadmin) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-          no: number;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json':
-            | {
-                /** @enum {string} */
-                outcome: 'submitted';
-                requestId: string;
-              }
-            | {
-                /** @enum {string} */
-                outcome: 'not_submitted';
-              };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @enum {boolean} */
-              success: true;
-              data: {
-                batchNo: number;
-                state: string;
-              };
-            };
-          };
-        };
-        /** @description Missing permission, disabled user, suspended account or impersonation block */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
-        422: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/voice-api/ivrs': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** IVR menus this account may use in a recorded-voice campaign */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @enum {boolean} */
-              success: true;
-              data: components['schemas']['VoiceIvr'][];
-            };
-          };
-        };
-        /** @description Missing permission, disabled user, suspended account or impersonation block */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/webhooks/voice-api/{secret}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Cell24x7 call results (secret path; answered at once, processed in the background) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          secret: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': {
-            event?: string;
-            request_id: string;
-            receiver: string | number;
-            status: string;
-            duration?: number | string | null;
-            retry_count?: number | string | null;
-            ivr?:
-              | ({
-                  digits_pressed?: string | null;
-                  disposition?: string | null;
-                } & {
-                  [key: string]: unknown;
-                })
-              | null;
-          } & {
-            [key: string]: unknown;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @enum {boolean} */
-              success: true;
-              data: {
-                received: boolean;
-              };
-            };
-          };
-        };
-        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorEnvelope'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/whatsapp-campaigns': {
     parameters: {
       query?: never;
@@ -33843,8 +34069,6 @@ export interface components {
         | 'call.test_started'
         | 'call.recording_accessed'
         | 'call.hung_up_remotely'
-        | 'call.answered'
-        | 'call.callback_done'
         | 'call.triggered'
         | 'campaign.created'
         | 'campaign.updated'
@@ -33947,7 +34171,6 @@ export interface components {
         | 'phone_number.updated'
         | 'phone_number.assigned'
         | 'phone_number.released'
-        | 'phone_number.inbound_updated'
         | 'whatsapp.call_permission_bulk_requested'
         | 'account.signed_up'
         | 'account.reseller_changed'
@@ -33971,7 +34194,12 @@ export interface components {
         | 'whatsapp_campaign.retried'
         | 'account.voice_api_changed'
         | 'voice_api.webhook_registered'
-        | 'voice_api.batch_resolved';
+        | 'voice_api.batch_resolved'
+        | 'call.answered'
+        | 'call.callback_done'
+        | 'phone_number.inbound_updated'
+        | 'voice_api.credentials_changed'
+        | 'voice_api.account_webhook_registered';
       actor: {
         /** @enum {string} */
         type: 'user' | 'api_key' | 'system';
@@ -34024,6 +34252,55 @@ export interface components {
         };
       };
     };
+    AccountVoiceApi: {
+      enabled: boolean;
+      ivrIds: number[];
+      ivrEstimateSec: number;
+    };
+    VoiceCredentials: {
+      /** @enum {string} */
+      mode: 'platform' | 'own';
+      tokenHint: string | null;
+      callerId: string | null;
+      verifiedAt: string | null;
+      webhookRegisteredAt: string | null;
+    };
+    VoiceIvr: {
+      id: number;
+      name: string;
+    };
+    AdminVoiceIvr: {
+      id: number;
+      name: string;
+      runnable: boolean;
+    };
+    AdminVoiceStatus: {
+      /** @enum {string} */
+      provider: 'off' | 'fake' | 'cell24x7';
+      tokenConfigured: boolean;
+      webhook: {
+        registered: boolean;
+        /** @description Cell24x7 posts to this server */
+        matches: boolean;
+        error: string | null;
+      };
+      lastWebhookAt: string | null;
+      lastError: {
+        code: string;
+        at: string;
+      } | null;
+      uncertainBatches: {
+        campaignId: string;
+        campaignName: string;
+        accountId: string;
+        batchNo: number;
+        count: number;
+        /** @description Name in the Cell24x7 dashboard */
+        broadcastName: string;
+        error: string | null;
+        createdAt: string;
+      }[];
+    };
     AccountLimits: {
       maxConcurrentCalls: number;
       dialsPerMinute: number;
@@ -34067,6 +34344,7 @@ export interface components {
         enabled: boolean;
         ivrIds: number[];
         ivrEstimateSec: number;
+        credentials: components['schemas']['VoiceCredentials'];
       };
       usersByStatus: {
         invited: number;
@@ -37632,47 +37910,6 @@ export interface components {
         availableMicros: number;
       }[];
     };
-    AccountVoiceApi: {
-      enabled: boolean;
-      ivrIds: number[];
-      ivrEstimateSec: number;
-    };
-    VoiceIvr: {
-      id: number;
-      name: string;
-    };
-    AdminVoiceIvr: {
-      id: number;
-      name: string;
-      runnable: boolean;
-    };
-    AdminVoiceStatus: {
-      /** @enum {string} */
-      provider: 'off' | 'fake' | 'cell24x7';
-      tokenConfigured: boolean;
-      webhook: {
-        registered: boolean;
-        /** @description Cell24x7 posts to this server */
-        matches: boolean;
-        error: string | null;
-      };
-      lastWebhookAt: string | null;
-      lastError: {
-        code: string;
-        at: string;
-      } | null;
-      uncertainBatches: {
-        campaignId: string;
-        campaignName: string;
-        accountId: string;
-        batchNo: number;
-        count: number;
-        /** @description Name in the Cell24x7 dashboard */
-        broadcastName: string;
-        error: string | null;
-        createdAt: string;
-      }[];
-    };
     WhatsAppCampaign: {
       id: string;
       name: string;
@@ -38215,6 +38452,17 @@ export interface components {
       receivedAt: string;
       processedAt: string | null;
     };
+    VoiceCredentialsBody:
+      | {
+          /** @enum {string} */
+          mode: 'platform';
+        }
+      | {
+          /** @enum {string} */
+          mode: 'own';
+          token?: string;
+          callerId?: string | null;
+        };
     InboundSettingsBody: {
       enabled: boolean;
       /** @enum {string} */
