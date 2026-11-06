@@ -54,6 +54,8 @@ export interface ListCallsQuery {
   hasSummary?: boolean;
   answeredBy?: string;
   channelId?: string;
+  /** Phase 20: incoming calls nobody took — `open` = the callback list. */
+  missed?: 'open' | 'all';
 }
 
 const listParams = ({
@@ -106,4 +108,12 @@ export const callsApi = {
   recording: (id: string) =>
     unwrap(apiClient.get<SuccessEnvelope<CallRecordingLink>>(`/calls/${id}/recording`)),
   hangup: (id: string) => unwrap(apiClient.post<SuccessEnvelope<Call>>(`/calls/${id}/hangup`)),
+  /** Phase 20: take a ringing incoming phone call (first wins) → the browser's media ticket. */
+  answer: (id: string) =>
+    unwrap(apiClient.post<SuccessEnvelope<WhatsAppCallMediaTicket>>(`/calls/${id}/answer`)),
+  decline: (id: string) =>
+    unwrap(apiClient.post<SuccessEnvelope<{ declined: boolean }>>(`/calls/${id}/decline`)),
+  /** Phase 20: a missed call is handled — off the callback list. */
+  callbackDone: (id: string) =>
+    unwrap(apiClient.post<SuccessEnvelope<Call>>(`/calls/${id}/callback-done`)),
 };

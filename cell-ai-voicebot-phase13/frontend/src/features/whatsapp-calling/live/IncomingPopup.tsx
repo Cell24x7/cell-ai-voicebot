@@ -43,13 +43,24 @@ const useMemberName = (userId: string | null): string | null => {
 
 function Ring({ ring }: { ring: IncomingRing }) {
   const dismiss = useLiveCallStore((s) => s.dismiss);
-  const conversation = useConversation(ring.conversationId);
+  const conversation = useConversation(ring.kind === 'whatsapp' ? ring.conversationId : null);
   const session = useSession();
   const [muted, setMuted] = useState(isRingMuted);
   const [busy, setBusy] = useState(false);
   const taker = useMemberName(ring.takenBy);
-  const c = conversation.data;
-  const label = c ? c.label : 'WhatsApp customer';
+  const c = ring.kind === 'whatsapp' ? conversation.data : undefined;
+  const phone = ring.phone;
+  // Phase 20: a phone call shows the contact, else the number (or "hidden number")
+  const label = phone
+    ? (phone.contactName ?? (phone.from ? formatPhone(phone.from) : 'Hidden number'))
+    : c
+      ? c.label
+      : 'WhatsApp customer';
+  const title = phone
+    ? phone.transfer
+      ? 'Phone call handed over by AI'
+      : 'Incoming phone call'
+    : 'Incoming WhatsApp call';
   const ended = Boolean(ring.takenBy) || ring.gone;
   // ring + background notification while it rings (cleanups make Strict Mode safe)
   useEffect(() => {
@@ -70,7 +81,7 @@ function Ring({ ring }: { ring: IncomingRing }) {
   return (
     <Paper
       role="alertdialog"
-      aria-label="Incoming WhatsApp call"
+      aria-label={title}
       elevation={8}
       sx={{ p: 2, width: { xs: 'calc(100vw - 16px)', sm: 340 } }}
     >
@@ -78,7 +89,7 @@ function Ring({ ring }: { ring: IncomingRing }) {
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <CallOutlined color="success" aria-hidden />
           <Typography variant="subtitle2" sx={{ flex: 1 }}>
-            Incoming WhatsApp call
+            {title}
           </Typography>
           <Tooltip title={muted ? 'Ring sound off' : 'Ring sound on'}>
             <IconButton
@@ -98,6 +109,12 @@ function Ring({ ring }: { ring: IncomingRing }) {
           </Tooltip>
         </Stack>
         <Typography sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{label}</Typography>
+        {phone && (
+          <Typography variant="caption" color="text.secondary">
+            {phone.contactName && phone.from ? `${formatPhone(phone.from)} · ` : ''}
+            to {phone.numberLabel || formatPhone(phone.did)}
+          </Typography>
+        )}
         {c && (
           <Typography variant="caption" color="text.secondary">
             {c.label === formatPhone(c.phoneE164) ? '' : `${formatPhone(c.phoneE164)} · `}
@@ -118,7 +135,7 @@ function Ring({ ring }: { ring: IncomingRing }) {
               disabled={busy}
               onClick={() => {
                 setBusy(true);
-                void declineCall(ring.callId).finally(() => dismiss(ring.callId));
+                void declineCall(ring.callId, ring.kind).finally(() => dismiss(ring.callId));
               }}
             >
               Decline
@@ -136,6 +153,7 @@ function Ring({ ring }: { ring: IncomingRing }) {
                   label,
                   conversationId: ring.conversationId,
                   recording,
+                  transport: ring.kind,
                 });
               }}
             >

@@ -11,6 +11,8 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Incoming phone calls (Phase 20)** — Settings → **Phone numbers**: turn a number on, choose who answers (AI, team, AI then team, team then AI), greeting, ring list and time, call hours and after-hours behaviour, with a readiness list. Incoming phone calls ring in the call popup (contact or number, number called) and connect on the phone line; Calls → **Missed** lists calls nobody took with Call back / Mark done; a Direction filter works for every line; call detail shows the number called, route and missed reason. Admin: a number's use (outgoing / incoming / both) and the incoming minute price. Bell "Missed phone call", webhook event "Incoming phone call missed".
+
 - **API docs links and scopes** — Settings → API keys offers `resources:read` and the WhatsApp bulk campaign scopes (new "Account" group), links the API docs and the Postman collection; webhook endpoints can subscribe to WhatsApp bulk campaign events.
 
 - **Recorded-voice / IVR campaigns (Cell24x7)** — New campaign opens a three-type picker (SIP / Normal call, WhatsApp call, WhatsApp bulk message). SIP / Normal call can use **Recorded voice or IVR**: audio from the library or an assigned IVR, redials, review with per-number price, ETA and skipped non-mobiles; detail shows batches and provider results. Admin: account Recorded voice card, rate card price per 15 s, System → Cell24x7 status, webhook registration and uncertain-batch resolve. Ledger label "Recorded voice calls".

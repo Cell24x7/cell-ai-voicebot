@@ -1,7 +1,8 @@
 import { usePermission, useSession } from '@/features/auth/hooks';
 import { useImpersonating } from '@/features/wallet/queries';
 
-const useActing = (): boolean => {
+/** Not impersonating and the account is active (Phase 20: shared with Settings → Phone numbers). */
+export const useActing = (): boolean => {
   const impersonating = useImpersonating();
   const active = useSession()?.account.status === 'active';
   return !impersonating && active;

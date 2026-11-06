@@ -92,6 +92,22 @@ export interface WsEventMap {
     channelId: string;
     ringUntil: string;
   };
+  /** Phase 20 (to each user in the ring): a customer calls one of the account's numbers. */
+  'call.incoming': {
+    callId: string;
+    kind: 'sip';
+    contactId: string | null;
+    contactName: string | null;
+    /** The caller (null when hidden). */
+    from: string | null;
+    did: string;
+    numberLabel: string;
+    /** The AI handed the call over to the team. */
+    transfer: boolean;
+    ringUntil: string;
+  };
+  /** Phase 20: the phone call stopped ringing (answered, declined, timeout, hung up). */
+  'call.ring_ended': { callId: string; reason: string; answeredBy?: string };
   /** Phase 12: a team member answered (first wins) — the others stop ringing. */
   'whatsapp.call.taken': { callId: string; byUserId: string };
   /** Phase 12: the call stopped ringing (hang-up, timeout, declined, answered). */
@@ -175,6 +191,8 @@ export const WS_EVENT_TYPES: readonly WsEventType[] = [
   'whatsapp.channel.updated',
   'whatsapp.template.updated',
   'whatsapp.call.incoming',
+  'call.incoming',
+  'call.ring_ended',
   'whatsapp.call.taken',
   'whatsapp.call.ended_ringing',
   'whatsapp.call_permission.updated',

@@ -1,5 +1,5 @@
 import { apiClient, unwrap } from './client';
-import type { PhoneNumber, SuccessEnvelope } from './types';
+import type { InboundNumber, InboundSettings, PhoneNumber, SuccessEnvelope } from './types';
 
 export type PhoneNumberKind = PhoneNumber['kind'];
 
@@ -20,9 +20,13 @@ export const phoneNumbersApi = {
   /** Superadmin: every number, optionally of one account. */
   list: (params: { accountId?: string } = {}) =>
     unwrap(apiClient.get<SuccessEnvelope<PhoneNumber[]>>('/admin/phone-numbers', { params })),
-  create: (body: { number: string; kind: PhoneNumberKind; label: string }) =>
-    unwrap(apiClient.post<SuccessEnvelope<PhoneNumber>>('/admin/phone-numbers', body)),
-  update: (id: string, body: Partial<Pick<PhoneNumber, 'label' | 'kind' | 'status'>>) =>
+  create: (body: {
+    number: string;
+    kind: PhoneNumberKind;
+    label: string;
+    purpose?: PhoneNumber['purpose'];
+  }) => unwrap(apiClient.post<SuccessEnvelope<PhoneNumber>>('/admin/phone-numbers', body)),
+  update: (id: string, body: Partial<Pick<PhoneNumber, 'label' | 'kind' | 'status' | 'purpose'>>) =>
     unwrap(apiClient.patch<SuccessEnvelope<PhoneNumber>>(`/admin/phone-numbers/${id}`, body)),
   assign: (id: string, accountId: string) =>
     unwrap(
@@ -32,6 +36,10 @@ export const phoneNumbersApi = {
     ),
   release: (id: string) =>
     unwrap(apiClient.post<SuccessEnvelope<PhoneNumber>>(`/admin/phone-numbers/${id}/release`)),
+  /** Phase 20: the account's numbers customers can call, with who answers them. */
+  inbound: () => unwrap(apiClient.get<SuccessEnvelope<InboundNumber[]>>('/phone-numbers/inbound')),
+  updateInbound: (id: string, body: InboundSettings) =>
+    unwrap(apiClient.patch<SuccessEnvelope<InboundNumber>>(`/phone-numbers/${id}/inbound`, body)),
 };
 
 export const phoneNumberKeys = {
@@ -39,6 +47,14 @@ export const phoneNumberKeys = {
   admin: (accountId?: string) => ['phone-numbers', 'admin', accountId ?? 'all'] as const,
   mine: ['phone-numbers', 'mine'] as const,
   line: ['phone-numbers', 'line'] as const,
+  inbound: ['phone-numbers', 'inbound'] as const,
+};
+
+/** Phase 20: what a number is used for. */
+export const PHONE_PURPOSE_LABELS: Record<PhoneNumber['purpose'], string> = {
+  outbound: 'Outgoing (caller ID)',
+  inbound: 'Incoming calls',
+  both: 'Outgoing + incoming',
 };
 
 export const PHONE_KIND_LABELS: Record<PhoneNumberKind, string> = {

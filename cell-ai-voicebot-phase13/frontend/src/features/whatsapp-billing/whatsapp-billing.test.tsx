@@ -254,6 +254,7 @@ describe('wallet overview + settings', () => {
     });
     vi.spyOn(walletApi, 'rates').mockResolvedValue({
       callPerMinuteMicros: R,
+      inboundCallPerMinuteMicros: R,
       pulseSeconds: 60,
       aiPerMinuteMicros: R,
       ttsPer1kCharsMicros: R,

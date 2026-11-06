@@ -50,6 +50,29 @@ export const END_REASON_LABELS: Record<CallEndReason, string> = {
   outside_call_hours: 'Outside call hours',
   // Phase 18 — phone line
   machine: 'Answering machine',
+  // Phase 20 — incoming phone calls
+  line_busy: 'Line busy',
+  spam_guard: 'Too many calls from this number',
+  inbound_refused: 'Call refused',
+};
+
+/** Phase 20: why an incoming call was missed (the callback list). */
+export const MISSED_REASON_LABELS: Record<NonNullable<Call['missed']>['reason'], string> = {
+  no_answer: 'Nobody answered',
+  no_agents: 'Nobody was free',
+  after_hours: 'After hours',
+  line_busy: 'Line busy',
+  wallet_low: 'Wallet too low',
+  caller_hung_up: 'Caller hung up while ringing',
+  spam: 'Too many calls',
+};
+
+/** Phase 20: who answers calls to a number. */
+export const INBOUND_ROUTE_LABELS: Record<NonNullable<Call['inbound']>['route'], string> = {
+  ai: 'AI (flow or agent)',
+  team: 'Team',
+  ai_then_team: 'AI, then the team',
+  team_then_ai: 'Team, then AI',
 };
 
 /** Disposition key → label (unknown keys shown as they are). */

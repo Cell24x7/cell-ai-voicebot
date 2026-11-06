@@ -103,3 +103,5 @@ Phase 19 continuation: `features/calls/CallMethodDialog` is shared across call e
 wizard has a `voice_api` line (`wizard/VoiceFields.tsx`, draft `voice`); the detail page shows
 `detail/VoiceBatchesPanel`. Admin: `features/admin/VoiceApiCard`, `VoiceProviderSection`,
 `services/api/voice-api.ts`.
+
+Phase 20 (incoming phone calls): `features/settings/PhoneNumbersTab` (+ `inbound.ts` form checks) sets who answers each number; `features/whatsapp-calling/live` rings phone calls too (`IncomingRing.kind = 'sip'`, `answerCall({ transport: 'sip' })` uses `callsApi.answer`); `features/calls/MissedCalls` is Calls → Missed (call back via `CallMethodDialog`, mark done).

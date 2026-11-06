@@ -9,6 +9,8 @@ export const fakeCall = (overrides: Partial<Call> = {}): Call => ({
   agentUserId: null,
   whatsapp: null,
   callerId: null,
+  inbound: null,
+  missed: null,
   sip: null,
   isTest: true,
   charged: true,

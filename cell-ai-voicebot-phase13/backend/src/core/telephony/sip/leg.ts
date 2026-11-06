@@ -43,7 +43,23 @@ export interface SipLegOptions {
   app: string;
   /** Trunk channel for the transfer leg (T18.8); absent = no limit. */
   channels?: { acquire(id: string): Promise<boolean>; release(id: string): void };
+  /**
+   * Phase 20: a call the customer made. The trunk channel already exists (Asterisk named
+   * it); `dial()` answers it instead of placing a call.
+   */
+  inbound?: { channelId: string };
 }
+
+/** How an incoming call is refused before it is answered (ARI hangup reason → Q.850). */
+export const INBOUND_REJECT = {
+  /** 17 user busy — line full, too many calls from this caller. */
+  busy: 'busy',
+  /** 21 call rejected — unknown / switched-off number, after-hours "hang up". */
+  rejected: 'rejected',
+  /** 34 no circuit — the server cannot take it now. */
+  unavailable: 'congestion',
+} as const;
+export type InboundReject = keyof typeof INBOUND_REJECT;
 
 export interface SipLegMetrics {
   codec: G711;
@@ -100,6 +116,9 @@ export class SipCallLeg implements CallLeg {
   } | null = null;
   private transferred = false;
   private endedFns: (() => void)[] = [];
+  /** Phase 20: an incoming call's AI hands over to the team instead of dialing a number. */
+  private transferHandler:
+    ((target: TransferTarget, timeoutSec: number) => Promise<TransferResult>) | null = null;
 
   constructor(
     private readonly ari: AriClient,
@@ -107,7 +126,9 @@ export class SipCallLeg implements CallLeg {
     private readonly clock: Clock,
     private readonly options: SipLegOptions,
   ) {
-    this.ids = sipIds(options.callId);
+    this.ids = options.inbound
+      ? { ...sipIds(options.callId), main: options.inbound.channelId }
+      : sipIds(options.callId);
     this.pacer = new Pacer({
       clock,
       frameMs: 20,
@@ -177,10 +198,50 @@ export class SipCallLeg implements CallLeg {
     this.outgoingFns.push(fn);
   }
 
-  /** Places the call (after the session listens). Failures end the leg as `media_error`. */
+  get inbound(): boolean {
+    return this.options.inbound !== undefined;
+  }
+
+  /** Incoming call: the caller hears ringing while we decide who takes it. */
+  async ring(): Promise<void> {
+    if (!this.inbound || this.state !== 'new') return;
+    await this.ari.ring(this.ids.main).catch(() => undefined);
+    this.status('ringing');
+  }
+
+  /** Incoming call refused before the answer (no media, no charge). */
+  async reject(reason: InboundReject): Promise<void> {
+    if (!this.inbound || this.state === 'ended' || this.answeredAt !== null) return;
+    this.ourHangup = true;
+    this.askedCause = reason === 'busy' ? 'busy' : reason === 'unavailable' ? 'limit' : 'rejected';
+    this.dialedAt ??= this.clock.now();
+    this.confirmTimer = this.clock.setTimeout(
+      () => this.finish(this.askedCause ?? 'rejected'),
+      HANGUP_CONFIRM_MS,
+    );
+    await this.ari.hangup(this.ids.main, INBOUND_REJECT[reason]).catch(() => undefined);
+  }
+
+  /**
+   * Places the call (after the session listens) — or answers an incoming one. Failures end
+   * the leg as `media_error`.
+   */
   async dial(): Promise<void> {
-    if (this.state !== 'new') return;
+    if (this.state !== 'new' && !(this.inbound && this.state === 'ringing')) return;
     this.dialedAt = this.clock.now();
+    if (this.options.inbound) {
+      try {
+        await this.ari.answer(this.ids.main);
+        await this.ari
+          .setVar(this.ids.main, 'CAV_CALL_ID', this.options.callId)
+          .catch(() => undefined);
+      } catch {
+        this.finish('media_error');
+        return;
+      }
+      await this.answered(null, []);
+      return;
+    }
     try {
       await this.ari.originate({
         channelId: this.ids.main,
@@ -215,7 +276,8 @@ export class SipCallLeg implements CallLeg {
         if (event.dialstatus) this.dialStatus = event.dialstatus;
         break;
       case 'StasisStart':
-        void this.answered(event.channel, event.args);
+        // an incoming channel entered the app before the leg existed: `dial()` answers it
+        if (!this.inbound) void this.answered(event.channel, event.args);
         break;
       case 'ChannelDtmfReceived':
         if (this.state === 'answered' && !this.transferred) {
@@ -245,7 +307,7 @@ export class SipCallLeg implements CallLeg {
     });
   }
 
-  private async answered(channel: AriChannel, args: string[]): Promise<void> {
+  private async answered(channel: AriChannel | null, args: string[]): Promise<void> {
     if (this.answeredAt !== null) return;
     if (args[0] === 'amd') {
       this.amdStatus = args[1] ?? null;
@@ -302,10 +364,18 @@ export class SipCallLeg implements CallLeg {
     return played;
   }
 
+  /** Phase 20 (`ai_then_team`): a flow / agent transfer rings the team instead. */
+  setTransferHandler(
+    fn: ((target: TransferTarget, timeoutSec: number) => Promise<TransferResult>) | null,
+  ): void {
+    this.transferHandler = fn;
+  }
+
   transfer(target: TransferTarget, timeoutSec: number): Promise<TransferResult> {
     if (this.state !== 'answered' || this.transferring || this.transferred) {
       return Promise.resolve('failed');
     }
+    if (this.transferHandler) return this.transferHandler(target, timeoutSec);
     if (!/^\+[1-9]\d{7,14}$/.test(target.phone)) return Promise.resolve('failed');
     return this.startTransfer(target, timeoutSec);
   }
@@ -394,7 +464,8 @@ export class SipCallLeg implements CallLeg {
     this.ourHangup = true;
     this.askedCause = cause;
     this.pacer.clear();
-    if (this.dialedAt === null) {
+    // an incoming channel exists before we answer it: it must be hung up too
+    if (this.dialedAt === null && !this.inbound) {
       this.finish(cause);
       return;
     }

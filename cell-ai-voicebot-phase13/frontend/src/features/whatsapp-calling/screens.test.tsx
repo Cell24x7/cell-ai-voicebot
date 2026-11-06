@@ -103,11 +103,12 @@ describe('calls pages: WhatsApp calls', () => {
     );
   });
 
-  it('list: the WhatsApp filters only show for WhatsApp', async () => {
+  it('list: "Answered by" only shows for two-way lines; Direction for every line (Phase 20)', async () => {
     signInAs('agent');
     renderWithProviders({ route: '/calls' });
     await screen.findByRole('table', { name: 'Calls' });
-    expect(screen.queryByRole('combobox', { name: 'Direction' })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Direction' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Answered by' })).not.toBeInTheDocument();
   });
 
   it('detail: WhatsApp section with direction, who answered, Meta timeline; free incoming call', async () => {

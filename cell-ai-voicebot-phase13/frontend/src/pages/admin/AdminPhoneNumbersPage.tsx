@@ -26,6 +26,7 @@ import { adminApi } from '@/services/api/admin';
 import { getErrorMessage } from '@/services/api/errors';
 import {
   PHONE_KIND_LABELS,
+  PHONE_PURPOSE_LABELS,
   phoneNumberKeys,
   phoneNumbersApi,
   type PhoneNumberKind,
@@ -39,8 +40,10 @@ function AddDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [number, setNumber] = useState('');
   const [kind, setKind] = useState<PhoneNumberKind>('1600');
   const [label, setLabel] = useState('');
+  const [purpose, setPurpose] = useState<PhoneNumber['purpose']>('outbound');
   const create = useMutation({
-    mutationFn: () => phoneNumbersApi.create({ number: number.trim(), kind, label: label.trim() }),
+    mutationFn: () =>
+      phoneNumbersApi.create({ number: number.trim(), kind, label: label.trim(), purpose }),
     onSuccess: (created) => {
       enqueueSnackbar(
         created.warnings.includes('not_1600_series')
@@ -77,6 +80,19 @@ function AddDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
             onChange={(e) => setKind(e.target.value as PhoneNumberKind)}
           >
             {Object.entries(PHONE_KIND_LABELS).map(([value, text]) => (
+              <MenuItem key={value} value={value}>
+                {text}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Used for"
+            value={purpose}
+            onChange={(e) => setPurpose(e.target.value as PhoneNumber['purpose'])}
+            helperText="Incoming: customers can call it (the account sets who answers)"
+          >
+            {Object.entries(PHONE_PURPOSE_LABELS).map(([value, text]) => (
               <MenuItem key={value} value={value}>
                 {text}
               </MenuItem>
@@ -180,12 +196,18 @@ export function AdminPhoneNumbersPage() {
     onSuccess: (n) => done(n.status === 'active' ? 'Number turned on' : 'Number turned off'),
     onError: fail,
   });
+  const repurpose = useMutation({
+    mutationFn: (input: { n: PhoneNumber; purpose: PhoneNumber['purpose'] }) =>
+      phoneNumbersApi.update(input.n.id, { purpose: input.purpose }),
+    onSuccess: () => done('Number updated'),
+    onError: fail,
+  });
 
   return (
     <>
       <PageHeader
         title="Phone numbers"
-        subtitle="Caller IDs on the SIP trunk. An account's calls show its first active number unless a campaign picks another."
+        subtitle="Numbers on the SIP trunk: caller IDs for outgoing calls and numbers customers call in. An account's calls show its first active caller ID unless a campaign picks another."
         actions={
           <Button variant="contained" startIcon={<AddOutlined />} onClick={() => setAdding(true)}>
             Add number
@@ -206,6 +228,7 @@ export function AdminPhoneNumbersPage() {
               <TableRow>
                 <TableCell>Number</TableCell>
                 <TableCell>Kind</TableCell>
+                <TableCell>Used for</TableCell>
                 <TableCell>Label</TableCell>
                 <TableCell>Account</TableCell>
                 <TableCell>Status</TableCell>
@@ -228,6 +251,25 @@ export function AdminPhoneNumbersPage() {
                     ) : null}
                   </TableCell>
                   <TableCell>{PHONE_KIND_LABELS[n.kind]}</TableCell>
+                  <TableCell>
+                    <TextField
+                      select
+                      size="small"
+                      variant="standard"
+                      value={n.purpose}
+                      disabled={repurpose.isPending}
+                      onChange={(e) =>
+                        repurpose.mutate({ n, purpose: e.target.value as PhoneNumber['purpose'] })
+                      }
+                      slotProps={{ htmlInput: { 'aria-label': `Use of ${n.number}` } }}
+                    >
+                      {Object.entries(PHONE_PURPOSE_LABELS).map(([value, text]) => (
+                        <MenuItem key={value} value={value}>
+                          {text}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </TableCell>
                   <TableCell>{n.label || '—'}</TableCell>
                   <TableCell>{n.accountName ?? 'In the pool'}</TableCell>
                   <TableCell>

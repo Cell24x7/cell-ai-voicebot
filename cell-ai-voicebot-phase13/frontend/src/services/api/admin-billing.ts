@@ -34,6 +34,8 @@ export interface RateCardInput {
   sttPerMinuteMicros: number;
   /** VAPI: recorded voice per 15 s per number (0 = not priced). */
   voiceApiPulseMicros?: number;
+  /** Phase 20: a minute of an incoming phone call (`null` = same as `callPerMinuteMicros`). */
+  inboundCallPerMinuteMicros?: number | null;
   note?: string | null;
 }
 

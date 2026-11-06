@@ -29,19 +29,64 @@ export interface ActiveWaCall {
   ended: { reason: string; durationSec: number } | null;
 }
 
-export type IncomingRing = WsEventMap['whatsapp.call.incoming'] & {
+/** A ringing call: WhatsApp (Phase 12) or a phone call to one of the numbers (Phase 20). */
+export type IncomingEvent = WsEventMap['whatsapp.call.incoming'] | WsEventMap['call.incoming'];
+
+export interface IncomingRing {
+  callId: string;
+  kind: 'whatsapp' | 'sip';
+  conversationId: string | null;
+  contactId: string | null;
+  ringUntil: string;
+  /** Phone calls: who calls (null when hidden), which number, and the AI handover. */
+  phone: {
+    contactName: string | null;
+    from: string | null;
+    did: string;
+    numberLabel: string;
+    transfer: boolean;
+  } | null;
   /** Someone else answered — the popup says so, then closes. */
   takenBy: string | null;
   /** This user declined / it stopped ringing. */
   gone: boolean;
-};
+}
+
+const toRing = (event: IncomingEvent): IncomingRing =>
+  'kind' in event
+    ? {
+        callId: event.callId,
+        kind: 'sip',
+        conversationId: null,
+        contactId: event.contactId,
+        ringUntil: event.ringUntil,
+        phone: {
+          contactName: event.contactName,
+          from: event.from,
+          did: event.did,
+          numberLabel: event.numberLabel,
+          transfer: event.transfer,
+        },
+        takenBy: null,
+        gone: false,
+      }
+    : {
+        callId: event.callId,
+        kind: 'whatsapp',
+        conversationId: event.conversationId,
+        contactId: event.contactId,
+        ringUntil: event.ringUntil,
+        phone: null,
+        takenBy: null,
+        gone: false,
+      };
 
 interface LiveCallState {
   active: ActiveWaCall | null;
   incoming: IncomingRing[];
   setActive: (call: ActiveWaCall | null) => void;
   patchActive: (patch: Partial<ActiveWaCall>) => void;
-  ring: (event: WsEventMap['whatsapp.call.incoming']) => void;
+  ring: (event: IncomingEvent) => void;
   taken: (callId: string, by: string) => void;
   stopRinging: (callId: string) => void;
   dismiss: (callId: string) => void;
@@ -56,7 +101,7 @@ export const useLiveCallStore = create<LiveCallState>((set) => ({
     set((s) =>
       s.incoming.some((r) => r.callId === event.callId)
         ? s
-        : { incoming: [...s.incoming, { ...event, takenBy: null, gone: false }] },
+        : { incoming: [...s.incoming, toRing(event)] },
     ),
   taken: (callId, by) =>
     set((s) => ({

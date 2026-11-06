@@ -75,7 +75,12 @@ describe('Admin → Phone numbers (Phase 18)', () => {
     await user.type(within(dialog).getByLabelText('Number'), '+911600999999');
     await user.click(add);
     await waitFor(() =>
-      expect(api.create).toHaveBeenCalledWith({ number: '+911600999999', kind: '1600', label: '' }),
+      expect(api.create).toHaveBeenCalledWith({
+        number: '+911600999999',
+        kind: '1600',
+        label: '',
+        purpose: 'outbound',
+      }),
     );
   });
 

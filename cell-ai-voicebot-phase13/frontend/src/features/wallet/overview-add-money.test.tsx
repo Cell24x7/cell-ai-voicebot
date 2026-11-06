@@ -65,6 +65,7 @@ const WALLET = (overrides: Partial<Wallet> = {}): Wallet => ({
 });
 const RATES: RateCardView = {
   callPerMinuteMicros: R,
+  inboundCallPerMinuteMicros: R,
   pulseSeconds: 60,
   aiPerMinuteMicros: 6 * R,
   ttsPer1kCharsMicros: 2_500_000,

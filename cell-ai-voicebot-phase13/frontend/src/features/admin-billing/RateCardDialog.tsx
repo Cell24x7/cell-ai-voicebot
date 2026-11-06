@@ -55,6 +55,12 @@ export function RateCardDialog({
   const [embedding, setEmbedding] = useState(formatRupeesInput(initial.embeddingPer1kTokensMicros));
   const [stt, setStt] = useState(formatRupeesInput(initial.sttPerMinuteMicros));
   const [voice, setVoice] = useState(formatRupeesInput(initial.voiceApiPulseMicros ?? 0));
+  // Phase 20: empty = incoming minutes cost what outgoing ones do
+  const [inbound, setInbound] = useState(
+    initial.inboundCallPerMinuteMicros === null || initial.inboundCallPerMinuteMicros === undefined
+      ? ''
+      : formatRupeesInput(initial.inboundCallPerMinuteMicros),
+  );
   const [commission, setCommission] = useState(formatBps(initial.commissionBps).replace('%', ''));
   const [unanswered, setUnanswered] = useState(initial.billUnansweredAttempts);
   const [note, setNote] = useState('');
@@ -70,15 +76,16 @@ export function RateCardDialog({
   const e = money(embedding);
   const s = money(stt);
   const v = money(voice);
+  const inb = inbound.trim() ? money(inbound) : ({ ok: true, micros: null } as const);
   const bps = parsePercentToBps(commission);
   const noteProblem = note.trim() && note.trim().length < 3 ? 'At least 3 characters' : null;
   const valid =
-    c.ok && a.ok && t.ok && x.ok && e.ok && s.ok && v.ok && bps !== null && !noteProblem;
+    c.ok && a.ok && t.ok && x.ok && e.ok && s.ok && v.ok && inb.ok && bps !== null && !noteProblem;
 
   const save = async () => {
     setTouched(true);
-    if (!c.ok || !a.ok || !t.ok || !x.ok || !e.ok || !s.ok || !v.ok || bps === null || noteProblem)
-      return;
+    if (!valid || !c.ok || !a.ok || !t.ok || !x.ok || !e.ok || !s.ok || !v.ok || !inb.ok) return;
+    if (bps === null) return;
     setSaving(true);
     setError(null);
     try {
@@ -92,6 +99,7 @@ export function RateCardDialog({
         embeddingPer1kTokensMicros: e.micros,
         sttPerMinuteMicros: s.micros,
         voiceApiPulseMicros: v.micros,
+        inboundCallPerMinuteMicros: inb.micros,
         billUnansweredAttempts: unanswered,
         note: note.trim() || null,
       });
@@ -181,6 +189,17 @@ export function RateCardDialog({
             onChange={(ev) => setStt(ev.target.value)}
             error={touched && !s.ok}
             helperText={help(s, 'Recorded team calls turned into text, per second')}
+          />
+          <TextField
+            label="Incoming call (₹ per minute)"
+            value={inbound}
+            onChange={(ev) => setInbound(ev.target.value)}
+            error={touched && !inb.ok}
+            helperText={
+              touched && !inb.ok
+                ? inb.message
+                : 'Customers calling your numbers; empty = the call price above'
+            }
           />
           <TextField
             label="Recorded voice (₹ per 15 s per number)"

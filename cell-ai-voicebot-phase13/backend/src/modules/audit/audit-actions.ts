@@ -208,6 +208,10 @@ export const AUDIT_ACTIONS = [
   'account.voice_api_changed',
   'voice_api.webhook_registered',
   'voice_api.batch_resolved',
+  // Phase 20: incoming phone calls
+  'call.answered',
+  'call.callback_done',
+  'phone_number.inbound_updated',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

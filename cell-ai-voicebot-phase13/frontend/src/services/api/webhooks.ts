@@ -11,6 +11,7 @@ export const WEBHOOK_EVENTS = [
   { key: 'call.started', label: 'Call answered' },
   { key: 'call.completed', label: 'Call finished (result + cost)' },
   { key: 'call.insights.ready', label: 'AI summary / outcome ready' },
+  { key: 'call.missed', label: 'Incoming phone call missed' },
   { key: 'campaign.completed', label: 'Campaign finished' },
   { key: 'whatsapp.message.received', label: 'WhatsApp message received' },
   { key: 'whatsapp.message.status', label: 'WhatsApp message sent / delivered / read' },

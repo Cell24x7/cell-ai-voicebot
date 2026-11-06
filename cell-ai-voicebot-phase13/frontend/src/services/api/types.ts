@@ -339,6 +339,9 @@ export type SheetPreview = Schemas['SheetPreview'];
 
 // Phase 18: SIP line
 export type PhoneNumber = Schemas['PhoneNumber'];
+/** Phase 20: a number customers can call, who answers it and what is missing. */
+export type InboundNumber = Schemas['InboundNumber'];
+export type InboundSettings = Schemas['InboundSettingsBody'];
 
 // Phase 19: reseller panel
 export type ResellerCustomer = Schemas['ResellerCustomer'];

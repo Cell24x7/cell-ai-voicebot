@@ -42,6 +42,15 @@ export function CallMounts() {
     if (canAnswer) ring(e.data);
   });
   useWsEvent('whatsapp.call.taken', (e) => taken(e.data.callId, e.data.byUserId));
+  // Phase 20: a customer calls one of the account's phone numbers
+  useWsEvent('call.incoming', (e) => {
+    if (canAnswer) ring(e.data);
+  });
+  useWsEvent('call.ring_ended', (e) => {
+    const me = useLiveCallStore.getState().active?.callId === e.data.callId;
+    if (e.data.answeredBy && !me) taken(e.data.callId, e.data.answeredBy);
+    else stopRinging(e.data.callId);
+  });
   useWsEvent('whatsapp.call.ended_ringing', (e) => stopRinging(e.data.callId));
   return (
     <Suspense fallback={null}>

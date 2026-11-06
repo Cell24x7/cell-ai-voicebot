@@ -27,6 +27,8 @@ import {
   describeEvent,
   dispositionLabel,
   END_REASON_LABELS,
+  INBOUND_ROUTE_LABELS,
+  MISSED_REASON_LABELS,
   STATUS_LABELS,
   statusColor,
 } from '@/features/calls/labels';
@@ -47,6 +49,7 @@ import type { Call } from '@/services/api/types';
 import { useWsEvent, useWsTopic } from '@/services/realtime';
 import { formatInAccountTz } from '@/utils/datetime';
 import { formatCurrencyMicros, formatDateOnly, formatNumber } from '@/utils/format';
+import { formatPhone } from '@/utils/phone';
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -278,10 +281,27 @@ export function CallDetailPage() {
                 <Row label="Started by" value={c.startedBy?.name ?? '—'} />
                 <Row label="Length" value={`${String(c.durationSec)} s`} />
                 <Row label="Ended" value={c.endReason ? END_REASON_LABELS[c.endReason] : '—'} />
-                {c.provider === 'sip' && (
+                {c.provider === 'sip' && !c.inbound && (
                   <>
                     <Row label="Caller ID" value={c.callerId ?? '—'} />
                     <Row label="Line result" value={sipResult(c.sip)} />
+                  </>
+                )}
+                {c.inbound && (
+                  <>
+                    <Row
+                      label="Number called"
+                      value={`${c.inbound.numberLabel ? `${c.inbound.numberLabel} · ` : ''}${formatPhone(c.inbound.did)}`}
+                    />
+                    <Row label="Who answers" value={INBOUND_ROUTE_LABELS[c.inbound.route]} />
+                    {c.inbound.callerHidden && <Row label="Caller" value="Hidden number" />}
+                    <Row label="Line result" value={sipResult(c.sip)} />
+                    {c.missed && (
+                      <Row
+                        label="Missed"
+                        value={`${MISSED_REASON_LABELS[c.missed.reason]} · ${c.missed.callback.status === 'done' ? 'handled' : 'to call back'}`}
+                      />
+                    )}
                   </>
                 )}
                 <Row

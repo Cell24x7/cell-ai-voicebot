@@ -11,6 +11,8 @@ import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useEffect, useState } from 'react';
@@ -22,6 +24,7 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { useCan, usePermission } from '@/features/auth/hooks';
 import { useAuthStore } from '@/features/auth/store';
 import { END_REASON_LABELS, STATUS_LABELS, statusColor } from '@/features/calls/labels';
+import { MissedCalls } from '@/features/calls/MissedCalls';
 import { useCallLiveUpdates, useCalls, useCanTriggerCalls } from '@/features/calls/queries';
 import { useCampaigns } from '@/features/campaigns/queries';
 import { SENTIMENT_LABELS, sentimentColor, type SentimentLabel } from '@/features/insights/labels';
@@ -78,6 +81,9 @@ export function CallsPage() {
   const direction = params.get('direction');
   const mode = params.get('mode');
   const whatsapp = provider === 'whatsapp';
+  // Phase 20: incoming phone calls too — direction / answered-by for both lines
+  const twoWay = whatsapp || provider === 'sip';
+  const missedView = params.get('view') === 'missed';
   const campaignId = params.get('campaignId') ?? '';
   // Phase 14 record filters
   const outcomes = (params.get('disposition') ?? '')
@@ -118,8 +124,8 @@ export function CallsPage() {
     ...(isSentiment(sentiment) ? { sentiment } : {}),
     ...(promiseOnly ? { hasPromise: true } : {}),
     ...(isProvider(provider) ? { provider } : {}),
-    ...(whatsapp && (direction === 'inbound' || direction === 'outbound') ? { direction } : {}),
-    ...(whatsapp && (mode === 'human' || mode === 'ai') ? { mode } : {}),
+    ...(direction === 'inbound' || direction === 'outbound' ? { direction } : {}),
+    ...(twoWay && (mode === 'human' || mode === 'ai') ? { mode } : {}),
     ...(from ? { from: startOfDayIso(from, timezone) } : {}),
     ...(to ? { to: startOfDayIso(shiftYmd(to, 1), timezone) } : {}),
   };
@@ -137,7 +143,9 @@ export function CallsPage() {
     outcomes.length > 0 ||
     isSentiment(sentiment) ||
     promiseOnly ||
-    isProvider(provider);
+    isProvider(provider) ||
+    direction === 'inbound' ||
+    direction === 'outbound';
 
   const columns: Column<Call>[] = [
     {
@@ -272,258 +280,276 @@ export function CallsPage() {
           </Stack>
         }
       />
-      <Stack spacing={2}>
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          spacing={2}
-          sx={{ alignItems: { md: 'center' } }}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Tabs
+          value={missedView ? 'missed' : 'all'}
+          onChange={(_e, v: string) =>
+            setParams(v === 'missed' ? { view: 'missed' } : {}, { replace: true })
+          }
+          aria-label="Call lists"
         >
-          <TextField
-            size="small"
-            label="Contact name"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchOutlined fontSize="small" />
-                  </InputAdornment>
-                ),
-              },
-              htmlInput: { maxLength: 80 },
-            }}
-          />
-          <TextField
-            select
-            label="Status"
-            size="small"
-            sx={{ minWidth: 180 }}
-            value={status}
-            slotProps={{
-              select: {
-                multiple: true,
-                displayEmpty: true,
-                renderValue: (v) =>
-                  (v as string[]).length
-                    ? (v as Call['status'][]).map((s) => STATUS_LABELS[s]).join(', ')
-                    : 'All',
-              },
-              inputLabel: { shrink: true },
-            }}
-            onChange={(e) => set('status', (e.target.value as unknown as string[]).join(','))}
+          <Tab value="all" label="All calls" />
+          <Tab value="missed" label="Missed" />
+        </Tabs>
+      </Box>
+      {missedView ? (
+        <MissedCalls />
+      ) : (
+        <Stack spacing={2}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={2}
+            sx={{ alignItems: { md: 'center' } }}
           >
-            {STATUSES.map((s) => (
-              <MenuItem key={s} value={s}>
-                <Checkbox size="small" checked={status.includes(s)} />
-                <ListItemText primary={STATUS_LABELS[s]} />
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            label="From"
-            type="date"
-            size="small"
-            value={from}
-            onChange={(e) => set('from', e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
-          <TextField
-            label="To"
-            type="date"
-            size="small"
-            value={to}
-            onChange={(e) => set('to', e.target.value)}
-            error={badRange}
-            helperText={badRange ? 'Must be after From' : undefined}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
-          <TextField
-            select
-            label="Line"
-            size="small"
-            sx={{ minWidth: 140 }}
-            value={isProvider(provider) ? provider : ''}
-            onChange={(e) => set('provider', e.target.value)}
-            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
-          >
-            <MenuItem value="">All</MenuItem>
-            {(Object.keys(PROVIDER_LABELS) as NonNullable<Call['provider']>[]).map((p) => (
-              <MenuItem key={p} value={p}>
-                {PROVIDER_LABELS[p]}
-              </MenuItem>
-            ))}
-          </TextField>
-          {whatsapp && (
-            <>
-              <TextField
-                select
-                label="Direction"
-                size="small"
-                sx={{ minWidth: 140 }}
-                value={direction === 'inbound' || direction === 'outbound' ? direction : ''}
-                onChange={(e) => set('direction', e.target.value)}
-                slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="inbound">Incoming</MenuItem>
-                <MenuItem value="outbound">Outgoing</MenuItem>
-              </TextField>
-              <TextField
-                select
-                label="Answered by"
-                size="small"
-                sx={{ minWidth: 150 }}
-                value={mode === 'human' || mode === 'ai' ? mode : ''}
-                onChange={(e) => set('mode', e.target.value)}
-                slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
-              >
-                <MenuItem value="">Anyone</MenuItem>
-                <MenuItem value="human">Team member</MenuItem>
-                <MenuItem value="ai">AI</MenuItem>
-              </TextField>
-            </>
-          )}
-          {canCampaigns && (
+            <TextField
+              size="small"
+              label="Contact name"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchOutlined fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+                htmlInput: { maxLength: 80 },
+              }}
+            />
             <TextField
               select
-              label="Campaign"
+              label="Status"
               size="small"
               sx={{ minWidth: 180 }}
-              value={
-                campaignOptions.data?.pages[0]?.data.some((cp) => cp.id === campaignId)
-                  ? campaignId
-                  : ''
-              }
-              onChange={(e) => set('campaignId', e.target.value)}
-              slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+              value={status}
+              slotProps={{
+                select: {
+                  multiple: true,
+                  displayEmpty: true,
+                  renderValue: (v) =>
+                    (v as string[]).length
+                      ? (v as Call['status'][]).map((s) => STATUS_LABELS[s]).join(', ')
+                      : 'All',
+                },
+                inputLabel: { shrink: true },
+              }}
+              onChange={(e) => set('status', (e.target.value as unknown as string[]).join(','))}
             >
-              <MenuItem value="">All</MenuItem>
-              {(campaignOptions.data?.pages[0]?.data ?? []).map((cp) => (
-                <MenuItem key={cp.id} value={cp.id}>
-                  {cp.name}
+              {STATUSES.map((s) => (
+                <MenuItem key={s} value={s}>
+                  <Checkbox size="small" checked={status.includes(s)} />
+                  <ListItemText primary={STATUS_LABELS[s]} />
                 </MenuItem>
               ))}
             </TextField>
-          )}
-          <TextField
-            select
-            label="Outcome"
-            size="small"
-            sx={{ minWidth: 180 }}
-            value={outcomes}
-            slotProps={{
-              select: {
-                multiple: true,
-                displayEmpty: true,
-                renderValue: (v) =>
-                  (v as string[]).length
-                    ? (v as string[]).map((k) => outcomeLabel(k, dispositions.data)).join(', ')
-                    : 'All',
-              },
-              inputLabel: { shrink: true },
-            }}
-            onChange={(e) => set('disposition', (e.target.value as unknown as string[]).join(','))}
-          >
-            {(dispositions.data ?? []).map((d) => (
-              <MenuItem key={d.key} value={d.key}>
-                <Checkbox size="small" checked={outcomes.includes(d.key)} />
-                <ListItemText primary={d.label} />
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            label="Customer mood"
-            size="small"
-            sx={{ minWidth: 150 }}
-            value={isSentiment(sentiment) ? sentiment : ''}
-            onChange={(e) => set('sentiment', e.target.value)}
-            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
-          >
-            <MenuItem value="">Any</MenuItem>
-            {(Object.keys(SENTIMENT_LABELS) as SentimentLabel[]).map((k) => (
-              <MenuItem key={k} value={k}>
-                {SENTIMENT_LABELS[k]}
-              </MenuItem>
-            ))}
-          </TextField>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={promiseOnly}
-                onChange={(e) => set('promise', e.target.checked ? '1' : null)}
-              />
-            }
-            label="Promise to pay"
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={testOnly}
-                onChange={(e) => set('test', e.target.checked ? '1' : null)}
-              />
-            }
-            label="Test calls only"
-          />
-          {filtered && (
-            <Button
-              sx={{ ml: { md: 'auto' } }}
-              onClick={() => {
-                setSearch('');
-                setParams({}, { replace: true });
-              }}
+            <TextField
+              label="From"
+              type="date"
+              size="small"
+              value={from}
+              onChange={(e) => set('from', e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+            <TextField
+              label="To"
+              type="date"
+              size="small"
+              value={to}
+              onChange={(e) => set('to', e.target.value)}
+              error={badRange}
+              helperText={badRange ? 'Must be after From' : undefined}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+            <TextField
+              select
+              label="Line"
+              size="small"
+              sx={{ minWidth: 140 }}
+              value={isProvider(provider) ? provider : ''}
+              onChange={(e) => set('provider', e.target.value)}
+              slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
             >
-              Clear filters
-            </Button>
-          )}
-        </Stack>
-        {(params.get('flowId') || params.get('agentId') || params.get('contactId')) && (
-          <Typography variant="body2" color="text.secondary">
-            Showing the calls of one{' '}
-            {params.get('flowId') ? 'flow' : params.get('agentId') ? 'agent' : 'contact'}.{' '}
-            <Link
-              component="button"
-              onClick={() => {
-                const next = new URLSearchParams(params);
-                next.delete('flowId');
-                next.delete('agentId');
-                next.delete('contactId');
-                setParams(next, { replace: true });
-              }}
+              <MenuItem value="">All</MenuItem>
+              {(Object.keys(PROVIDER_LABELS) as NonNullable<Call['provider']>[]).map((p) => (
+                <MenuItem key={p} value={p}>
+                  {PROVIDER_LABELS[p]}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              label="Direction"
+              size="small"
+              sx={{ minWidth: 140 }}
+              value={direction === 'inbound' || direction === 'outbound' ? direction : ''}
+              onChange={(e) => set('direction', e.target.value)}
+              slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
             >
-              Show all
-            </Link>
-          </Typography>
-        )}
-        <DataTable
-          aria-label="Calls"
-          columns={columns}
-          rows={badRange ? [] : calls.data?.pages.flatMap((p) => p.data)}
-          getRowId={(c) => c.id}
-          loading={calls.isPending && !badRange}
-          error={calls.error}
-          onRetry={() => void calls.refetch()}
-          emptyTitle={filtered ? 'Nothing matches these filters' : 'No calls yet'}
-          emptyDescription={
-            filtered
-              ? undefined
-              : 'Start a test call from here, a flow or an agent — it appears in this list.'
-          }
-          footer={
-            calls.hasNextPage ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}>
-                <Button
-                  onClick={() => void calls.fetchNextPage()}
-                  disabled={calls.isFetchingNextPage}
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="inbound">Incoming</MenuItem>
+              <MenuItem value="outbound">Outgoing</MenuItem>
+            </TextField>
+            {twoWay && (
+              <>
+                <TextField
+                  select
+                  label="Answered by"
+                  size="small"
+                  sx={{ minWidth: 150 }}
+                  value={mode === 'human' || mode === 'ai' ? mode : ''}
+                  onChange={(e) => set('mode', e.target.value)}
+                  slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
                 >
-                  {calls.isFetchingNextPage ? 'Loading…' : 'Load more'}
-                </Button>
-              </Box>
-            ) : undefined
-          }
-        />
-      </Stack>
+                  <MenuItem value="">Anyone</MenuItem>
+                  <MenuItem value="human">Team member</MenuItem>
+                  <MenuItem value="ai">AI</MenuItem>
+                </TextField>
+              </>
+            )}
+            {canCampaigns && (
+              <TextField
+                select
+                label="Campaign"
+                size="small"
+                sx={{ minWidth: 180 }}
+                value={
+                  campaignOptions.data?.pages[0]?.data.some((cp) => cp.id === campaignId)
+                    ? campaignId
+                    : ''
+                }
+                onChange={(e) => set('campaignId', e.target.value)}
+                slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+              >
+                <MenuItem value="">All</MenuItem>
+                {(campaignOptions.data?.pages[0]?.data ?? []).map((cp) => (
+                  <MenuItem key={cp.id} value={cp.id}>
+                    {cp.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+            <TextField
+              select
+              label="Outcome"
+              size="small"
+              sx={{ minWidth: 180 }}
+              value={outcomes}
+              slotProps={{
+                select: {
+                  multiple: true,
+                  displayEmpty: true,
+                  renderValue: (v) =>
+                    (v as string[]).length
+                      ? (v as string[]).map((k) => outcomeLabel(k, dispositions.data)).join(', ')
+                      : 'All',
+                },
+                inputLabel: { shrink: true },
+              }}
+              onChange={(e) =>
+                set('disposition', (e.target.value as unknown as string[]).join(','))
+              }
+            >
+              {(dispositions.data ?? []).map((d) => (
+                <MenuItem key={d.key} value={d.key}>
+                  <Checkbox size="small" checked={outcomes.includes(d.key)} />
+                  <ListItemText primary={d.label} />
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              label="Customer mood"
+              size="small"
+              sx={{ minWidth: 150 }}
+              value={isSentiment(sentiment) ? sentiment : ''}
+              onChange={(e) => set('sentiment', e.target.value)}
+              slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+            >
+              <MenuItem value="">Any</MenuItem>
+              {(Object.keys(SENTIMENT_LABELS) as SentimentLabel[]).map((k) => (
+                <MenuItem key={k} value={k}>
+                  {SENTIMENT_LABELS[k]}
+                </MenuItem>
+              ))}
+            </TextField>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={promiseOnly}
+                  onChange={(e) => set('promise', e.target.checked ? '1' : null)}
+                />
+              }
+              label="Promise to pay"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={testOnly}
+                  onChange={(e) => set('test', e.target.checked ? '1' : null)}
+                />
+              }
+              label="Test calls only"
+            />
+            {filtered && (
+              <Button
+                sx={{ ml: { md: 'auto' } }}
+                onClick={() => {
+                  setSearch('');
+                  setParams({}, { replace: true });
+                }}
+              >
+                Clear filters
+              </Button>
+            )}
+          </Stack>
+          {(params.get('flowId') || params.get('agentId') || params.get('contactId')) && (
+            <Typography variant="body2" color="text.secondary">
+              Showing the calls of one{' '}
+              {params.get('flowId') ? 'flow' : params.get('agentId') ? 'agent' : 'contact'}.{' '}
+              <Link
+                component="button"
+                onClick={() => {
+                  const next = new URLSearchParams(params);
+                  next.delete('flowId');
+                  next.delete('agentId');
+                  next.delete('contactId');
+                  setParams(next, { replace: true });
+                }}
+              >
+                Show all
+              </Link>
+            </Typography>
+          )}
+          <DataTable
+            aria-label="Calls"
+            columns={columns}
+            rows={badRange ? [] : calls.data?.pages.flatMap((p) => p.data)}
+            getRowId={(c) => c.id}
+            loading={calls.isPending && !badRange}
+            error={calls.error}
+            onRetry={() => void calls.refetch()}
+            emptyTitle={filtered ? 'Nothing matches these filters' : 'No calls yet'}
+            emptyDescription={
+              filtered
+                ? undefined
+                : 'Start a test call from here, a flow or an agent — it appears in this list.'
+            }
+            footer={
+              calls.hasNextPage ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}>
+                  <Button
+                    onClick={() => void calls.fetchNextPage()}
+                    disabled={calls.isFetchingNextPage}
+                  >
+                    {calls.isFetchingNextPage ? 'Loading…' : 'Load more'}
+                  </Button>
+                </Box>
+              ) : undefined
+            }
+          />
+        </Stack>
+      )}
       <NewWhatsAppCallDialog open={waCall} onClose={() => setWaCall(false)} />
     </>
   );

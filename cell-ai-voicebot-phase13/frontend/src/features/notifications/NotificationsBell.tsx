@@ -112,6 +112,12 @@ const TYPE_ICONS: Partial<
     color: 'warning',
     label: 'WhatsApp charge after a release',
   },
+  // Phase 20 — incoming phone calls
+  'call.sip_missed': {
+    icon: PhoneMissedOutlined,
+    color: 'warning',
+    label: 'Missed phone call',
+  },
   // Phase 12 — WhatsApp calling
   'call.whatsapp_missed': {
     icon: PhoneMissedOutlined,

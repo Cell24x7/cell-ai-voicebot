@@ -26,6 +26,12 @@ import { RateHistoryTable } from './RateHistoryTable';
 export function RateFacts({ card }: { card: AccountRateCards['effective'] }) {
   const facts: [string, string][] = [
     ['Call', `${formatCurrencyMicros(card.callPerMinuteMicros)} / min`],
+    [
+      'Incoming call',
+      card.inboundCallPerMinuteMicros === null || card.inboundCallPerMinuteMicros === undefined
+        ? 'Same as call'
+        : `${formatCurrencyMicros(card.inboundCallPerMinuteMicros)} / min`,
+    ],
     ['Pulse', `${card.pulseSeconds} s`],
     ['AI', `${formatCurrencyMicros(card.aiPerMinuteMicros)} / min`],
     ['Voice (TTS)', `${formatCurrencyMicros(card.ttsPer1kCharsMicros)} / 1k chars`],

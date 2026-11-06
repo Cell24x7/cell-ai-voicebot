@@ -32,6 +32,10 @@ const RetentionTab = lazy(async () => ({
 const NotificationsTab = lazy(async () => ({
   default: (await import('@/features/settings/NotificationsTab')).NotificationsTab,
 }));
+// Phase 20: incoming calls on the account's numbers
+const PhoneNumbersTab = lazy(async () => ({
+  default: (await import('@/features/settings/PhoneNumbersTab')).PhoneNumbersTab,
+}));
 const InboxSettingsTab = lazy(async () => ({
   default: (await import('@/features/settings/InboxSettingsTab')).InboxSettingsTab,
 }));
@@ -41,6 +45,12 @@ const TABS = [
   { key: 'security', label: 'Security', Component: SecurityTab },
   { key: 'account', label: 'Account', Component: AccountTab, permission: 'account.read' },
   { key: 'calls', label: 'Calls', Component: CallsTab, permission: 'account.read' },
+  {
+    key: 'phone-numbers',
+    label: 'Phone numbers',
+    Component: PhoneNumbersTab,
+    permission: 'account.read',
+  },
   { key: 'inbox', label: 'Inbox', Component: InboxSettingsTab, permission: 'account.read' },
   { key: 'ai', label: 'AI & outcomes', Component: InsightsSettingsTab, permission: 'account.read' },
   { key: 'compliance', label: 'Compliance', Component: ComplianceTab, permission: 'account.read' },

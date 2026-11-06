@@ -505,6 +505,7 @@
           "embeddingPer1kTokensMicros": { "type": "number" },
           "sttPerMinuteMicros": { "type": "number" },
           "voiceApiPulseMicros": { "type": "number" },
+          "inboundCallPerMinuteMicros": { "type": "number" },
           "source": { "type": "string", "enum": ["account", "default"] },
           "effectiveFrom": { "type": "string" },
           "whatsapp": {
@@ -568,6 +569,7 @@
           "embeddingPer1kTokensMicros",
           "sttPerMinuteMicros",
           "voiceApiPulseMicros",
+          "inboundCallPerMinuteMicros",
           "source",
           "effectiveFrom",
           "whatsapp",
@@ -781,6 +783,7 @@
           "embeddingPer1kTokensMicros": { "type": "number" },
           "sttPerMinuteMicros": { "type": "number" },
           "voiceApiPulseMicros": { "type": "number" },
+          "inboundCallPerMinuteMicros": { "type": ["number", "null"] },
           "inheritsDefault": { "type": "boolean" },
           "effectiveFrom": { "type": "string" },
           "createdBy": { "type": ["string", "null"] },
@@ -800,6 +803,7 @@
           "embeddingPer1kTokensMicros",
           "sttPerMinuteMicros",
           "voiceApiPulseMicros",
+          "inboundCallPerMinuteMicros",
           "inheritsDefault",
           "effectiveFrom",
           "createdBy",
@@ -825,6 +829,7 @@
               "embeddingPer1kTokensMicros": { "type": "number" },
               "sttPerMinuteMicros": { "type": "number" },
               "voiceApiPulseMicros": { "type": "number" },
+              "inboundCallPerMinuteMicros": { "type": ["number", "null"] },
               "effectiveFrom": { "type": "string" }
             },
             "required": [
@@ -840,6 +845,7 @@
               "embeddingPer1kTokensMicros",
               "sttPerMinuteMicros",
               "voiceApiPulseMicros",
+              "inboundCallPerMinuteMicros",
               "effectiveFrom"
             ]
           },
@@ -878,6 +884,7 @@
               "embeddingPer1kTokensMicros": { "type": "number" },
               "sttPerMinuteMicros": { "type": "number" },
               "voiceApiPulseMicros": { "type": "number" },
+              "inboundCallPerMinuteMicros": { "type": ["number", "null"] },
               "effectiveFrom": { "type": "string" }
             },
             "required": [
@@ -893,6 +900,7 @@
               "embeddingPer1kTokensMicros",
               "sttPerMinuteMicros",
               "voiceApiPulseMicros",
+              "inboundCallPerMinuteMicros",
               "effectiveFrom"
             ]
           },
@@ -1175,6 +1183,8 @@
               "call.test_started",
               "call.recording_accessed",
               "call.hung_up_remotely",
+              "call.answered",
+              "call.callback_done",
               "call.triggered",
               "campaign.created",
               "campaign.updated",
@@ -1277,6 +1287,7 @@
               "phone_number.updated",
               "phone_number.assigned",
               "phone_number.released",
+              "phone_number.inbound_updated",
               "whatsapp.call_permission_bulk_requested",
               "account.signed_up",
               "account.reseller_changed",
@@ -2770,10 +2781,51 @@
               "no_agent_available",
               "outside_call_hours",
               "machine",
+              "line_busy",
+              "spam_guard",
+              "inbound_refused",
               null
             ]
           },
           "callerId": { "type": ["string", "null"] },
+          "inbound": {
+            "type": ["object", "null"],
+            "properties": {
+              "did": { "type": "string" },
+              "phoneNumberId": { "type": "string" },
+              "numberLabel": { "type": "string" },
+              "route": { "type": "string", "enum": ["ai", "team", "ai_then_team", "team_then_ai"] },
+              "callerHidden": { "type": "boolean" }
+            },
+            "required": ["did", "phoneNumberId", "numberLabel", "route", "callerHidden"]
+          },
+          "missed": {
+            "type": ["object", "null"],
+            "properties": {
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "no_answer",
+                  "no_agents",
+                  "after_hours",
+                  "line_busy",
+                  "wallet_low",
+                  "caller_hung_up",
+                  "spam"
+                ]
+              },
+              "callback": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["open", "done"] },
+                  "doneBy": { "type": ["string", "null"] },
+                  "doneAt": { "type": ["string", "null"] }
+                },
+                "required": ["status", "doneBy", "doneAt"]
+              }
+            },
+            "required": ["reason", "callback"]
+          },
           "sip": {
             "type": ["object", "null"],
             "properties": {
@@ -2965,6 +3017,8 @@
           "status",
           "endReason",
           "callerId",
+          "inbound",
+          "missed",
           "sip",
           "source",
           "contact",
@@ -4181,7 +4235,10 @@
           "source": {
             "type": "object",
             "properties": {
-              "type": { "type": "string", "enum": ["manual", "import", "api", "whatsapp"] },
+              "type": {
+                "type": "string",
+                "enum": ["manual", "import", "api", "whatsapp", "inbound_call"]
+              },
               "importJobId": { "type": ["string", "null"] }
             },
             "required": ["type", "importJobId"]
@@ -4348,7 +4405,7 @@
           "kind": { "type": "string", "enum": ["1600", "landline", "mobile", "other"] },
           "accountId": { "type": ["string", "null"] },
           "accountName": { "type": ["string", "null"] },
-          "purpose": { "type": "string", "enum": ["outbound", "inbound"] },
+          "purpose": { "type": "string", "enum": ["outbound", "inbound", "both"] },
           "label": { "type": "string" },
           "dltPrincipalEntityId": { "type": ["string", "null"] },
           "status": { "type": "string", "enum": ["active", "disabled"] },
@@ -4368,6 +4425,111 @@
           "warnings",
           "createdAt"
         ]
+      },
+      "InboundNumber": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "number": { "type": "string" },
+          "label": { "type": "string" },
+          "purpose": { "type": "string", "enum": ["outbound", "inbound", "both"] },
+          "status": { "type": "string", "enum": ["active", "disabled"] },
+          "inbound": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "route": { "type": "string", "enum": ["ai", "team", "ai_then_team", "team_then_ai"] },
+              "program": {
+                "type": ["object", "null"],
+                "properties": {
+                  "kind": { "type": "string", "enum": ["flow", "agent"] },
+                  "id": { "type": "string" }
+                },
+                "required": ["kind", "id"]
+              },
+              "greeting": { "type": "string" },
+              "ringUserIds": { "type": ["array", "null"], "items": { "type": "string" } },
+              "ringTimeoutSec": { "type": "number" },
+              "callHours": {
+                "type": "object",
+                "properties": {
+                  "enabled": { "type": "boolean" },
+                  "timezone": { "type": "string", "maxLength": 64 },
+                  "weekly": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "day": {
+                          "type": "string",
+                          "enum": [
+                            "MONDAY",
+                            "TUESDAY",
+                            "WEDNESDAY",
+                            "THURSDAY",
+                            "FRIDAY",
+                            "SATURDAY",
+                            "SUNDAY"
+                          ]
+                        },
+                        "open": { "type": "string", "pattern": "^([01]\\d|2[0-3])[0-5]\\d$" },
+                        "close": { "type": "string", "pattern": "^([01]\\d|2[0-3])[0-5]\\d$" }
+                      },
+                      "required": ["day", "open", "close"]
+                    },
+                    "maxItems": 14
+                  },
+                  "holidays": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+                        "start": { "type": "string", "pattern": "^([01]\\d|2[0-3])[0-5]\\d$" },
+                        "end": { "type": "string", "pattern": "^([01]\\d|2[0-3])[0-5]\\d$" }
+                      },
+                      "required": ["date", "start", "end"]
+                    },
+                    "maxItems": 20
+                  }
+                },
+                "required": ["enabled", "timezone", "weekly", "holidays"]
+              },
+              "afterHours": {
+                "type": "object",
+                "properties": {
+                  "action": { "type": "string", "enum": ["message", "ai", "hangup"] },
+                  "message": { "type": "string" }
+                },
+                "required": ["action", "message"]
+              },
+              "updatedAt": { "type": ["string", "null"] }
+            },
+            "required": [
+              "enabled",
+              "route",
+              "program",
+              "greeting",
+              "ringUserIds",
+              "ringTimeoutSec",
+              "callHours",
+              "afterHours",
+              "updatedAt"
+            ]
+          },
+          "readiness": {
+            "type": "object",
+            "properties": {
+              "line": { "type": "boolean" },
+              "server": { "type": "boolean" },
+              "program": { "type": ["boolean", "null"] },
+              "teamMembers": { "type": "number" },
+              "problems": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": ["line", "server", "program", "teamMembers", "problems"]
+          }
+        },
+        "required": ["id", "number", "label", "purpose", "status", "inbound", "readiness"]
       },
       "PhoneLine": {
         "type": "object",
@@ -6911,6 +7073,7 @@
               "account.delete_scheduled",
               "sip.spend_guard_paused",
               "sip.trunk_down",
+              "call.sip_missed",
               "whatsapp.call_permission_bulk_done",
               "account.reseller_signed_up",
               "reseller.approved",
@@ -7230,9 +7393,26 @@
             "type": "object",
             "properties": { "enabled": { "type": "boolean" } },
             "required": ["enabled"]
+          },
+          "inboundNumbers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "number": { "type": "string" },
+                "label": { "type": "string" },
+                "enabled": { "type": "boolean" },
+                "route": {
+                  "type": "string",
+                  "enum": ["ai", "team", "ai_then_team", "team_then_ai"]
+                }
+              },
+              "required": ["id", "number", "label", "enabled", "route"]
+            }
           }
         },
-        "required": ["line", "numbers", "voiceApi"]
+        "required": ["line", "numbers", "voiceApi", "inboundNumbers"]
       },
       "PublicIvr": {
         "type": "object",
@@ -8900,6 +9080,93 @@
           "receivedAt",
           "processedAt"
         ]
+      },
+      "InboundSettingsBody": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "route": { "type": "string", "enum": ["ai", "team", "ai_then_team", "team_then_ai"] },
+          "program": {
+            "type": ["object", "null"],
+            "properties": {
+              "kind": { "type": "string", "enum": ["flow", "agent"] },
+              "id": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" }
+            },
+            "required": ["kind", "id"]
+          },
+          "greeting": { "type": "string", "maxLength": 200 },
+          "ringUserIds": {
+            "type": ["array", "null"],
+            "items": { "type": "string", "pattern": "^[a-f0-9]{24}$" },
+            "maxItems": 50
+          },
+          "ringTimeoutSec": { "type": "integer", "minimum": 10, "maximum": 300 },
+          "callHours": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "timezone": { "type": "string", "maxLength": 64 },
+              "weekly": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "day": {
+                      "type": "string",
+                      "enum": [
+                        "MONDAY",
+                        "TUESDAY",
+                        "WEDNESDAY",
+                        "THURSDAY",
+                        "FRIDAY",
+                        "SATURDAY",
+                        "SUNDAY"
+                      ]
+                    },
+                    "open": { "type": "string", "pattern": "^([01]\\d|2[0-3])[0-5]\\d$" },
+                    "close": { "type": "string", "pattern": "^([01]\\d|2[0-3])[0-5]\\d$" }
+                  },
+                  "required": ["day", "open", "close"]
+                },
+                "maxItems": 14
+              },
+              "holidays": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+                    "start": { "type": "string", "pattern": "^([01]\\d|2[0-3])[0-5]\\d$" },
+                    "end": { "type": "string", "pattern": "^([01]\\d|2[0-3])[0-5]\\d$" }
+                  },
+                  "required": ["date", "start", "end"]
+                },
+                "maxItems": 20
+              }
+            },
+            "required": ["enabled", "timezone", "weekly", "holidays"]
+          },
+          "afterHours": {
+            "type": "object",
+            "properties": {
+              "action": { "type": "string", "enum": ["message", "ai", "hangup"] },
+              "message": { "type": "string", "minLength": 1, "maxLength": 200 }
+            },
+            "required": ["action", "message"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "enabled",
+          "route",
+          "program",
+          "greeting",
+          "ringUserIds",
+          "ringTimeoutSec",
+          "callHours",
+          "afterHours"
+        ],
+        "additionalProperties": false
       },
       "InboxSendMessage": {
         "oneOf": [
@@ -11593,6 +11860,11 @@
                   },
                   "sttPerMinuteMicros": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
                   "voiceApiPulseMicros": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
+                  "inboundCallPerMinuteMicros": {
+                    "type": ["integer", "null"],
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
                   "note": { "type": ["string", "null"], "minLength": 3, "maxLength": 300 }
                 },
                 "required": [
@@ -11789,6 +12061,11 @@
                   },
                   "sttPerMinuteMicros": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
                   "voiceApiPulseMicros": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
+                  "inboundCallPerMinuteMicros": {
+                    "type": ["integer", "null"],
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
                   "note": { "type": ["string", "null"], "minLength": 3, "maxLength": 300 }
                 },
                 "required": [
@@ -16727,6 +17004,17 @@
             "in": "query"
           },
           {
+            "schema": {
+              "type": "string",
+              "enum": ["open", "all"],
+              "description": "Phase 20: incoming calls nobody took — `open` = still to call back, `all` = every missed call"
+            },
+            "required": false,
+            "description": "Phase 20: incoming calls nobody took — `open` = still to call back, `all` = every missed call",
+            "name": "missed",
+            "in": "query"
+          },
+          {
             "schema": { "type": "string", "enum": ["true", "false"] },
             "required": false,
             "name": "isTest",
@@ -17229,6 +17517,187 @@
             }
           },
           "202": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": { "$ref": "#/components/schemas/Call" }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calls/{id}/answer": {
+      "post": {
+        "tags": ["Calls"],
+        "summary": "Answer a ringing incoming phone call (calls.answer; Phase 20) — first answer wins: 409 CALL_ALREADY_ANSWERED / CALL_NOT_RINGING; returns the media ticket for the browser",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "callId": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+                        "mediaTicket": { "type": "string" },
+                        "expiresAt": { "type": "string", "format": "date-time" },
+                        "wsPath": { "type": "string" }
+                      },
+                      "required": ["callId", "mediaTicket", "expiresAt", "wsPath"]
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calls/{id}/decline": {
+      "post": {
+        "tags": ["Calls"],
+        "summary": "Decline a ringing incoming phone call for yourself (calls.answer; Phase 20)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": { "declined": { "type": "boolean" } },
+                      "required": ["declined"]
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calls/{id}/callback-done": {
+      "post": {
+        "tags": ["Calls"],
+        "summary": "Take a missed incoming call off the callback list (calls.trigger; Phase 20) — 409 when the call was not missed",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
             "description": "OK",
             "content": {
               "application/json": {
@@ -21837,6 +22306,11 @@
                     "type": ["string", "null"],
                     "maxLength": 40,
                     "default": null
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "enum": ["outbound", "inbound", "both"],
+                    "default": "outbound"
                   }
                 },
                 "required": ["number", "kind"],
@@ -21885,7 +22359,7 @@
     "/api/v1/admin/phone-numbers/{id}": {
       "patch": {
         "tags": ["Phone numbers"],
-        "summary": "Change label, kind, DLT id or status (superadmin)",
+        "summary": "Change label, kind, purpose, DLT id or status (superadmin)",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           {
@@ -21904,7 +22378,8 @@
                   "kind": { "type": "string", "enum": ["1600", "landline", "mobile", "other"] },
                   "label": { "type": "string", "maxLength": 60 },
                   "dltPrincipalEntityId": { "type": ["string", "null"], "maxLength": 40 },
-                  "status": { "type": "string", "enum": ["active", "disabled"] }
+                  "status": { "type": "string", "enum": ["active", "disabled"] },
+                  "purpose": { "type": "string", "enum": ["outbound", "inbound", "both"] }
                 },
                 "additionalProperties": false
               }
@@ -22047,6 +22522,94 @@
           },
           "404": {
             "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/phone-numbers/inbound": {
+      "get": {
+        "tags": ["Phone numbers"],
+        "summary": "This account's numbers that take incoming calls, their settings and readiness (account.read; Phase 20)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/InboundNumber" }
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/phone-numbers/{id}/inbound": {
+      "patch": {
+        "tags": ["Phone numbers"],
+        "summary": "Who answers calls to this number: route, flow / agent, greeting, ring list, call hours, after hours (account.update; Phase 20) — 422 INBOUND_PROGRAM_REQUIRED / INBOUND_PROGRAM_NOT_READY",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$" },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/InboundSettingsBody" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": { "$ref": "#/components/schemas/InboundNumber" }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "422": {
+            "description": "Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID)",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
             }
@@ -29148,7 +29711,7 @@
         "operationId": "getPhoneLine",
         "tags": ["Public API", "Account resources"],
         "summary": "Phone line, caller numbers and recorded voice",
-        "description": "Which line phone calls use (`sip` = real phones, `dryrun` = the simulated test line), the caller numbers (`phoneLine.callerNumberId` in campaigns) and whether recorded-voice / IVR campaigns (`line: voice_api`) are on for the account.",
+        "description": "Which line phone calls use (`sip` = real phones, `dryrun` = the simulated test line), the caller numbers (`phoneLine.callerNumberId` in campaigns), whether recorded-voice / IVR campaigns (`line: voice_api`) are on for the account, and the numbers customers can call in (`inboundNumbers`: on / off and who answers — flows, AI agents or the team).",
         "security": [{ "bearerAuth": [] }, { "apiKeyAuth": [] }],
         "x-scope": "resources:read",
         "responses": {
@@ -29168,7 +29731,16 @@
                         "label": "Main"
                       }
                     ],
-                    "voiceApi": { "enabled": true }
+                    "voiceApi": { "enabled": true },
+                    "inboundNumbers": [
+                      {
+                        "id": "6720f0a1b2c3d4e5f6a7b8c9",
+                        "number": "+911600000001",
+                        "label": "Support line",
+                        "enabled": true,
+                        "route": "ai"
+                      }
+                    ]
                   }
                 },
                 "schema": {
@@ -35676,6 +36248,7 @@
                         "call.started",
                         "call.completed",
                         "call.insights.ready",
+                        "call.missed",
                         "campaign.completed",
                         "whatsapp.message.received",
                         "whatsapp.message.status",
@@ -35808,6 +36381,7 @@
                         "call.started",
                         "call.completed",
                         "call.insights.ready",
+                        "call.missed",
                         "campaign.completed",
                         "whatsapp.message.received",
                         "whatsapp.message.status",
@@ -35923,6 +36497,7 @@
                       "call.started",
                       "call.completed",
                       "call.insights.ready",
+                      "call.missed",
                       "campaign.completed",
                       "whatsapp.message.received",
                       "whatsapp.message.status",
@@ -36093,6 +36668,7 @@
                 "call.started",
                 "call.completed",
                 "call.insights.ready",
+                "call.missed",
                 "campaign.completed",
                 "whatsapp.message.received",
                 "whatsapp.message.status",

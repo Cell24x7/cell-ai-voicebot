@@ -53,6 +53,8 @@ test('contact → normal SIP → flow / agent / self → browser microphone, hol
     agentUserId: null,
     whatsapp: null,
     callerId: null,
+    inbound: null,
+    missed: null,
     sip: null,
     isTest: false,
     charged: true,

@@ -26,7 +26,8 @@ import { newActiveCall, useLiveCallStore, type ActiveWaCall } from './store';
  * WhatsApp leg). AI calls have no media here — the bar follows their status.
  */
 export interface LiveCallDeps {
-  phoneApi?: Pick<typeof callsApi, 'start' | 'mediaTicket' | 'hold'>;
+  phoneApi?: Pick<typeof callsApi, 'start' | 'mediaTicket' | 'hold'> &
+    Partial<Pick<typeof callsApi, 'answer' | 'decline'>>;
   requestMic: () => Promise<MediaStream>;
   createEngine: (stream: MediaStream) => Promise<AudioEngine>;
   socketFactory?: MediaWebSocketFactory;
@@ -303,14 +304,18 @@ export const answerCall = async (input: {
   label: string;
   conversationId: string | null;
   recording: boolean;
+  /** Phase 20: a phone call to one of the account's numbers (default WhatsApp). */
+  transport?: 'whatsapp' | 'sip';
 }): Promise<boolean> => {
   if (isBusy()) return false;
   const generation = ++attempt;
   release();
+  const sip = input.transport === 'sip';
   store().setActive({
     ...newActiveCall({
       mode: 'human',
       direction: 'inbound',
+      transport: sip ? 'sip' : 'whatsapp',
       label: input.label,
       conversationId: input.conversationId,
       callId: input.callId,
@@ -320,7 +325,9 @@ export const answerCall = async (input: {
   const stream = await micStream(generation);
   if (!stream) return false;
   try {
-    const ticket = await deps.api.answer(input.callId);
+    const phone = deps.phoneApi ?? callsApi;
+    const ticket =
+      sip && phone.answer ? await phone.answer(input.callId) : await deps.api.answer(input.callId);
     if (generation !== attempt) {
       for (const track of stream.getTracks()) track.stop();
       await deps.api.hangup(input.callId).catch(() => undefined);
@@ -359,8 +366,14 @@ export const reconnectCall = async (): Promise<void> => {
   }
 };
 
-export const declineCall = async (callId: string): Promise<void> => {
-  await deps.api.decline(callId).catch(() => undefined);
+export const declineCall = async (
+  callId: string,
+  transport: 'whatsapp' | 'sip' = 'whatsapp',
+): Promise<void> => {
+  const phone = deps.phoneApi ?? callsApi;
+  await (
+    transport === 'sip' && phone.decline ? phone.decline(callId) : deps.api.decline(callId)
+  ).catch(() => undefined);
 };
 
 /** Supervisors: take an AI call over (ring yourself on the same call, then answer). */

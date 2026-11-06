@@ -625,6 +625,53 @@ describe('incoming calls', () => {
     expect(api.decline).toHaveBeenCalledTimes(1);
   });
 
+  it('Phase 20: a phone call to the number rings; Accept answers on the phone line', async () => {
+    const phone = {
+      start: vi.fn(),
+      mediaTicket: vi.fn(),
+      hold: vi.fn(),
+      answer: vi.fn(() => Promise.resolve({ ...TICKET, callId: 'pc1' })),
+      decline: vi.fn(() => Promise.resolve({ declined: true })),
+    };
+    make({ phoneApi: phone as unknown as LiveCallDeps['phoneApi'] });
+    const rt = show();
+    const ring = {
+      callId: 'pc1',
+      kind: 'sip',
+      contactId: 'k1',
+      contactName: 'Asha Verma',
+      from: '+919000000001',
+      did: '+911600000001',
+      numberLabel: 'Support line',
+      transfer: false,
+      ringUntil: '2026-11-06T10:00:30.000Z',
+    };
+    rt.emit('call.incoming', ring);
+    const popup = await screen.findByRole('alertdialog', { name: 'Incoming phone call' });
+    expect(within(popup).getByText('Asha Verma')).toBeInTheDocument();
+    expect(within(popup).getByText(/to Support line/)).toBeInTheDocument();
+    await userEvent.click(within(popup).getByRole('button', { name: 'Accept' }));
+    await waitFor(() => expect(phone.answer).toHaveBeenCalledWith('pc1'));
+    expect(api.answer).not.toHaveBeenCalled();
+    await waitFor(() => expect(FakeMediaWs.instances).toHaveLength(1));
+    expect(active()).toMatchObject({ transport: 'sip', direction: 'inbound', callId: 'pc1' });
+    // someone else's answer / a stopped ring on another call
+    act(() => {
+      clearCall();
+      useLiveCallStore.setState({ incoming: [] });
+    });
+    rt.emit('call.incoming', { ...ring, callId: 'pc2', contactName: null, from: null });
+    const second = await screen.findByRole('alertdialog', { name: 'Incoming phone call' });
+    expect(within(second).getByText('Hidden number')).toBeInTheDocument();
+    rt.emit('call.ring_ended', { callId: 'pc2', reason: 'answered', answeredBy: 'u2' });
+    expect(await within(second).findByText(/^Taken by/)).toBeInTheDocument();
+    act(() => useLiveCallStore.getState().dismiss('pc2'));
+    rt.emit('call.incoming', { ...ring, callId: 'pc3' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Decline' }));
+    await waitFor(() => expect(phone.decline).toHaveBeenCalledWith('pc3'));
+    expect(api.decline).not.toHaveBeenCalled();
+  });
+
   it('viewers never see incoming calls; the ring sound can be turned off', () => {
     signInAs('viewer');
     const rt = show();
