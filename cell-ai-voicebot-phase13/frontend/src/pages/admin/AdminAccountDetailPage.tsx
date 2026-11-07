@@ -41,6 +41,9 @@ const VoiceApiCard = lazy(async () => ({
 const PhoneLineCard = lazy(async () => ({
   default: (await import('@/features/admin/PhoneLineCard')).PhoneLineCard,
 }));
+const SipTrunkCard = lazy(async () => ({
+  default: (await import('@/features/admin/SipTrunkCard')).SipTrunkCard,
+}));
 const LimitsCard = lazy(async () => ({
   default: (await import('@/features/admin/LimitsCard')).LimitsCard,
 }));
@@ -142,6 +145,7 @@ function Overview({ detail }: { detail: AdminAccountDetail }) {
           key={`${detail.voiceLine}:${JSON.stringify(detail.sipSettings)}`}
           detail={detail}
         />
+        <SipTrunkCard accountId={detail.account.id} />
         <VoiceApiCard key={JSON.stringify(detail.voiceApi)} detail={detail} />
       </Suspense>
       <Suspense fallback={<Skeleton variant="rounded" height={160} />}>

@@ -51,6 +51,27 @@ import { formatInAccountTz } from '@/utils/datetime';
 import { formatCurrencyMicros, formatDateOnly, formatNumber } from '@/utils/format';
 import { formatPhone } from '@/utils/phone';
 
+/** The language the customer spoke (ISO code from speech recognition) as a name. */
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  hi: 'Hindi / Hinglish',
+  hinglish: 'Hinglish',
+  mr: 'Marathi',
+  gu: 'Gujarati',
+  bn: 'Bengali',
+  pa: 'Punjabi',
+  ta: 'Tamil',
+  te: 'Telugu',
+  kn: 'Kannada',
+  ml: 'Malayalam',
+  or: 'Odia',
+  ur: 'Urdu',
+};
+const languageName = (code: string): string => {
+  const c = code.toLowerCase();
+  return LANGUAGE_NAMES[c] ?? LANGUAGE_NAMES[c.slice(0, 2)] ?? code;
+};
+
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between' }}>
@@ -306,13 +327,7 @@ export function CallDetailPage() {
                 )}
                 <Row
                   label="Language"
-                  value={
-                    c.languageDetected === 'en'
-                      ? 'English'
-                      : c.languageDetected
-                        ? 'Hindi / Hinglish'
-                        : '—'
-                  }
+                  value={c.languageDetected ? languageName(c.languageDetected) : '—'}
                 />
                 {c.error && <Row label="Error" value={c.error.code.replace(/_/g, ' ')} />}
               </Stack>

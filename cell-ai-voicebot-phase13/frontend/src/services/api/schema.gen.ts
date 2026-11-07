@@ -26955,6 +26955,176 @@ export interface paths {
     };
     trace?: never;
   };
+  '/api/v1/admin/accounts/{id}/sip-trunk': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The account's own SIP trunk and whether it is reachable (superadmin) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['SipTrunk'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    /** Save the account's own SIP trunk and connect it — no env change; puts the account on the phone line and gives it the caller ID (superadmin) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['SipTrunkBody'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['SipTrunk'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    post?: never;
+    /** Remove the account's own SIP trunk (calls use the server trunk again; superadmin) */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['SipTrunk'];
+            };
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/whatsapp-campaigns': {
     parameters: {
       query?: never;
@@ -34199,7 +34369,8 @@ export interface components {
         | 'call.callback_done'
         | 'phone_number.inbound_updated'
         | 'voice_api.credentials_changed'
-        | 'voice_api.account_webhook_registered';
+        | 'voice_api.account_webhook_registered'
+        | 'account.sip_trunk_changed';
       actor: {
         /** @enum {string} */
         type: 'user' | 'api_key' | 'system';
@@ -37910,6 +38081,25 @@ export interface components {
         availableMicros: number;
       }[];
     };
+    SipTrunk: {
+      configured: boolean;
+      trunk: {
+        host: string;
+        port: number;
+        /** @enum {string} */
+        transport: 'udp' | 'tcp';
+        /** @enum {string} */
+        auth: 'ip' | 'register';
+        username: string | null;
+        passwordSet: boolean;
+        trunkIps: string[];
+        callerId: string;
+        codecs: ('ulaw' | 'alaw')[];
+        updatedAt: string;
+      } | null;
+      state: string | null;
+      lineConnected: boolean;
+    };
     WhatsAppCampaign: {
       id: string;
       name: string;
@@ -38732,6 +38922,30 @@ export interface components {
           ttlMinutes?: number;
           payload?: string | null;
         };
+    SipTrunkBody: {
+      host: string;
+      /** @default 5060 */
+      port: number;
+      /**
+       * @default udp
+       * @enum {string}
+       */
+      transport: 'udp' | 'tcp';
+      /** @enum {string} */
+      auth: 'ip' | 'register';
+      username?: string | null;
+      password?: string;
+      /** @default [] */
+      trunkIps: string[];
+      callerId: string;
+      /**
+       * @default [
+       *       "ulaw",
+       *       "alaw"
+       *     ]
+       */
+      codecs: ('ulaw' | 'alaw')[];
+    };
     WhatsAppTemplateListItem: {
       id: string;
       name: string;

@@ -74,7 +74,7 @@ export function VoiceTab({ form, catalog, readOnly }: EditorTabProps) {
                   <FormControlLabel
                     value="auto"
                     control={<Radio />}
-                    label="Follow the customer (Hindi, English or Hinglish)"
+                    label="Follow the customer — replies in whatever language they speak (Hindi, English, Hinglish, Marathi, Gujarati, Tamil, Telugu, Bengali…)"
                   />
                   <FormControlLabel value="fixed" control={<Radio />} label="Always one language" />
                 </RadioGroup>
