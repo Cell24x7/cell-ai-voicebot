@@ -11,6 +11,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Cell24x7 API key in the SIP trunk card** — a third option: paste the Cell24x7 API key, Save and connect turns recorded voice on, saves the key (checked) and registers the webhook. Clearly marked: recorded voice / IVR only, no AI conversation.
 - **SIP trunk per account** — Admin → account → **SIP trunk (normal calls)**: enter the carrier's host, port, username + password (or IP) and caller ID, **Save and connect**; the chip shows when Asterisk reaches the carrier. No server change per account.
 - **AI follows any language** — agents set to "Follow the customer" reply in whatever language the customer speaks; call detail names the language heard (Marathi, Tamil, …).
 

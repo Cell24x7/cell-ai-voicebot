@@ -145,7 +145,7 @@ function Overview({ detail }: { detail: AdminAccountDetail }) {
           key={`${detail.voiceLine}:${JSON.stringify(detail.sipSettings)}`}
           detail={detail}
         />
-        <SipTrunkCard accountId={detail.account.id} />
+        <SipTrunkCard accountId={detail.account.id} voiceApi={detail.voiceApi} />
         <VoiceApiCard key={JSON.stringify(detail.voiceApi)} detail={detail} />
       </Suspense>
       <Suspense fallback={<Skeleton variant="rounded" height={160} />}>

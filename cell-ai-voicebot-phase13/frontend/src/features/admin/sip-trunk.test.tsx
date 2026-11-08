@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as SipTrunksModule from '@/services/api/sip-trunks';
 import { sipTrunksApi, type SipTrunkView } from '@/services/api/sip-trunks';
+import type * as VoiceApiModule from '@/services/api/voice-api';
+import { voiceAdminApi } from '@/services/api/voice-api';
 import { signInAs } from '@/test/auth';
 import { renderWithProviders } from '@/test/render';
 
@@ -15,6 +17,11 @@ vi.mock('@/services/api/sip-trunks', async (importOriginal) => ({
   ...(await importOriginal<typeof SipTrunksModule>()),
   sipTrunksApi: { get: vi.fn(), save: vi.fn(), remove: vi.fn() },
 }));
+vi.mock('@/services/api/voice-api', async (importOriginal) => ({
+  ...(await importOriginal<typeof VoiceApiModule>()),
+  voiceAdminApi: { setAccount: vi.fn(), setCredentials: vi.fn(), registerAccountWebhook: vi.fn() },
+}));
+const voice = vi.mocked(voiceAdminApi);
 const api = vi.mocked(sipTrunksApi);
 const empty: SipTrunkView = { configured: false, trunk: null, state: null, lineConnected: true };
 
@@ -84,4 +91,34 @@ describe('SIP trunk card', () => {
     await userEvent.click(within(card).getByRole('button', { name: 'Remove trunk' }));
     await waitFor(() => expect(api.remove).toHaveBeenCalledWith('acc1'));
   });
+
+  it('Cell24x7 API key: paste the key → recorded voice on, key saved, webhook registered', async () => {
+    const creds = {
+      mode: 'own' as const,
+      tokenHint: '9876',
+      callerId: null,
+      verifiedAt: '2026-11-08T06:00:00Z',
+      webhookRegisteredAt: null,
+    };
+    voice.setAccount.mockResolvedValue({ enabled: true, ivrIds: [], ivrEstimateSec: 60 });
+    voice.setCredentials.mockResolvedValue(creds);
+    voice.registerAccountWebhook.mockResolvedValue({
+      ...creds,
+      webhookRegisteredAt: '2026-11-08T06:00:01Z',
+    });
+    show();
+    const card = await screen.findByRole('region', { name: 'SIP trunk' });
+    await userEvent.click(await within(card).findByDisplayValue('apikey'));
+    expect(within(card).getByText(/the AI cannot talk on these calls/)).toBeInTheDocument();
+    expect(within(card).queryByLabelText('SIP server (host)')).not.toBeInTheDocument();
+    await userEvent.type(within(card).getByLabelText('Cell24x7 API key'), 'cell-key-9876');
+    await userEvent.click(within(card).getByRole('button', { name: 'Save and connect' }));
+    await waitFor(() => expect(voice.registerAccountWebhook).toHaveBeenCalledWith('acc1'));
+    expect(voice.setAccount).toHaveBeenCalledWith('acc1', { enabled: true });
+    expect(voice.setCredentials).toHaveBeenCalledWith('acc1', {
+      mode: 'own',
+      token: 'cell-key-9876',
+      callerId: null,
+    });
+  }, 60_000);
 });
