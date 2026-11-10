@@ -54,13 +54,13 @@ function ApiKeyForm({
   const callerBad = callerId.trim() !== '' && !/^\d{10}$/.test(callerId.trim());
   const connect = useMutation({
     mutationFn: async () => {
-      await voiceAdminApi.setAccount(accountId, { enabled: true });
       const creds = await voiceAdminApi.setCredentials(accountId, {
         mode: 'own',
         ...(key.trim() ? { token: key.trim() } : {}),
         callerId: callerId.trim() || null,
       });
-      return creds.webhookRegisteredAt ? creds : voiceAdminApi.registerAccountWebhook(accountId);
+      if (!creds.webhookRegisteredAt) await voiceAdminApi.registerAccountWebhook(accountId);
+      return voiceAdminApi.setAccount(accountId, { enabled: true });
     },
     meta: { silent: true },
     onSuccess: () => {

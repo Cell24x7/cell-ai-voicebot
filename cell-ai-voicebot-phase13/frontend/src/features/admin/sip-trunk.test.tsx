@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ApiError } from '@/services/api/errors';
 import type * as SipTrunksModule from '@/services/api/sip-trunks';
 import { sipTrunksApi, type SipTrunkView } from '@/services/api/sip-trunks';
 import type * as VoiceApiModule from '@/services/api/voice-api';
@@ -120,5 +121,31 @@ describe('SIP trunk card', () => {
       token: 'cell-key-9876',
       callerId: null,
     });
+    expect(voice.setCredentials.mock.invocationCallOrder[0]).toBeLessThan(
+      voice.registerAccountWebhook.mock.invocationCallOrder[0] as number,
+    );
+    expect(voice.registerAccountWebhook.mock.invocationCallOrder[0]).toBeLessThan(
+      voice.setAccount.mock.invocationCallOrder[0] as number,
+    );
   }, 60_000);
+
+  it('a refused API key leaves recorded voice off and does not register a webhook', async () => {
+    voice.setCredentials.mockRejectedValue(
+      new ApiError({
+        kind: 'http',
+        status: 401,
+        code: 'VOICE_API_AUTH',
+        message: 'Cell24x7 refused this key',
+      }),
+    );
+    show();
+    const card = await screen.findByRole('region', { name: 'SIP trunk' });
+    await userEvent.click(await within(card).findByDisplayValue('apikey'));
+    await userEvent.type(within(card).getByLabelText('Cell24x7 API key'), 'rejected-key');
+    await userEvent.click(within(card).getByRole('button', { name: 'Save and connect' }));
+    expect(await within(card).findByText('Cell24x7 refused this key')).toBeInTheDocument();
+    await waitFor(() => expect(voice.setCredentials).toHaveBeenCalled());
+    expect(voice.setAccount).not.toHaveBeenCalled();
+    expect(voice.registerAccountWebhook).not.toHaveBeenCalled();
+  });
 });

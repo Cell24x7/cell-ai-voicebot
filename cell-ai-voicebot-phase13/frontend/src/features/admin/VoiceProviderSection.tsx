@@ -56,6 +56,7 @@ export function VoiceProviderSection() {
   if (status.isPending) return null;
   if (status.error) return <Alert severity="error">{getErrorMessage(status.error)}</Alert>;
   if (!s || s.provider === 'off') return null;
+  const platformLogin = s.tokenConfigured || s.provider === 'fake';
   return (
     <Card variant="outlined" component="section" aria-label="Recorded voice provider">
       <CardContent>
@@ -68,16 +69,24 @@ export function VoiceProviderSection() {
             {s.provider === 'cell24x7' && (
               <Chip
                 size="small"
-                color={s.tokenConfigured ? 'success' : 'error'}
-                label={s.tokenConfigured ? 'Token set' : 'No token'}
+                color={s.tokenConfigured ? 'success' : 'default'}
+                label={s.tokenConfigured ? 'Platform token set' : 'Account API keys'}
               />
             )}
-            <Chip
-              size="small"
-              color={s.webhook.matches ? 'success' : 'warning'}
-              label={s.webhook.matches ? 'Webhook registered' : 'Webhook not registered'}
-            />
+            {platformLogin && (
+              <Chip
+                size="small"
+                color={s.webhook.matches ? 'success' : 'warning'}
+                label={s.webhook.matches ? 'Webhook registered' : 'Webhook not registered'}
+              />
+            )}
           </Stack>
+          {!platformLogin && (
+            <Alert severity="info">
+              Connect each account’s Cell24x7 API key in Admin → Accounts → SIP trunk. Saving
+              registers its webhook automatically; no server setup is needed.
+            </Alert>
+          )}
           <Typography variant="body2" color="text.secondary">
             Last result:{' '}
             {s.lastWebhookAt ? new Date(s.lastWebhookAt).toLocaleString('en-IN') : 'none yet'}
@@ -89,11 +98,13 @@ export function VoiceProviderSection() {
             <Alert severity="warning">Webhook check failed: {s.webhook.error}</Alert>
           )}
           {register.error && <Alert severity="error">{getErrorMessage(register.error)}</Alert>}
-          <div>
-            <Button disabled={register.isPending} onClick={() => register.mutate()}>
-              {s.webhook.matches ? 'Register webhook again' : 'Register webhook'}
-            </Button>
-          </div>
+          {platformLogin && (
+            <div>
+              <Button disabled={register.isPending} onClick={() => register.mutate()}>
+                {s.webhook.matches ? 'Register webhook again' : 'Register webhook'}
+              </Button>
+            </div>
+          )}
           {s.uncertainBatches.map((b) => (
             <Alert
               key={`${b.campaignId}-${String(b.batchNo)}`}
