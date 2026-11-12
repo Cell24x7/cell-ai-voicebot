@@ -107,6 +107,12 @@ const TYPE_ICONS: Partial<
     color: 'warning',
     label: 'Template quality low',
   },
+  // PN: the partner (Pinnacle) wallet is empty — managed numbers fail (superadmins)
+  'whatsapp.provider_balance_low': {
+    icon: AccountBalanceWalletOutlined,
+    color: 'warning',
+    label: 'Partner WhatsApp balance low',
+  },
   'wallet.whatsapp_late_charge': {
     icon: AccountBalanceWalletOutlined,
     color: 'warning',

@@ -69,6 +69,8 @@ export const UNAVAILABLE_TEXT: Record<
     'WhatsApp needs a messaging limit of at least 2,000 conversations a day for calling.',
   not_cloud_api: 'Calling works on Cloud API numbers only.',
   country: "WhatsApp doesn't offer calling for this number's country yet.",
+  // PN: a managed number whose partner can't do calling
+  provider_unsupported: "WhatsApp calling isn't available on this number yet.",
 };
 
 export const unavailableText = (reason: string | null | undefined): string =>

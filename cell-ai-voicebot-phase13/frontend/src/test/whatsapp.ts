@@ -1,4 +1,5 @@
 import type {
+  AdminWhatsAppChannelRow,
   WhatsAppAdminStatus,
   WhatsAppChannel,
   WhatsAppChannelDetail,
@@ -10,6 +11,7 @@ export const fakeChannel = (overrides: Partial<WhatsAppChannel> = {}): WhatsAppC
   id: 'wa1',
   label: 'Support line',
   provider: 'fake',
+  managed: false,
   mode: 'cloud_api',
   status: 'connected',
   statusReason: null,
@@ -95,7 +97,34 @@ export const fakeAdminWhatsAppStatus = (
   deauthorizeUrl: 'http://localhost:5100/api/v1/meta/deauthorize',
   dataDeletionUrl: 'http://localhost:5100/api/v1/meta/data-deletion',
   lastEventAt: '2026-10-22T09:00:00.000Z',
+  pinnacle: {
+    enabled: false,
+    baseUrl: 'https://partnersv1.pinbot.ai',
+    voiceBaseUrl: 'https://partnersv1.pinbot.ai',
+  },
   channelsByStatus: { connected: 2, needs_reconnect: 1 },
   eventsByStatus24h: { processed: 4, deferred: 10, failed: 1 },
+  ...overrides,
+});
+
+/** PN: a superadmin account-detail WhatsApp row (managed / Meta). */
+export const fakeAdminWhatsAppRow = (
+  overrides: Partial<AdminWhatsAppChannelRow> = {},
+): AdminWhatsAppChannelRow => ({
+  id: 'wa1',
+  label: 'Support line',
+  status: 'connected',
+  mode: 'cloud_api',
+  displayPhoneNumber: '+91 90000 12345',
+  verifiedName: 'Test Business',
+  qualityRating: 'GREEN',
+  messagingLimitTier: 'TIER_1K',
+  metaPayer: 'platform',
+  creditLineStatus: 'attached',
+  connectedAt: '2026-10-22T08:00:00.000Z',
+  provider: 'fake',
+  managed: false,
+  pinnacle: null,
+  statusReasonCode: null,
   ...overrides,
 });

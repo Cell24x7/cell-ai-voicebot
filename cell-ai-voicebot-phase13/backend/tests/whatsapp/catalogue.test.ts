@@ -75,6 +75,11 @@ describe('Phase 9 catalogue', () => {
       'whatsapp.event_replayed',
       'meta.deauthorized',
       'meta.data_deletion_requested',
+      // PN: managed numbers over the Pinnacle partner API
+      'whatsapp.managed_number_added',
+      'whatsapp.managed_key_replaced',
+      'whatsapp.managed_webhook_reset',
+      'whatsapp.credit_line_updated',
     ]);
   });
 
@@ -89,6 +94,8 @@ describe('Phase 9 catalogue', () => {
       'whatsapp.name_approved',
       'whatsapp.name_rejected',
       'whatsapp.channel_disconnected_by_admin',
+      // PN: the partner wallet is empty (superadmins)
+      'whatsapp.provider_balance_low',
     ]);
     expect(WS_EVENT_TYPES).toContain('whatsapp.channel.updated');
     expect(QUEUES.whatsapp).toBe('whatsapp');

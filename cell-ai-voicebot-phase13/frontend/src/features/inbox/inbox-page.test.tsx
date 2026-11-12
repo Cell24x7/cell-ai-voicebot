@@ -606,7 +606,8 @@ describe('chat', () => {
     api.messages.mockResolvedValue(msgs([fakeOutgoing('failed', { id: 'f1', at: iso(-60_000) })]));
     api.retry.mockRejectedValueOnce(http(409, 'WHATSAPP_WINDOW_CLOSED'));
     open();
-    await userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+    const log = await screen.findByRole('log', { name: 'Messages' });
+    await userEvent.click(await within(log).findByRole('button', { name: 'Retry' }));
     expect(
       await screen.findByText(/You can reply when the customer writes again/),
     ).toBeInTheDocument();

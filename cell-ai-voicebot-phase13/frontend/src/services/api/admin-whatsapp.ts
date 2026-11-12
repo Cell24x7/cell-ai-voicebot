@@ -8,6 +8,17 @@ import type {
   WhatsAppMetaPayer,
 } from './types';
 
+/** PN: a number onboarded at the partner (Pinnacle) — what the partner panel shows. */
+export interface ManagedNumberInput {
+  label: string;
+  wabaId: string;
+  phoneNumberId: string;
+  apiKey: string;
+  creditLine: ManagedCreditLine;
+}
+
+export type ManagedCreditLine = 'partner_pending' | 'partner_active';
+
 export interface ManualConnectInput {
   wabaId: string;
   phoneNumberId: string;
@@ -49,6 +60,34 @@ export const adminWhatsappApi = {
       apiClient.post<SuccessEnvelope<WhatsAppConnectResult>>(
         `/admin/accounts/${accountId}/whatsapp/manual-connect`,
         body,
+      ),
+    ),
+  // PN: managed numbers over the Pinnacle partner API
+  addManagedNumber: (accountId: string, body: ManagedNumberInput) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<WhatsAppConnectResult>>(
+        `/admin/accounts/${accountId}/whatsapp/managed-numbers`,
+        body,
+      ),
+    ),
+  replaceManagedKey: (channelId: string, apiKey: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<WhatsAppChannel>>(
+        `/admin/whatsapp/channels/${channelId}/managed/api-key`,
+        { apiKey },
+      ),
+    ),
+  resetManagedWebhook: (channelId: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<WhatsAppChannel>>(
+        `/admin/whatsapp/channels/${channelId}/managed/webhook`,
+      ),
+    ),
+  setManagedCreditLine: (channelId: string, status: ManagedCreditLine) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<WhatsAppChannel>>(
+        `/admin/whatsapp/channels/${channelId}/managed/credit-line`,
+        { status },
       ),
     ),
 };

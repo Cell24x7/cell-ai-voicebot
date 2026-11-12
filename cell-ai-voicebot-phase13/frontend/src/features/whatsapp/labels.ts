@@ -120,7 +120,48 @@ export const whatsappErrorMessage = (err: ApiError): string => {
       return 'Please wait a minute before trying again.';
     case 'AUTH_IMPERSONATION_BLOCKED':
       return "You can't change WhatsApp numbers while viewing as a user.";
+    // PN: managed numbers (Pinnacle partner API)
+    case 'PINNACLE_KEY_INVALID':
+      return 'The API key was rejected by the partner.';
+    case 'PINNACLE_NUMBER_NOT_ON_KEY':
+      return "This API key doesn't include that phone number ID / WABA ID.";
+    case 'PINNACLE_WEBHOOK_NOT_SET':
+      return "The partner didn't accept our webhook — try again or contact the partner.";
+    case 'WA_PROVIDER_NOT_CONFIGURED':
+      return 'Managed numbers are turned off on this server.';
+    case 'WA_PROVIDER_BALANCE_LOW':
+      return 'The WhatsApp partner balance is low — contact support.';
+    case 'WA_PROVIDER_UNSUPPORTED':
+      return "This isn't available for managed numbers.";
+    case 'WA_PROVIDER_ERROR': {
+      const partner = err.details[0]?.message;
+      return partner
+        ? `The WhatsApp partner refused: ${partner}`
+        : 'The WhatsApp partner refused the request.';
+    }
     default:
       return err.message;
   }
+};
+
+/** PN: what the owner sees for a managed number's partner-side problems (not the server text). */
+export const MANAGED_REASON_TEXT: Record<string, string> = {
+  partner_credit_line_pending:
+    "Billing for this number is being activated. We'll let you know when it's ready.",
+  provider_key_invalid: 'This number needs attention from support.',
+  provider_number_missing: 'This number needs attention from support.',
+  provider_webhook_mismatch: 'This number needs attention from support.',
+  register_at_partner: 'This number is being registered. It will be ready soon.',
+};
+
+/** The reason line of a number (managed numbers: our owner-facing text). */
+export const channelReasonText = (channel: {
+  managed?: boolean;
+  statusReason: { code: string; message: string } | null;
+}): string | null => {
+  if (!channel.statusReason) return null;
+  return (
+    (channel.managed ? MANAGED_REASON_TEXT[channel.statusReason.code] : undefined) ??
+    channel.statusReason.message
+  );
 };

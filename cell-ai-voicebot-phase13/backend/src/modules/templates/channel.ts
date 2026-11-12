@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 
-import { isMetaApiError, mapTemplateError } from '../../core/meta';
+import { isMetaApiError, mapTemplateError, type MetaClient } from '../../core/meta';
 import {
   WhatsAppChannelModel,
   type WaChannelStatus,
@@ -9,8 +9,9 @@ import {
 import { AppError, NotFoundError, ValidationError } from '../../shared/errors/app-error';
 import { getLogger } from '../../shared/logger';
 import { markNeedsReconnect, TOKEN_INVALID_REASON } from '../whatsapp/channel-status';
-import { openSecret } from '../whatsapp/context';
+import { clientFor, openSecret } from '../whatsapp/context';
 import { metaApiError, notReady } from '../whatsapp/errors';
+import { noteProviderError } from '../whatsapp/provider-alerts';
 
 import type { TemplateContext } from './context';
 
@@ -37,14 +38,19 @@ export const loadAccountChannel = async (
 export const templateToken = async (
   tx: Pick<TemplateContext, 'wa'>,
   channelId: Types.ObjectId,
-): Promise<{ channel: WhatsAppChannelDoc; token: string }> => {
+): Promise<{ channel: WhatsAppChannelDoc; token: string; api: MetaClient }> => {
   const channel = await WhatsAppChannelModel.findById(channelId)
     .select('+tokenSealed')
     .lean<WhatsAppChannelDoc>();
   if (!channel) throw new NotFoundError('WhatsApp number not found');
   if (!MANAGING.has(channel.status) || !channel.tokenSealed) throw notReady();
   try {
-    return { channel, token: openSecret(tx.wa, channel.tokenSealed) };
+    // PN: Meta, or the Pinnacle partner API for a managed number
+    return {
+      channel,
+      token: openSecret(tx.wa, channel.tokenSealed),
+      api: clientFor(tx.wa, channel),
+    };
   } catch {
     getLogger().error(
       { channelId: channel._id.toString() },
@@ -80,6 +86,8 @@ export const templateMetaError = async (
   err: unknown,
 ): Promise<unknown> => {
   if (!isMetaApiError(err)) return err;
+  // PN (D13): the partner wallet is empty (managed numbers)
+  await noteProviderError(tx.wa, channel._id, err);
   if (err.tokenInvalid) {
     await markNeedsReconnect(tx.wa, channel, TOKEN_INVALID_REASON);
     return notReady('The WhatsApp connection expired — reconnect the number.');

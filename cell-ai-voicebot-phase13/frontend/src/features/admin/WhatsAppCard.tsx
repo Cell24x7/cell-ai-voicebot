@@ -10,18 +10,25 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { enqueueSnackbar } from 'notistack';
 import { useState } from 'react';
 
+import { useConfirm } from '@/components/confirm-context';
 import { DataTable } from '@/components/DataTable';
+import { RelativeTime } from '@/components/RelativeTime';
+import { whatsappKeys } from '@/features/whatsapp/keys';
 import {
   CHANNEL_STATUS_LABELS,
   channelStatusColor,
   QUALITY_LABELS,
   whatsappErrorMessage,
 } from '@/features/whatsapp/labels';
-import { adminWhatsappApi, type ManualConnectInput } from '@/services/api/admin-whatsapp';
+import {
+  adminWhatsappApi,
+  type ManagedCreditLine,
+  type ManualConnectInput,
+} from '@/services/api/admin-whatsapp';
 import { toApiError } from '@/services/api/errors';
 import type {
   AdminAccountDetail,
@@ -31,6 +38,143 @@ import type {
 } from '@/services/api/types';
 
 import { adminKeys } from './keys';
+import { ManagedNumberDialog } from './ManagedNumberDialog';
+import { MANAGED_TEXTS } from './whatsapp-texts';
+
+const DAY_MS = 86_400_000;
+
+/** PN: replace the partner API key of a managed number. */
+function ReplaceKeyDialog({
+  row,
+  onClose,
+  onDone,
+}: {
+  row: AdminWhatsAppChannelRow;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [apiKey, setApiKey] = useState('');
+  const replace = useMutation({
+    mutationFn: () => adminWhatsappApi.replaceManagedKey(row.id, apiKey),
+    meta: { silent: true },
+    onSuccess: () => {
+      setApiKey('');
+      enqueueSnackbar('API key replaced', { variant: 'success' });
+      onDone();
+    },
+  });
+  const ready = apiKey.length >= 8 && !/\s/.test(apiKey);
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs" aria-labelledby="wa-key-title">
+      <DialogTitle id="wa-key-title">Replace API key — {row.label}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {replace.error && (
+            <Alert severity="error">{whatsappErrorMessage(toApiError(replace.error))}</Alert>
+          )}
+          <TextField
+            label="New API key"
+            type="password"
+            autoComplete="off"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value.trim())}
+            helperText="From the partner panel: Admin → Manage API Keys."
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          disabled={!ready || replace.isPending}
+          onClick={() => replace.mutate()}
+        >
+          Replace key
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** PN: partner details and actions of a managed number (superadmin). */
+function ManagedDetails({
+  row,
+  onReplaceKey,
+  onChanged,
+}: {
+  row: AdminWhatsAppChannelRow;
+  onReplaceKey: () => void;
+  onChanged: () => void;
+}) {
+  const confirm = useConfirm();
+  const fail = (err: unknown) =>
+    enqueueSnackbar(whatsappErrorMessage(toApiError(err)), { variant: 'error' });
+  const reset = useMutation({
+    mutationFn: () => adminWhatsappApi.resetManagedWebhook(row.id),
+    meta: { silent: true },
+    onSuccess: () => {
+      enqueueSnackbar('Webhook set again at the partner', { variant: 'success' });
+      onChanged();
+    },
+    onError: fail,
+  });
+  const credit = useMutation({
+    mutationFn: (status: ManagedCreditLine) =>
+      adminWhatsappApi.setManagedCreditLine(row.id, status),
+    meta: { silent: true },
+    onSuccess: () => {
+      enqueueSnackbar('Credit line updated', { variant: 'success' });
+      onChanged();
+    },
+    onError: fail,
+  });
+  const p = row.pinnacle;
+  const lowAt = p?.lastBalanceErrorAt ? new Date(p.lastBalanceErrorAt).getTime() : 0;
+  // eslint-disable-next-line react-hooks/purity -- a display-only "recent" check
+  const lowRecently = lowAt > 0 && Date.now() - lowAt < DAY_MS;
+  const active = row.creditLineStatus === 'partner_active';
+  const onCredit = async (next: ManagedCreditLine) => {
+    if (next === 'partner_active') {
+      const ok = await confirm({
+        title: 'Credit line active?',
+        message: MANAGED_TEXTS.activeConfirm,
+        confirmText: 'It is active',
+      });
+      if (!ok) return;
+    }
+    credit.mutate(next);
+  };
+  return (
+    <Stack spacing={0.5} sx={{ py: 0.5 }}>
+      <Typography variant="caption" color="text.secondary">
+        Key ••••{p?.keyLast4 ?? '????'} · Webhook set <RelativeTime value={p?.webhookSetAt} /> ·
+        Last checked <RelativeTime value={p?.keyCheckedAt} />
+      </Typography>
+      {lowRecently && (
+        <Typography variant="caption" color="error">
+          {MANAGED_TEXTS.balanceLow} — <RelativeTime value={p?.lastBalanceErrorAt} />
+        </Typography>
+      )}
+      {row.status !== 'disconnected' && (
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+          <Button size="small" onClick={onReplaceKey}>
+            Replace API key
+          </Button>
+          <Button size="small" disabled={reset.isPending} onClick={() => reset.mutate()}>
+            Reset webhook
+          </Button>
+          <Button
+            size="small"
+            disabled={credit.isPending}
+            onClick={() => void onCredit(active ? 'partner_pending' : 'partner_active')}
+          >
+            {active ? 'Credit line: set to Requested' : 'Credit line: set to Active'}
+          </Button>
+        </Stack>
+      )}
+    </Stack>
+  );
+}
 
 const PAYER_LABELS: Record<WhatsAppMetaPayer, string> = {
   platform: 'Platform credit line',
@@ -167,12 +311,21 @@ function ManualConnectDialog({
   );
 }
 
-/** Superadmin account detail: WhatsApp numbers, force disconnect, manual connect (Meta billing: WhatsApp billing card). */
+/** Superadmin account detail: WhatsApp numbers, force disconnect, manual connect, managed numbers (PN). */
 export function WhatsAppCard({ detail }: { detail: AdminAccountDetail }) {
   const id = detail.account.id;
   const queryClient = useQueryClient();
   const [force, setForce] = useState<AdminWhatsAppChannelRow | null>(null);
   const [manual, setManual] = useState(false);
+  const [managed, setManaged] = useState(false);
+  const [keyFor, setKeyFor] = useState<AdminWhatsAppChannelRow | null>(null);
+  // PN: managed numbers only when the server has the partner API on
+  const status = useQuery({
+    queryKey: whatsappKeys.adminStatus,
+    queryFn: adminWhatsappApi.status,
+    meta: { silent: true },
+  });
+  const pinnacleOn = status.data?.pinnacle.enabled === true;
   const refresh = () => void queryClient.invalidateQueries({ queryKey: adminKeys.account(id) });
   return (
     <Card variant="outlined" component="section" aria-label="WhatsApp">
@@ -184,9 +337,16 @@ export function WhatsAppCard({ detail }: { detail: AdminAccountDetail }) {
           <Typography variant="subtitle1" component="h2">
             WhatsApp
           </Typography>
-          <Button size="small" onClick={() => setManual(true)}>
-            Manual connect
-          </Button>
+          <Stack direction="row" spacing={1}>
+            {pinnacleOn && (
+              <Button size="small" onClick={() => setManaged(true)}>
+                {MANAGED_TEXTS.add}
+              </Button>
+            )}
+            <Button size="small" onClick={() => setManual(true)}>
+              Manual connect
+            </Button>
+          </Stack>
         </Stack>
         <DataTable
           aria-label="WhatsApp numbers"
@@ -194,7 +354,25 @@ export function WhatsAppCard({ detail }: { detail: AdminAccountDetail }) {
             {
               key: 'label',
               header: 'Number',
-              render: (r) => `${r.label} · ${r.displayPhoneNumber ?? '—'}`,
+              render: (r) => (
+                <Stack spacing={0.5}>
+                  <span>
+                    {r.label} · {r.displayPhoneNumber ?? '—'}
+                    {r.managed && (
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        color="info"
+                        label="Managed"
+                        sx={{ ml: 1 }}
+                      />
+                    )}
+                  </span>
+                  {r.managed && (
+                    <ManagedDetails row={r} onReplaceKey={() => setKeyFor(r)} onChanged={refresh} />
+                  )}
+                </Stack>
+              ),
             },
             {
               key: 'status',
@@ -216,7 +394,9 @@ export function WhatsAppCard({ detail }: { detail: AdminAccountDetail }) {
               key: 'payer',
               header: 'Meta billed to',
               render: (r) =>
-                `${PAYER_LABELS[r.metaPayer]} (${r.creditLineStatus.replace('_', ' ')})`,
+                r.managed
+                  ? `Partner credit line (${r.creditLineStatus === 'partner_active' ? 'active' : 'requested'})`
+                  : `${PAYER_LABELS[r.metaPayer]} (${r.creditLineStatus.replace('_', ' ')})`,
             },
             {
               key: 'actions',
@@ -240,6 +420,26 @@ export function WhatsAppCard({ detail }: { detail: AdminAccountDetail }) {
           onClose={() => setForce(null)}
           onDone={() => {
             setForce(null);
+            refresh();
+          }}
+        />
+      )}
+      {managed && (
+        <ManagedNumberDialog
+          accountId={id}
+          onClose={() => setManaged(false)}
+          onDone={() => {
+            setManaged(false);
+            refresh();
+          }}
+        />
+      )}
+      {keyFor && (
+        <ReplaceKeyDialog
+          row={keyFor}
+          onClose={() => setKeyFor(null)}
+          onDone={() => {
+            setKeyFor(null);
             refresh();
           }}
         />

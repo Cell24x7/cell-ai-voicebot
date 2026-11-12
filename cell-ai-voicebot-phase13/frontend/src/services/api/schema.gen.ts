@@ -33426,6 +33426,121 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/webhooks/pinnacle/{channelId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Partner (Pinnacle) webhook ping — answers ok, reads nothing */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          channelId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description `ok` (text/plain) */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'text/plain': string;
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Meta's webhook payload relayed by Pinnacle for one managed number (x-cell-webhook-secret, ≤ 3 MB) */
+    post: {
+      parameters: {
+        query?: never;
+        header: {
+          /** @description The per-number secret we gave the partner (setwebhook) */
+          'x-cell-webhook-secret': string;
+        };
+        path: {
+          channelId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            object: string;
+            entry: unknown[];
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['MetaWebhookReceipt'];
+            };
+          };
+        };
+        /** @description Missing / wrong secret (PINNACLE_WEBHOOK_FORBIDDEN) */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Body or file too large (PAYLOAD_TOO_LARGE) */
+        413: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Storage / queue unavailable — the partner retries (PROVIDER_UNAVAILABLE) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/meta/deauthorize': {
     parameters: {
       query?: never;
@@ -34120,6 +34235,484 @@ export interface paths {
           };
         };
         /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/accounts/{id}/whatsapp/managed-numbers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Add a managed number (lives at Pinnacle): key checked, details read, our webhook set at the partner */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['WhatsAppManagedNumberInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                channel: components['schemas']['WhatsAppChannel'];
+                /** @enum {string} */
+                outcome: 'connected' | 'action_needed' | 'needs_reconnect';
+              };
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description The partner refused the request or didn't keep our webhook (WA_PROVIDER_ERROR / PINNACLE_WEBHOOK_NOT_SET) */
+        502: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/whatsapp/channels/{id}/managed/api-key': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Replace the partner API key of a managed number (checked; webhook set with it) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['WhatsAppManagedKeyInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppChannel'];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description The partner refused the request or didn't keep our webhook (WA_PROVIDER_ERROR / PINNACLE_WEBHOOK_NOT_SET) */
+        502: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/whatsapp/channels/{id}/managed/webhook': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Set our webhook again at the partner with a new secret (read back) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppChannel'];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description The partner refused the request or didn't keep our webhook (WA_PROVIDER_ERROR / PINNACLE_WEBHOOK_NOT_SET) */
+        502: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/whatsapp/channels/{id}/managed/credit-line': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The partner credit line of a managed number: requested (number waits) or active (as approved in the partner panel) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['WhatsAppManagedCreditLineInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppChannel'];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/dev/meta/managed-number': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** DEV ONLY — a fake number "at Pinnacle" and its test API key, to try Add managed number (superadmin; fake provider) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['DevSeedManagedNumberInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                apiKey: string;
+                wabaId: string;
+                phoneNumberId: string;
+                displayPhoneNumber: string | null;
+              };
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Managed numbers are off (WA_PROVIDER_NOT_CONFIGURED) */
         503: {
           headers: {
             [name: string]: unknown;
@@ -35214,7 +35807,11 @@ export interface components {
         | 'voice_api.account_webhook_registered'
         | 'account.sip_trunk_changed'
         | 'campaign.agent_joined'
-        | 'campaign.agent_left';
+        | 'campaign.agent_left'
+        | 'whatsapp.managed_number_added'
+        | 'whatsapp.managed_key_replaced'
+        | 'whatsapp.managed_webhook_reset'
+        | 'whatsapp.credit_line_updated';
       actor: {
         /** @enum {string} */
         type: 'user' | 'api_key' | 'system';
@@ -35419,6 +36016,16 @@ export interface components {
         metaPayer: 'platform' | 'customer';
         creditLineStatus: string;
         connectedAt: string | null;
+        provider: string;
+        managed: boolean;
+        pinnacle: {
+          keyLast4: string | null;
+          webhookUrl: string | null;
+          webhookSetAt: string | null;
+          keyCheckedAt: string | null;
+          lastBalanceErrorAt: string | null;
+        } | null;
+        statusReasonCode: string | null;
       }[];
       recentAudit: components['schemas']['AuditEntry'][];
     };
@@ -38572,7 +39179,8 @@ export interface components {
         | 'wallet.customer_low_balance'
         | 'whatsapp_campaign.completed'
         | 'whatsapp_campaign.paused'
-        | 'voice_api.provider_error';
+        | 'voice_api.provider_error'
+        | 'whatsapp.provider_balance_low';
       title: string;
       body: string;
       link: string | null;
@@ -39359,7 +39967,9 @@ export interface components {
       id: string;
       label: string;
       /** @enum {string} */
-      provider: 'meta' | 'fake';
+      provider: 'meta' | 'fake' | 'pinnacle';
+      /** @description A managed number: every call goes through the partner API (Pinnacle); added and looked after by the platform team */
+      managed: boolean;
       /** @enum {string} */
       mode: 'cloud_api' | 'coexistence';
       /** @enum {string} */
@@ -39407,7 +40017,13 @@ export interface components {
         /** @enum {string} */
         status: 'disabled' | 'enabled' | 'unavailable';
         /** @enum {string|null} */
-        unavailableReason: 'coexistence' | 'country' | 'messaging_limit' | 'not_cloud_api' | null;
+        unavailableReason:
+          | 'coexistence'
+          | 'country'
+          | 'messaging_limit'
+          | 'not_cloud_api'
+          | 'provider_unsupported'
+          | null;
         /** @description Meta paused calling on the number now */
         restricted: boolean;
       };
@@ -39416,7 +40032,7 @@ export interface components {
         metaPayer: 'platform' | 'customer';
         creditLine: {
           /** @enum {string} */
-          status: 'not_needed' | 'attached' | 'failed';
+          status: 'not_needed' | 'attached' | 'failed' | 'partner_pending' | 'partner_active';
         };
         paymentMethodOk: boolean | null;
       };
@@ -39534,6 +40150,11 @@ export interface components {
       deauthorizeUrl: string;
       dataDeletionUrl: string;
       lastEventAt: string | null;
+      pinnacle: {
+        enabled: boolean;
+        baseUrl: string;
+        voiceBaseUrl: string;
+      };
       channelsByStatus: {
         [key: string]: number;
       };
@@ -40172,6 +40793,35 @@ export interface components {
       phoneNumberId: string;
       /** @description System User token (never stored in plain text) */
       accessToken: string;
+    };
+    WhatsAppManagedNumberInput: {
+      label: string;
+      /** @example 106540352242922 */
+      wabaId: string;
+      /** @example 106540352242922 */
+      phoneNumberId: string;
+      /** @description Partner API key (Admin → Manage API Keys); sealed at rest, never echoed */
+      apiKey: string;
+      /**
+       * @description The partner credit line as the partner panel shows it: requested (`partner_pending`, the number stays 'action needed') or approved (`partner_active`)
+       * @enum {string}
+       */
+      creditLine: 'partner_pending' | 'partner_active';
+    };
+    WhatsAppManagedKeyInput: {
+      /** @description Partner API key (Admin → Manage API Keys); sealed at rest, never echoed */
+      apiKey: string;
+    };
+    WhatsAppManagedCreditLineInput: {
+      /**
+       * @description The partner credit line as the partner panel shows it: requested (`partner_pending`, the number stays 'action needed') or approved (`partner_active`)
+       * @enum {string}
+       */
+      status: 'partner_pending' | 'partner_active';
+    };
+    DevSeedManagedNumberInput: {
+      businessName?: string;
+      phone?: string;
     };
     WhatsAppSimulatorInput: {
       channelId: string;

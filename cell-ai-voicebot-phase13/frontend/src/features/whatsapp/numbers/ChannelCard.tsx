@@ -17,6 +17,7 @@ import type { WhatsAppChannel } from '@/services/api/types';
 
 import {
   CHANNEL_STATUS_LABELS,
+  channelReasonText,
   channelStatusColor,
   MODE_LABELS,
   nameStatusLabel,
@@ -40,6 +41,16 @@ const RETRYABLE_SYNC = new Set(['not_requested', 'failed', 'declined']);
 /** Who pays Meta for this number (and what is missing). */
 function BillingLine({ channel }: { channel: WhatsAppChannel }) {
   const { metaPayer, creditLine, paymentMethodOk } = channel.billing;
+  // PN: a managed number is billed on the partner's credit line
+  if (channel.managed) {
+    return creditLine.status === 'partner_active' ? (
+      <Typography variant="body2">Meta billed to: platform (managed number) ✓</Typography>
+    ) : (
+      <Typography variant="body2" color="text.secondary">
+        Meta billed to: platform (managed number) — being activated
+      </Typography>
+    );
+  }
   if (metaPayer === 'platform') {
     if (creditLine.status === 'attached') {
       return <Typography variant="body2">Meta billed to: platform credit line ✓</Typography>;
@@ -186,6 +197,7 @@ export function ChannelCard({
             label={QUALITY_LABELS[channel.qualityRating]}
           />
           <Chip size="small" variant="outlined" label={MODE_LABELS[channel.mode]} />
+          {channel.managed && <Chip size="small" color="info" variant="outlined" label="Managed" />}
           {status === 'connected' && <CallingReadyChip channelId={channel.id} />}
         </Stack>
         <Typography sx={{ mt: 1 }}>
@@ -201,8 +213,13 @@ export function ChannelCard({
         <BillingLine channel={channel} />
         {showReason && channel.statusReason && (
           <Alert severity={status === 'action_needed' ? 'warning' : 'error'} sx={{ mt: 1 }}>
-            {channel.statusReason.message}
+            {channelReasonText(channel)}
           </Alert>
+        )}
+        {channel.managed && status === 'needs_reconnect' && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            This number is managed by the platform team — contact support to fix it.
+          </Typography>
         )}
         <CoexistenceSection channel={channel} canManage={canManage} />
         <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 1 }}>
@@ -240,7 +257,7 @@ export function ChannelCard({
                 Retry setup
               </Button>
             )}
-            {(status === 'needs_reconnect' || status === 'disconnected') && (
+            {!channel.managed && (status === 'needs_reconnect' || status === 'disconnected') && (
               <Button size="small" variant="contained" onClick={onReconnect}>
                 {status === 'disconnected' ? 'Connect again' : 'Reconnect'}
               </Button>

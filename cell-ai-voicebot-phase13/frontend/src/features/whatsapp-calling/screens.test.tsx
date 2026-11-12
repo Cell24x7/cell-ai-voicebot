@@ -94,7 +94,7 @@ describe('calls pages: WhatsApp calls', () => {
     expect(within(table).getByText('Team member')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('combobox', { name: 'Direction' }));
     await userEvent.click(await screen.findByRole('option', { name: 'Incoming' }));
-    await userEvent.click(screen.getByRole('combobox', { name: 'Answered by' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Talked by' }));
     await userEvent.click(await screen.findByRole('option', { name: 'AI' }));
     await waitFor(() =>
       expect(calls.list).toHaveBeenLastCalledWith(
@@ -103,12 +103,12 @@ describe('calls pages: WhatsApp calls', () => {
     );
   });
 
-  it('list: "Answered by" only shows for two-way lines; Direction for every line (Phase 20)', async () => {
+  it('list: Direction and "Talked by" for every line (Phase 20, CM)', async () => {
     signInAs('agent');
     renderWithProviders({ route: '/calls' });
     await screen.findByRole('table', { name: 'Calls' });
     expect(screen.getByRole('combobox', { name: 'Direction' })).toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Answered by' })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Talked by' })).toBeInTheDocument();
   });
 
   it('detail: WhatsApp section with direction, who answered, Meta timeline; free incoming call', async () => {
