@@ -4,12 +4,14 @@ import { Link as RouterLink, useParams } from 'react-router';
 
 import { PageHeader } from '@/components/PageHeader';
 import { useAuthStore } from '@/features/auth/store';
+import { AgentStatsCard } from '@/features/campaigns/detail/AgentStatsCard';
 import { CampaignControls } from '@/features/campaigns/detail/CampaignControls';
 import { ExportButton } from '@/features/campaigns/detail/ExportButton';
 import { ActivityTab, LiveCallsPanel, RunsTab } from '@/features/campaigns/detail/OtherTabs';
 import { ProgressPanel } from '@/features/campaigns/detail/ProgressPanel';
 import { ResultsTab } from '@/features/campaigns/detail/ResultsTab';
 import { StatusBanner } from '@/features/campaigns/detail/StatusBanner';
+import { TeamCallingPanel } from '@/features/campaigns/detail/TeamCallingPanel';
 import { VoiceBatchesPanel } from '@/features/campaigns/detail/VoiceBatchesPanel';
 import { useCampaignEta } from '@/features/campaigns/eta';
 import {
@@ -66,7 +68,10 @@ export function CampaignDetailPage() {
                     : 'SIP / Normal call'
               }
             />
-            {c.line !== 'voice_api' && (
+            {c.talkMode === 'team' && (
+              <Chip size="small" variant="outlined" color="primary" label="Your team talks" />
+            )}
+            {c.line !== 'voice_api' && c.talkMode !== 'team' && (
               <Link
                 component={RouterLink}
                 to={c.program?.kind === 'agent' ? `/agents/${c.program.id}` : `/flows/${c.flow.id}`}
@@ -95,6 +100,10 @@ export function CampaignDetailPage() {
         <StatusBanner campaign={c} timezone={timezone} />
         {!recurringParent && <ProgressPanel campaign={c} eta={eta} />}
         {c.line === 'voice_api' && <VoiceBatchesPanel campaign={c} timezone={timezone} />}
+        {c.talkMode === 'team' && <TeamCallingPanel campaign={c} />}
+        {c.line !== 'voice_api' && c.status !== 'draft' && (
+          <AgentStatsCard campaignId={c.id} live={ACTIVE_CAMPAIGN_STATUSES.includes(c.status)} />
+        )}
         <LiveCallsPanel
           campaignId={c.id}
           enabled={c.status === 'running' || c.status === 'paused'}

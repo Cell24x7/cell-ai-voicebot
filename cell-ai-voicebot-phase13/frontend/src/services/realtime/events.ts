@@ -63,6 +63,8 @@ export interface WsEventMap {
     waitingUntil?: string;
   };
   'campaign.progress': { campaignId: string; stats: Record<string, number> };
+  /** CM: a team campaign's calling session changed — refetch the board. */
+  'campaign.session': { campaignId: string };
   /** Phase 9: a WhatsApp number changed (status, quality, limit, name). */
   'whatsapp.channel.updated': {
     channelId: string;
@@ -188,6 +190,7 @@ export const WS_EVENT_TYPES: readonly WsEventType[] = [
   'call.insights',
   'campaign.status',
   'campaign.progress',
+  'campaign.session',
   'whatsapp.channel.updated',
   'whatsapp.template.updated',
   'whatsapp.call.incoming',

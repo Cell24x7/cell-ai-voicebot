@@ -126,10 +126,18 @@ export function CallNowDialog({
               >
                 <FormControlLabel value="flow" control={<Radio />} label="A flow" />
                 <FormControlLabel value="agent" control={<Radio />} label="An agent" />
-                {callerNumberId && (
-                  <FormControlLabel value="human" control={<Radio />} label="Call yourself" />
-                )}
+                <FormControlLabel
+                  value="human"
+                  control={<Radio />}
+                  label="Call yourself"
+                  disabled={!callerNumberId}
+                />
               </RadioGroup>
+              {!callerNumberId && (
+                <Typography variant="caption" color="text.secondary">
+                  “Call yourself” needs a phone number on this account — ask support to add one.
+                </Typography>
+              )}
               {kind === 'human' ? (
                 <Alert severity="info">
                   Talk using this browser’s microphone and speaker. Allow microphone access before

@@ -32,6 +32,7 @@ const PLATFORM: VoiceCredentials = {
   callerId: null,
   verifiedAt: null,
   webhookRegisteredAt: null,
+  checkError: null,
 };
 
 /**
@@ -131,7 +132,10 @@ function Cell24x7Login({ accountId, saved }: { accountId: string; saved: VoiceCr
       )}
       {save.error && <Alert severity="error">{getErrorMessage(save.error)}</Alert>}
       {webhook.error && <Alert severity="error">{getErrorMessage(webhook.error)}</Alert>}
-      {own && !saved.webhookRegisteredAt && (
+      {own && saved.checkError && (
+        <Alert severity="warning">Saved, not checked yet. {saved.checkError}</Alert>
+      )}
+      {own && !saved.checkError && !saved.webhookRegisteredAt && (
         <Alert severity="warning">
           Register the webhook so results arrive at once (polling still reads them every few
           minutes).

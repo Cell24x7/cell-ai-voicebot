@@ -30,6 +30,9 @@ const numberOrNull = (s: string) => (s.trim() === '' ? null : Number(s));
 export function PhoneLineCard({ detail }: { detail: AdminAccountDetail }) {
   const id = detail.account.id;
   const onSip = detail.voiceLine === 'sip';
+  // CM (D18): "Live" only when the server has SIP too (else calls stay simulated)
+  const serverSip = detail.phoneLine.server === 'sip';
+  const live = onSip && detail.phoneLine.connected;
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
   const [pulse, setPulse] = useState(text(detail.sipSettings.pulseSec));
@@ -75,10 +78,16 @@ export function PhoneLineCard({ detail }: { detail: AdminAccountDetail }) {
             Phone line
           </Typography>
           <Typography variant="body2">
-            {onSip
+            {live
               ? 'Live: campaigns and Call now dial real phones over the SIP trunk.'
               : 'Test line: calls are simulated and never charged.'}
           </Typography>
+          {onSip && !serverSip ? (
+            <Alert severity="warning">
+              This account is set to the phone line, but this server has no phone line (SIP) yet:
+              its calls stay simulated until the server team turns SIP on.
+            </Alert>
+          ) : null}
           {onSip && active.length === 0 ? (
             <Alert severity="warning">
               No number given to this account: its calls show the default caller ID.

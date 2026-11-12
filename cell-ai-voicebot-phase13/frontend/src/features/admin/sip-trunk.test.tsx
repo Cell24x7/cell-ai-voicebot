@@ -100,6 +100,7 @@ describe('SIP trunk card', () => {
       callerId: null,
       verifiedAt: '2026-11-08T06:00:00Z',
       webhookRegisteredAt: null,
+      checkError: null,
     };
     voice.setAccount.mockResolvedValue({ enabled: true, ivrIds: [], ivrEstimateSec: 60 });
     voice.setCredentials.mockResolvedValue(creds);
@@ -148,4 +149,24 @@ describe('SIP trunk card', () => {
     expect(voice.setAccount).not.toHaveBeenCalled();
     expect(voice.registerAccountWebhook).not.toHaveBeenCalled();
   });
+
+  it('server cannot reach Cell24x7: key saved, not checked — no webhook attempt, a clear warning', async () => {
+    const creds = {
+      mode: 'own' as const,
+      tokenHint: '9876',
+      callerId: null,
+      verifiedAt: null,
+      webhookRegisteredAt: null,
+      checkError: 'This server cannot reach Cell24x7 (voice.truebeeps.com): firewall.',
+    };
+    voice.setAccount.mockResolvedValue({ enabled: true, ivrIds: [], ivrEstimateSec: 60 });
+    voice.setCredentials.mockResolvedValue(creds);
+    show();
+    const card = await screen.findByRole('region', { name: 'SIP trunk' });
+    await userEvent.click(await within(card).findByDisplayValue('apikey'));
+    await userEvent.type(within(card).getByLabelText('Cell24x7 API key'), 'k-9876');
+    await userEvent.click(within(card).getByRole('button', { name: 'Save and connect' }));
+    await waitFor(() => expect(voice.setAccount).toHaveBeenCalledWith('acc1', { enabled: true }));
+    expect(voice.registerAccountWebhook).not.toHaveBeenCalled();
+  }, 60_000);
 });

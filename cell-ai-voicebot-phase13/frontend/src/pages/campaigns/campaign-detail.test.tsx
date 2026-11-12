@@ -32,6 +32,7 @@ vi.mock('@/services/api/campaigns', () => ({
     remove: vi.fn(),
     exportResults: vi.fn(),
     list: vi.fn(),
+    agentStats: vi.fn(() => Promise.resolve([])),
   },
 }));
 vi.mock('@/services/api/calls', () => ({ callsApi: { active: vi.fn() } }));

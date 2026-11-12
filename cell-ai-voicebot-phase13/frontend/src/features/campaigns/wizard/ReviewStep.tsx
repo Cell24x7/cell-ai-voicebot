@@ -30,7 +30,7 @@ import {
 import { formatInZone } from '../time';
 import { durationText, voiceIvrKeys } from '../voice';
 
-import type { StepIndex, WizardDraft } from './draft';
+import { isTeam, type StepIndex, type WizardDraft } from './draft';
 
 const days = (d: number[]) =>
   d.length === 7 ? 'every day' : d.map((x) => DAY_SHORT[x]).join(', ');
@@ -93,6 +93,7 @@ export function ReviewStep({ draft, onEdit, estimate }: ReviewStepProps) {
       ? (audioList.data?.find((a) => a.id === draft.voice.flowAudioId)?.name ?? 'Audio')
       : (ivrs.data?.find((i) => i.id === draft.voice.ivrId)?.name ?? 'IVR menu');
   const e = estimate?.data;
+  const team = isTeam(draft);
   const wallet = e?.walletAvailableMicros;
   const short = e !== undefined && wallet !== undefined && e.maxMicros > wallet;
   const mode = scheduleMode(draft.schedule);
@@ -120,8 +121,16 @@ export function ReviewStep({ draft, onEdit, estimate }: ReviewStepProps) {
       {!voice && (
         <Section title="Basics" step={0} onEdit={onEdit}>
           {draft.name} · {draft.mode === 'dry_run' ? 'Dry run' : 'Live'} ·{' '}
-          {draft.program?.kind === 'agent' ? 'AI agent' : (flow?.name ?? 'Flow')}{' '}
-          {draft.program?.kind === 'agent'
+          {team
+            ? `Your team talks (${
+                draft.team.agentUserIds === null
+                  ? 'everyone who may call'
+                  : `${String(draft.team.agentUserIds.length)} members`
+              }, ${String(draft.team.wrapUpSec)} s wrap-up)`
+            : draft.program?.kind === 'agent'
+              ? 'AI agent'
+              : (flow?.name ?? 'Flow')}{' '}
+          {team || draft.program?.kind === 'agent'
             ? ''
             : draft.chosenVersion
               ? `v${String(draft.chosenVersion)}`
@@ -260,6 +269,11 @@ export function ReviewStep({ draft, onEdit, estimate }: ReviewStepProps) {
                 {e.assumptions.avgDurationSec} s per answered call,{' '}
                 {formatCurrencyMicros(e.perCallMicros)} per call.
               </Typography>
+              {team && (
+                <Typography variant="body2" color="text.secondary">
+                  No AI minutes — your team talks, only the line is charged.
+                </Typography>
+              )}
               {wallet !== undefined && (
                 <Typography variant="body2">
                   Wallet available: {formatCurrencyMicros(wallet)}
@@ -288,7 +302,9 @@ export function ReviewStep({ draft, onEdit, estimate }: ReviewStepProps) {
       <Alert severity="info">
         {voice
           ? 'Do-not-call numbers, opted-out contacts and numbers that are not Indian mobiles are skipped. Calls go out only inside the calling window (09:00–21:00 at most).'
-          : 'Do-not-call numbers and opted-out contacts are always skipped; each contact is called at most as often as the account’s call limits allow. The flow opens with the AI disclosure line.'}
+          : team
+            ? 'Do-not-call numbers and opted-out contacts are always skipped; each contact is called at most as often as the account’s call limits allow. Team members join the calling session on the campaign page after you start it.'
+            : 'Do-not-call numbers and opted-out contacts are always skipped; each contact is called at most as often as the account’s call limits allow. The flow opens with the AI disclosure line.'}
       </Alert>
     </Stack>
   );

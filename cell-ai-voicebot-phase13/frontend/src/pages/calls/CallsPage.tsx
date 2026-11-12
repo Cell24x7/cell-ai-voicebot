@@ -15,6 +15,7 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link as RouterLink, useSearchParams } from 'react-router';
 
@@ -34,6 +35,7 @@ import { NewWhatsAppCallDialog } from '@/features/whatsapp-calling/panel/NewWhat
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import type { ListCallsQuery } from '@/services/api/calls';
 import { recordExportsApi } from '@/services/api/record-exports';
+import { teamApi } from '@/services/api/team';
 import type { Call } from '@/services/api/types';
 import { shiftYmd, startOfDayIso } from '@/utils/datetime';
 import { formatCurrencyMicros } from '@/utils/format';
@@ -80,9 +82,17 @@ export function CallsPage() {
   const provider = params.get('provider');
   const direction = params.get('direction');
   const mode = params.get('mode');
-  const whatsapp = provider === 'whatsapp';
-  // Phase 20: incoming phone calls too — direction / answered-by for both lines
-  const twoWay = whatsapp || provider === 'sip';
+  const talkedBy = /^[a-f0-9]{24}$/.test(params.get('answeredBy') ?? '')
+    ? (params.get('answeredBy') ?? '')
+    : '';
+  const canSeeTeam = usePermission('team.read');
+  const members = useQuery({
+    queryKey: ['team', 'assignable'],
+    queryFn: () => teamApi.list({ status: 'active', limit: 100 }),
+    staleTime: 60_000,
+    enabled: canSeeTeam,
+    meta: { silent: true },
+  });
   const missedView = params.get('view') === 'missed';
   const campaignId = params.get('campaignId') ?? '';
   // Phase 14 record filters
@@ -125,7 +135,9 @@ export function CallsPage() {
     ...(promiseOnly ? { hasPromise: true } : {}),
     ...(isProvider(provider) ? { provider } : {}),
     ...(direction === 'inbound' || direction === 'outbound' ? { direction } : {}),
-    ...(twoWay && (mode === 'human' || mode === 'ai') ? { mode } : {}),
+    // CM: who talked — the AI, any team member, or one member
+    ...(mode === 'human' || mode === 'ai' ? { mode } : {}),
+    ...(talkedBy ? { answeredBy: talkedBy } : {}),
     ...(from ? { from: startOfDayIso(from, timezone) } : {}),
     ...(to ? { to: startOfDayIso(shiftYmd(to, 1), timezone) } : {}),
   };
@@ -390,23 +402,32 @@ export function CallsPage() {
               <MenuItem value="inbound">Incoming</MenuItem>
               <MenuItem value="outbound">Outgoing</MenuItem>
             </TextField>
-            {twoWay && (
-              <>
-                <TextField
-                  select
-                  label="Answered by"
-                  size="small"
-                  sx={{ minWidth: 150 }}
-                  value={mode === 'human' || mode === 'ai' ? mode : ''}
-                  onChange={(e) => set('mode', e.target.value)}
-                  slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
-                >
-                  <MenuItem value="">Anyone</MenuItem>
-                  <MenuItem value="human">Team member</MenuItem>
-                  <MenuItem value="ai">AI</MenuItem>
-                </TextField>
-              </>
-            )}
+            <TextField
+              select
+              label="Talked by"
+              size="small"
+              sx={{ minWidth: 160 }}
+              value={talkedBy ? `u:${talkedBy}` : mode === 'human' || mode === 'ai' ? mode : ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                const next = new URLSearchParams(params);
+                next.delete('mode');
+                next.delete('answeredBy');
+                if (v.startsWith('u:')) next.set('answeredBy', v.slice(2));
+                else if (v) next.set('mode', v);
+                setParams(next, { replace: true });
+              }}
+              slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+            >
+              <MenuItem value="">Anyone</MenuItem>
+              <MenuItem value="ai">AI</MenuItem>
+              <MenuItem value="human">Any team member</MenuItem>
+              {(members.data?.data ?? []).map((m) => (
+                <MenuItem key={m.id} value={`u:${m.id}`}>
+                  {m.name}
+                </MenuItem>
+              ))}
+            </TextField>
             {canCampaigns && (
               <TextField
                 select

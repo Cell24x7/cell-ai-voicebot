@@ -12,6 +12,7 @@ import type {
   CursorPageMeta,
   ExportJob,
   ListEnvelope,
+  Schemas,
   SuccessEnvelope,
 } from './types';
 
@@ -35,9 +36,15 @@ export type VoiceRetryInterval = (typeof VOICE_RETRY_INTERVALS)[number];
 export type VoiceContentInput =
   { kind: 'audio'; flowAudioId: string } | { kind: 'ivr'; ivrId: number };
 
+/** Who talks on the calls: the flow / AI agent, or the team (members in the browser). */
+export type TalkMode = 'ai' | 'team';
+
 /** Settings groups — every one optional (create fills defaults, update merges). */
 export interface CampaignSettingsInput {
   line?: CampaignLine;
+  talkMode?: TalkMode;
+  /** `agentUserIds: null` = every member who may make calls. */
+  team?: { agentUserIds?: string[] | null; wrapUpSec?: number } | null;
   voiceApi?: {
     content?: VoiceContentInput | null;
     retries?: number;
@@ -126,6 +133,7 @@ export interface ListCampaignContactsQuery {
 }
 
 export interface AudiencePreviewInput {
+  talkMode?: TalkMode;
   channelId?: string;
   askPermissionFirst?: boolean;
   line?: CampaignLine;
@@ -134,6 +142,11 @@ export interface AudiencePreviewInput {
   chosenVersion?: number | null;
   audience: NonNullable<CampaignSettingsInput['audience']>;
 }
+
+export type TeamSession = Schemas['CampaignTeamSession'];
+export type TeamAgentState = TeamSession['agents'][number]['state'];
+export type TeamNext = Schemas['CampaignTeamNext'];
+export type CampaignAgentStats = Schemas['CampaignAgentStats'];
 
 /** `/api/v1/campaigns` (PHASE_8_PLAN §1r). */
 export const campaignsApi = {
@@ -190,4 +203,26 @@ export const campaignsApi = {
   /** Results export job; download through `GET /contact-exports/:id`. */
   exportResults: (id: string, format: 'csv' | 'xlsx') =>
     unwrap(apiClient.post<SuccessEnvelope<ExportJob>>(`/campaigns/${id}/export`, { format })),
+  /** CM: who talked — per member (and the AI) calls, connected, talk time, outcomes. */
+  agentStats: (id: string) =>
+    unwrap(apiClient.get<SuccessEnvelope<CampaignAgentStats[]>>(`/campaigns/${id}/agents`)),
+  /** CM: the calling session of a team campaign (board). */
+  session: (id: string) =>
+    unwrap(apiClient.get<SuccessEnvelope<TeamSession>>(`/campaigns/${id}/session`)),
+  sessionAction: (id: string, action: 'join' | 'leave' | 'heartbeat' | 'pause' | 'ready') =>
+    unwrap(apiClient.post<SuccessEnvelope<TeamSession>>(`/campaigns/${id}/session/${action}`)),
+  /** The agent's next call (with its media ticket) or why to wait. */
+  nextCall: (id: string) =>
+    unwrap(apiClient.post<SuccessEnvelope<TeamNext>>(`/campaigns/${id}/session/next`)),
+  wrapUp: (
+    id: string,
+    callId: string,
+    body: { disposition?: string | null; note?: string | null },
+  ) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<{ callId: string; disposition: string | null }>>(
+        `/campaigns/${id}/calls/${callId}/wrap-up`,
+        body,
+      ),
+    ),
 };

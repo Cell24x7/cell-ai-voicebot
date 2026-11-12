@@ -9,6 +9,8 @@ import {
 import {
   CAMPAIGN_AMD_MODES,
   CAMPAIGN_LINES,
+  TALK_MODES,
+  TEAM_LIMITS,
   CAMPAIGN_MODES,
   CAMPAIGN_PRIORITIES,
   CAMPAIGN_STATUSES,
@@ -149,8 +151,25 @@ const VoiceApiInput = z.strictObject({
     )
     .optional(),
 });
+/** CM: team calling — who may join, and the pause after each call. */
+export const TeamInput = z.strictObject({
+  agentUserIds: z.array(ObjectIdSchema).max(TEAM_LIMITS.agentsMax).nullable().default(null),
+  wrapUpSec: z
+    .number()
+    .int()
+    .min(0)
+    .max(TEAM_LIMITS.wrapUpMaxSec)
+    .default(TEAM_LIMITS.wrapUpDefaultSec),
+});
+
 const settings = {
   line: z.enum(CAMPAIGN_LINES).optional(),
+  /** CM: who talks — `ai` (flow / agent) or `team` (members in the browser; live only). */
+  talkMode: z.enum(TALK_MODES).optional().openapi({
+    description:
+      '`ai` (default): a flow or AI agent talks. `team`: team members take the calls in the browser (live phone / WhatsApp call campaigns; no flow)',
+  }),
+  team: TeamInput.nullable().optional(),
   voiceApi: VoiceApiInput.nullable().optional(),
   channelId: ObjectIdSchema.nullable().optional(),
   program: ProgramInput.nullable().optional(),
@@ -188,6 +207,7 @@ export const CancelCampaignBody = z.strictObject({ hangUpLive: z.boolean().defau
 export const ExportCampaignBody = z.strictObject({ format: z.enum(EXPORT_FORMATS).default('csv') });
 
 export const AudiencePreviewBody = z.strictObject({
+  talkMode: z.enum(TALK_MODES).optional(),
   channelId: ObjectIdSchema.nullable().optional(),
   askPermissionFirst: z.boolean().optional(),
   line: z.enum(CAMPAIGN_LINES).optional(),
@@ -265,6 +285,12 @@ export const CampaignListItemSchema = registry.register(
       .optional(),
     channelId: z.string().nullable().optional(),
     program: ProgramInput.extend({ name: z.string().optional() }).nullable().optional(),
+    /** CM: who talks on the calls. */
+    talkMode: z.enum(TALK_MODES).optional(),
+    team: z
+      .object({ agentUserIds: z.array(z.string()).nullable(), wrapUpSec: z.number() })
+      .nullable()
+      .optional(),
     askPermissionFirst: z.object({ templateId: z.string() }).nullable().optional(),
     flow: z.object({ id: z.string(), name: z.string(), version: z.number().nullable() }),
     stats: CampaignStatsSchema,
@@ -661,4 +687,118 @@ registry.registerPath({
   security: bearer,
   request: { params: CampaignParams, ...json(ExportCampaignBody) },
   responses: { 202: ok(ExportJobSchema, 'Queued'), ...writes },
+});
+
+// CM — team calling: the agents' calling session of a team campaign (browser only)
+export const TeamCallParams = z.strictObject({ id: ObjectIdSchema, callId: ObjectIdSchema });
+export const TeamWrapUpBody = z.strictObject({
+  disposition: z.string().trim().max(64).nullable().optional(),
+  note: z.string().max(2000).nullable().optional(),
+});
+const AGENT_VIEW_STATES = ['ready', 'on_call', 'wrap_up', 'paused', 'away'] as const;
+export const TeamSessionSchema = registry.register(
+  'CampaignTeamSession',
+  z.object({
+    agents: z.array(
+      z.object({
+        userId: z.string(),
+        name: z.string(),
+        state: z.enum(AGENT_VIEW_STATES),
+        callId: z.string().nullable(),
+        since: z.string().datetime(),
+        wrapUpUntil: z.string().datetime().nullable(),
+      }),
+    ),
+    ready: z.number().int(),
+    onCall: z.number().int(),
+  }),
+);
+export const TeamNextSchema = registry.register(
+  'CampaignTeamNext',
+  z.discriminatedUnion('kind', [
+    z.object({
+      kind: z.literal('call'),
+      callId: z.string(),
+      transport: z.enum(['sip', 'whatsapp']),
+      contact: z.object({ id: z.string(), name: z.string().nullable() }),
+      mediaTicket: z.string(),
+      expiresAt: z.string(),
+      wsPath: z.string(),
+    }),
+    z.object({
+      kind: z.literal('wait'),
+      reason: z.enum(['not_running', 'window', 'wallet', 'no_contacts', 'line', 'busy']),
+      until: z.string().datetime().nullable(),
+    }),
+  ]),
+);
+export const TeamWrapUpSchema = registry.register(
+  'CampaignTeamWrapUp',
+  z.object({ callId: z.string(), disposition: z.string().nullable() }),
+);
+for (const action of ['join', 'leave', 'heartbeat', 'pause', 'ready'] as const)
+  registry.registerPath({
+    method: 'post',
+    path: `${base}/{id}/session/${action}`,
+    tags,
+    summary: {
+      join: 'Join the calling session of a team campaign (calls.trigger) — 403 AGENT_NOT_IN_CAMPAIGN',
+      leave: 'Leave the calling session (calls.trigger)',
+      heartbeat: 'Still here (every 10 s; 30 s silent = away, no calls) — 409 AGENT_SESSION_GONE',
+      pause: 'Take a break: no calls until ready (calls.trigger)',
+      ready: 'Back from a break or wrap-up (calls.trigger)',
+    }[action],
+    security: bearer,
+    request: { params: CampaignParams },
+    responses: { 200: ok(TeamSessionSchema), ...writes },
+  });
+registry.registerPath({
+  method: 'get',
+  path: `${base}/{id}/session`,
+  tags,
+  summary: 'Who is calling for this team campaign and what each agent is doing (campaigns.read)',
+  security: bearer,
+  request: { params: CampaignParams },
+  responses: { 200: ok(TeamSessionSchema), ...common },
+});
+registry.registerPath({
+  method: 'post',
+  path: `${base}/{id}/session/next`,
+  tags,
+  summary:
+    "The agent's next call: a human call to the next dialable contact with a media ticket, or why to wait (calls.trigger) — 409 AGENT_CALL_ACTIVE / AGENT_SESSION_GONE",
+  security: bearer,
+  request: { params: CampaignParams },
+  responses: { 200: ok(TeamNextSchema), ...writes },
+});
+registry.registerPath({
+  method: 'post',
+  path: `${base}/{id}/calls/{callId}/wrap-up`,
+  tags,
+  summary:
+    "Save the outcome and a note of the agent's finished call; the agent is ready again (calls.trigger) — 422 DISPOSITION_UNKNOWN",
+  security: bearer,
+  request: { params: TeamCallParams, ...json(TeamWrapUpBody) },
+  responses: { 200: ok(TeamWrapUpSchema), ...writes },
+});
+export const CampaignAgentStatsSchema = registry.register(
+  'CampaignAgentStats',
+  z.object({
+    userId: z.string().nullable().openapi({ description: 'null = calls the AI talked on' }),
+    name: z.string(),
+    calls: z.number().int(),
+    connected: z.number().int(),
+    talkSec: z.number().int(),
+    outcomes: z.record(z.string(), z.number().int()),
+  }),
+);
+registry.registerPath({
+  method: 'get',
+  path: `${base}/{id}/agents`,
+  tags,
+  summary:
+    'Who talked on the campaign: per member (and the AI) calls, connected, talk time, outcomes (campaigns.read)',
+  security: bearer,
+  request: { params: CampaignParams },
+  responses: { 200: ok(z.array(CampaignAgentStatsSchema)), ...common },
 });

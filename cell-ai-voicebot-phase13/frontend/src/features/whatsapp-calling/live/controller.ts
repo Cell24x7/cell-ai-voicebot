@@ -12,6 +12,7 @@ import {
   type MediaWebSocketFactory,
 } from '@/features/calls/audio/media-socket';
 import { callsApi, type StartCallInput } from '@/services/api/calls';
+import type { TeamNext } from '@/services/api/campaigns';
 import { getErrorMessage, toApiError } from '@/services/api/errors';
 import type { WhatsAppCallMediaTicket, WhatsAppCallProgram } from '@/services/api/types';
 import { whatsappCallingApi } from '@/services/api/whatsapp-calling';
@@ -245,6 +246,70 @@ export const placeCall = async (input: PlaceCallInput): Promise<void> => {
     if (startedId) await deps.api.hangup(startedId).catch(() => undefined);
     for (const track of stream?.getTracks() ?? []) track.stop();
     if (generation === attempt) patch({ phase: 'failed', failure: callErrorText(err) });
+  }
+};
+
+/**
+ * CM — team calling: the microphone first, then the campaign's next contact for this agent
+ * (a human call the server started for them), then its browser leg. Answers why to wait
+ * when there is no contact to call now.
+ */
+export const placeTeamCall = async (input: {
+  next: () => Promise<TeamNext>;
+  hangup: (callId: string) => Promise<unknown>;
+  recording: boolean;
+}): Promise<TeamNext | null> => {
+  if (isBusy()) return null;
+  const generation = ++attempt;
+  release();
+  store().setActive({
+    ...newActiveCall({
+      mode: 'human',
+      direction: 'outbound',
+      label: 'Next customer',
+      conversationId: null,
+    }),
+    recording: input.recording,
+  });
+  const stream = await micStream(generation);
+  if (!stream) return null;
+  let callId: string | null = null;
+  try {
+    const next = await input.next();
+    if (next.kind === 'wait') {
+      for (const track of stream.getTracks()) track.stop();
+      if (generation === attempt) store().setActive(null);
+      return next;
+    }
+    callId = next.callId;
+    if (generation !== attempt) {
+      for (const track of stream.getTracks()) track.stop();
+      await input.hangup(callId).catch(() => undefined);
+      return next;
+    }
+    patch({
+      callId,
+      transport: next.transport,
+      label: next.contact.name ?? 'Customer',
+    });
+    await connectLeg(
+      stream,
+      {
+        callId,
+        mediaTicket: next.mediaTicket,
+        expiresAt: next.expiresAt,
+        wsPath: next.wsPath,
+      },
+      generation,
+    );
+    if (generation === attempt && store().active?.phase === 'failed')
+      await input.hangup(callId).catch(() => undefined);
+    return next;
+  } catch (err) {
+    for (const track of stream.getTracks()) track.stop();
+    if (callId) await input.hangup(callId).catch(() => undefined);
+    if (generation === attempt) patch({ phase: 'failed', failure: callErrorText(err) });
+    throw err;
   }
 };
 

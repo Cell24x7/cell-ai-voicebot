@@ -67,6 +67,7 @@ const detail = (overrides: Partial<AdminAccountDetail['account']> = {}): AdminAc
   retention: fakeRetention(),
   apiLimits: null,
   voiceLine: 'dryrun',
+  phoneLine: { server: 'dryrun', connected: false },
   sipSettings: { pulseSec: null, spendMinutesPerHour: null },
   voiceApi: {
     enabled: false,
@@ -78,6 +79,7 @@ const detail = (overrides: Partial<AdminAccountDetail['account']> = {}): AdminAc
       callerId: null,
       verifiedAt: null,
       webhookRegisteredAt: null,
+      checkError: null,
     },
   },
   usersByStatus: { active: 2, invited: 1, disabled: 0 },

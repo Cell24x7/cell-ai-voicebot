@@ -95,8 +95,9 @@ export const restrictionText = (type: string): string =>
 
 export const ROUTE_LABELS: Record<WhatsAppInboundRoute, string> = {
   team: 'Ring the team',
-  ai: 'AI answers',
+  ai: 'AI answers every call',
   ai_then_team: 'AI first, then the team',
+  team_then_ai: 'Team first, then AI (when nobody answers)',
 };
 
 type CallBubble = NonNullable<InboxMessage['call']>;

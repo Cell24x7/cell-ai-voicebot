@@ -59,14 +59,20 @@ function ApiKeyForm({
         ...(key.trim() ? { token: key.trim() } : {}),
         callerId: callerId.trim() || null,
       });
-      if (!creds.webhookRegisteredAt) await voiceAdminApi.registerAccountWebhook(accountId);
-      return voiceAdminApi.setAccount(accountId, { enabled: true });
+      // not checked (this server cannot reach Cell24x7): the webhook would fail the same way
+      if (!creds.checkError && !creds.webhookRegisteredAt)
+        await voiceAdminApi.registerAccountWebhook(accountId);
+      await voiceAdminApi.setAccount(accountId, { enabled: true });
+      return creds;
     },
     meta: { silent: true },
-    onSuccess: () => {
-      enqueueSnackbar('Cell24x7 API key connected — recorded-voice campaigns are on', {
-        variant: 'success',
-      });
+    onSuccess: (creds) => {
+      enqueueSnackbar(
+        creds.checkError
+          ? 'API key saved — not checked yet (this server cannot reach Cell24x7)'
+          : 'Cell24x7 API key connected — recorded-voice campaigns are on',
+        { variant: creds.checkError ? 'warning' : 'success' },
+      );
       setKey('');
       void queryClient.invalidateQueries({ queryKey: adminKeys.account(accountId) });
     },
@@ -107,6 +113,12 @@ function ApiKeyForm({
         helperText={callerBad ? 'Use the 10-digit caller ID' : 'Empty = the server default'}
         sx={{ maxWidth: 320 }}
       />
+      {own && saved.checkError && (
+        <Alert severity="warning">
+          Key saved but not checked yet. {saved.checkError} Press “Save and connect” again (no new
+          key needed) once it is allowed.
+        </Alert>
+      )}
       {connect.error && <Alert severity="error">{getErrorMessage(connect.error)}</Alert>}
       <div>
         <Button
@@ -125,10 +137,12 @@ function TrunkForm({
   accountId,
   view,
   voiceApi,
+  serverSip,
 }: {
   accountId: string;
   view: SipTrunkView;
   voiceApi: VoiceApi | undefined;
+  serverSip: boolean;
 }) {
   const queryClient = useQueryClient();
   const t = view.trunk;
@@ -283,7 +297,7 @@ function TrunkForm({
           <Stack direction="row" spacing={1}>
             <Button
               variant="contained"
-              disabled={save.isPending}
+              disabled={save.isPending || !serverSip}
               onClick={() => {
                 setTouched(true);
                 if (Object.keys(problems).length === 0) save.mutate();
@@ -310,10 +324,13 @@ function TrunkForm({
 export function SipTrunkCard({
   accountId,
   voiceApi,
+  serverSip = true,
 }: {
   accountId: string;
   /** The account's recorded-voice settings (for the Cell24x7 API key option). */
   voiceApi?: VoiceApi;
+  /** CM (D18): this server has a phone line (SIP); without it a trunk can't connect. */
+  serverSip?: boolean;
 }) {
   const trunk = useQuery({
     queryKey: sipTrunkKeys.account(accountId),
@@ -337,6 +354,12 @@ export function SipTrunkCard({
             Enter this account’s SIP carrier login (AI and team calls), or a Cell24x7 API key
             (recorded voice). Saving connects it at once — no server change needed.
           </Typography>
+          {!serverSip && (
+            <Alert severity="warning">
+              This server has no phone line yet (SIP is off), so a SIP trunk can’t connect. The
+              Cell24x7 API key option still works for recorded voice.
+            </Alert>
+          )}
           {trunk.isPending ? (
             <Skeleton variant="rounded" height={160} />
           ) : trunk.error ? (
@@ -347,6 +370,7 @@ export function SipTrunkCard({
               accountId={accountId}
               view={trunk.data}
               voiceApi={voiceApi}
+              serverSip={serverSip}
             />
           )}
         </Stack>

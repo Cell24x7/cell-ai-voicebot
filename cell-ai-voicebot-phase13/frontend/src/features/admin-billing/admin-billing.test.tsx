@@ -80,6 +80,7 @@ const DETAIL: AdminAccountDetail = {
   usersCount: 3,
   apiLimits: null,
   voiceLine: 'dryrun',
+  phoneLine: { server: 'dryrun', connected: false },
   sipSettings: { pulseSec: null, spendMinutesPerHour: null },
   voiceApi: {
     enabled: false,
@@ -91,6 +92,7 @@ const DETAIL: AdminAccountDetail = {
       callerId: null,
       verifiedAt: null,
       webhookRegisteredAt: null,
+      checkError: null,
     },
   },
   usersByStatus: { active: 3, invited: 0, disabled: 0 },

@@ -6,6 +6,7 @@ import type {
   DryRunOutcome,
   RetryOn,
   ScenarioKey,
+  TalkMode,
   UpdateCampaignInput,
 } from '@/services/api/campaigns';
 import { toApiError } from '@/services/api/errors';
@@ -24,6 +25,9 @@ export const STEPS = [
 export type StepIndex = 0 | 1 | 2 | 3 | 4;
 
 export type AudienceMode = 'lists' | 'segment' | 'filter' | 'pick';
+
+/** CM: seconds after each team call to save the outcome. */
+export const TEAM_WRAP_UP = { min: 0, max: 120, default: 15 } as const;
 
 export const DRY_RUN_SPEEDS = [1, 5, 10, 20] as const;
 export const MAX_PICKED = 1_000;
@@ -60,6 +64,10 @@ export const emptyVoice = (): VoiceDraft => ({
 export interface WizardDraft {
   name: string;
   line: CampaignLine;
+  /** CM: who talks — the flow / AI agent, or the team in the browser (live only). */
+  talkMode: TalkMode;
+  /** `agentUserIds: null` = every member who may make calls. */
+  team: { agentUserIds: string[] | null; wrapUpSec: number };
   voice: VoiceDraft;
   channelId: string;
   program: { kind: 'flow' | 'agent'; id: string } | null;
@@ -117,6 +125,8 @@ export const DEFAULT_SCENARIOS: Record<ScenarioKey, number> = {
 export const emptyDraft = (account: { timezone: string; window: CampaignWindow }): WizardDraft => ({
   name: '',
   line: 'phone',
+  talkMode: 'ai',
+  team: { agentUserIds: null, wrapUpSec: TEAM_WRAP_UP.default },
   voice: emptyVoice(),
   channelId: '',
   program: null,
@@ -158,6 +168,11 @@ const audienceModeOf = (a: Campaign['audience']): AudienceMode => {
 export const draftFromCampaign = (c: Campaign): WizardDraft => ({
   name: c.name,
   line: c.line ?? 'phone',
+  talkMode: c.talkMode ?? 'ai',
+  team: {
+    agentUserIds: c.team?.agentUserIds ? [...c.team.agentUserIds] : null,
+    wrapUpSec: c.team?.wrapUpSec ?? TEAM_WRAP_UP.default,
+  },
   voice: c.voiceApi
     ? {
         kind: c.voiceApi.content?.kind ?? 'audio',
@@ -231,15 +246,19 @@ export const previewBody = (d: WizardDraft) =>
     ? audienceProblems(d).length
       ? null
       : { line: 'voice_api' as const, audience: audienceOf(d) }
-    : (d.line === 'whatsapp' ? d.channelId && d.program?.id : d.flowId) &&
-        !audienceProblems(d).length
+    : (isTeam(d)
+          ? d.line !== 'whatsapp' || d.channelId
+          : d.line === 'whatsapp'
+            ? d.channelId && d.program?.id
+            : d.flowId) && !audienceProblems(d).length
       ? {
-          ...(d.flowId ? { flowId: d.flowId } : {}),
+          ...(isTeam(d) ? { talkMode: 'team' as const } : {}),
+          ...(d.flowId && !isTeam(d) ? { flowId: d.flowId } : {}),
           ...(d.line === 'whatsapp'
             ? {
                 line: d.line,
                 channelId: d.channelId,
-                program: d.program,
+                program: isTeam(d) ? null : d.program,
                 askPermissionFirst: d.askPermissionFirst,
               }
             : {}),
@@ -266,11 +285,13 @@ const settingsOf = (d: WizardDraft): CampaignSettingsInput =>
   d.line === 'voice_api' ? voiceSettingsOf(d) : phoneSettingsOf(d);
 
 const phoneSettingsOf = (d: WizardDraft): CampaignSettingsInput => ({
+  talkMode: d.talkMode,
+  team: isTeam(d) ? { agentUserIds: d.team.agentUserIds, wrapUpSec: d.team.wrapUpSec } : null,
   ...(d.line === 'whatsapp'
     ? {
         line: 'whatsapp',
         channelId: d.channelId,
-        program: d.program,
+        program: isTeam(d) ? null : d.program,
         askPermissionFirst:
           d.askPermissionFirst && d.askPermissionTemplateId
             ? { templateId: d.askPermissionTemplateId }
@@ -297,7 +318,7 @@ const phoneSettingsOf = (d: WizardDraft): CampaignSettingsInput => ({
 export const toCreateInput = (d: WizardDraft): CreateCampaignInput => ({
   name: d.name.trim(),
   mode: d.line === 'voice_api' ? 'live' : d.mode,
-  ...(d.flowId && d.line !== 'voice_api' ? { flowId: d.flowId } : {}),
+  ...(d.flowId && d.line !== 'voice_api' && !isTeam(d) ? { flowId: d.flowId } : {}),
   ...settingsOf(d),
 });
 
@@ -350,6 +371,10 @@ export const isLocked = (rule: LockRule, group: string): boolean =>
   (rule === 'mode' && group === 'mode') ||
   (rule === 'live' && !LIVE_EDITABLE.has(group));
 
+/** CM: the team talks (no flow / AI program). */
+export const isTeam = (d: Pick<WizardDraft, 'line' | 'talkMode'>): boolean =>
+  d.talkMode === 'team' && d.line !== 'voice_api';
+
 const intIn = (v: number, r: { min: number; max: number }) =>
   Number.isInteger(v) && v >= r.min && v <= r.max;
 
@@ -377,6 +402,12 @@ export const stepProblems = (step: StepIndex, d: WizardDraft, now = new Date()):
     if (d.line === 'voice_api') {
       if (!voiceContentOf(d.voice))
         p.push(d.voice.kind === 'audio' ? 'Choose or upload the audio' : 'Choose an IVR menu');
+      return p;
+    }
+    if (isTeam(d)) {
+      if (d.mode !== 'live') p.push('Team calling needs live calls');
+      if (d.team.agentUserIds?.length === 0) p.push('Choose at least one team member');
+      if (!intIn(d.team.wrapUpSec, TEAM_WRAP_UP)) p.push('Wrap-up time: 0 to 120 seconds');
       return p;
     }
     if (!d.flowId && !(d.line === 'whatsapp' && d.program?.id)) p.push('Choose a published flow');

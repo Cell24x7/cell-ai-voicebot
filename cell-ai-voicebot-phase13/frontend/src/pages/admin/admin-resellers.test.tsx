@@ -132,6 +132,7 @@ describe('Admin: resellers (T19.4)', () => {
         retention: fakeRetention(),
         apiLimits: null,
         voiceLine: 'dryrun',
+        phoneLine: { server: 'dryrun', connected: false },
         sipSettings: { pulseSec: null, spendMinutesPerHour: null },
         usersByStatus: { invited: 0, active: 1, disabled: 0 },
         limits: { maxConcurrentCalls: 5, dialsPerMinute: 10 },

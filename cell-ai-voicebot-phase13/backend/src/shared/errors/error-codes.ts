@@ -327,6 +327,10 @@ export const ERROR_CODES = {
     status: 503,
     message: 'The voice provider did not answer. Please try again later.',
   },
+  VOICE_API_UNREACHABLE: {
+    status: 503,
+    message: 'This server cannot reach the voice provider (network / firewall).',
+  },
   // Phase 20 — incoming phone calls
   CALL_ALREADY_ANSWERED: { status: 409, message: 'Someone else already answered this call.' },
   CALL_NOT_RINGING: { status: 409, message: "This call isn't ringing any more." },
@@ -338,6 +342,20 @@ export const ERROR_CODES = {
     status: 422,
     message: 'The chosen flow is not published or the AI agent is not active.',
   },
+  // Call modes — team calling campaigns
+  CAMPAIGN_NO_AGENTS: {
+    status: 422,
+    message: 'Choose at least one active team member who can make calls.',
+  },
+  AGENT_NOT_IN_CAMPAIGN: {
+    status: 403,
+    message: "You aren't one of this campaign's callers.",
+  },
+  AGENT_SESSION_GONE: {
+    status: 409,
+    message: 'Your calling session ended. Join the campaign again.',
+  },
+  AGENT_CALL_ACTIVE: { status: 409, message: 'Finish your current call first.' },
 } as const satisfies Record<string, { status: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

@@ -13,6 +13,7 @@ import { fakeCallingSettings } from '@/test/calls-wa';
 import { fakeFlowRow } from '@/test/flows';
 import { renderWithProviders } from '@/test/render';
 
+import { ROUTE_LABELS } from './labels';
 import { CallingReadyChip } from './settings/CallingReadiness';
 import { CallingSection } from './settings/CallingSection';
 import { settingsPatch, settingsProblems, draftOf } from './settings/form';
@@ -326,6 +327,24 @@ describe('settings form helpers', () => {
       permissionRequestBody: 'New text',
       inbound: { route: 'team', aiProgram: null, ringTimeoutSec: 30, ringUserIds: null },
     });
+  });
+  it('Team → AI (call modes): the program is required and kept; the label says so', () => {
+    const saved = draftOf(fakeCallingSettings());
+    const teamThenAi = { ...saved, inbound: { ...saved.inbound, route: 'team_then_ai' as const } };
+    expect(settingsProblems(teamThenAi, today)).toEqual({
+      aiProgram: 'Choose a flow or an AI agent',
+    });
+    const withAi = {
+      ...teamThenAi,
+      inbound: { ...teamThenAi.inbound, aiProgram: { kind: 'agent' as const, id: 'a1' } },
+    };
+    expect(settingsProblems(withAi, today)).toEqual({});
+    expect(settingsPatch(withAi, saved).inbound).toMatchObject({
+      route: 'team_then_ai',
+      aiProgram: { kind: 'agent', id: 'a1' },
+    });
+    expect(ROUTE_LABELS.team_then_ai).toBe('Team first, then AI (when nobody answers)');
+    expect(ROUTE_LABELS.ai).toBe('AI answers every call');
   });
   it('problems: ring timeout, text, countries', () => {
     const d = draftOf(fakeCallingSettings());

@@ -25,11 +25,13 @@ import {
   emptyVoice,
   isLocked,
   LIMITS,
+  isTeam,
   type AmdMode,
   type LockRule,
   type WizardDraft,
 } from './draft';
 import { VoiceContentFields } from './VoiceFields';
+import { WhoTalks } from './WhoTalks';
 
 const AMD_LABELS: Record<AmdMode, string> = {
   off: 'Off — every answer goes to the flow',
@@ -72,6 +74,7 @@ export function BasicsStep({
       : phone.data?.line === 'sip';
   const voiceOn = phone.data?.voiceApi?.enabled === true;
   const voice = draft.line === 'voice_api';
+  const team = isTeam(draft);
   const line = draft.phoneLine;
   const setLine = (patch: Partial<WizardDraft['phoneLine']>) =>
     onChange({ phoneLine: { ...line, ...patch } });
@@ -152,18 +155,20 @@ export function BasicsStep({
               messaging only.
             </Alert>
           )}
-          <ProgramPicker
-            campaign
-            value={draft.program}
-            disabled={flowLocked}
-            onChange={(program) =>
-              onChange({
-                program,
-                flowId: program?.kind === 'flow' ? program.id : '',
-                chosenVersion: null,
-              })
-            }
-          />
+          {!team && (
+            <ProgramPicker
+              campaign
+              value={draft.program}
+              disabled={flowLocked}
+              onChange={(program) =>
+                onChange({
+                  program,
+                  flowId: program?.kind === 'flow' ? program.id : '',
+                  chosenVersion: null,
+                })
+              }
+            />
+          )}
           <Alert severity="info">
             Only customers who allowed WhatsApp calls from this number are called.
           </Alert>
@@ -192,6 +197,7 @@ export function BasicsStep({
           )}
         </Stack>
       )}
+      {!voice && <WhoTalks draft={draft} onChange={onChange} lock={lock} liveAllowed={onSip} />}
       <TextField
         label="Campaign name"
         value={draft.name}
@@ -213,7 +219,7 @@ export function BasicsStep({
               value="dry_run"
               control={<Radio />}
               label="Dry run (simulated calls)"
-              disabled={isLocked(lock, 'mode')}
+              disabled={isLocked(lock, 'mode') || team}
             />
             <Tooltip
               title={onSip ? '' : 'This account is on the test line — ask support to switch it'}
@@ -259,7 +265,11 @@ export function BasicsStep({
             value={line.amd}
             disabled={isLocked(lock, 'mode')}
             onChange={(e) => setLine({ amd: e.target.value as AmdMode })}
-            helperText="Checking takes 2–5 seconds after the answer, before the bot speaks"
+            helperText={
+              team
+                ? 'Checking takes 2–5 seconds after the answer, before your team member is connected'
+                : 'Checking takes 2–5 seconds after the answer, before the bot speaks'
+            }
             sx={{ maxWidth: 420 }}
           >
             {Object.entries(AMD_LABELS).map(([value, text]) => (
@@ -282,7 +292,7 @@ export function BasicsStep({
           )}
         </Stack>
       )}
-      {draft.line === 'phone' && (
+      {draft.line === 'phone' && !team && (
         <Tooltip title={flowLocked ? LOCKED_HINT : ''}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
@@ -329,7 +339,7 @@ export function BasicsStep({
           </Stack>
         </Tooltip>
       )}
-      {selected && !voice && (
+      {selected && !voice && !team && (
         <Alert severity="info">
           {selected.name}: {selected.nodesCount} steps
           {selected.agents.length

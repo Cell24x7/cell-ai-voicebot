@@ -60,6 +60,7 @@ const detail = (over: Partial<AdminAccountDetail> = {}): AdminAccountDetail => (
   usersCount: 1,
   apiLimits: null,
   voiceLine: 'dryrun',
+  phoneLine: { server: 'dryrun', connected: false },
   sipSettings: { pulseSec: null, spendMinutesPerHour: null },
   voiceApi: {
     enabled: false,
@@ -71,6 +72,7 @@ const detail = (over: Partial<AdminAccountDetail> = {}): AdminAccountDetail => (
       callerId: null,
       verifiedAt: null,
       webhookRegisteredAt: null,
+      checkError: null,
     },
   },
   usersByStatus: { active: 1, invited: 0, disabled: 0 },

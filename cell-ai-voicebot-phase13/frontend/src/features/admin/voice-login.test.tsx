@@ -29,6 +29,7 @@ const creds = (over: Partial<VoiceCredentials> = {}): VoiceCredentials => ({
   callerId: null,
   verifiedAt: null,
   webhookRegisteredAt: null,
+  checkError: null,
   ...over,
 });
 const show = (credentials: VoiceCredentials) =>
