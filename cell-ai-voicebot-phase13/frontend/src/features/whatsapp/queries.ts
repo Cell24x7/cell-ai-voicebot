@@ -116,7 +116,7 @@ export const useRenameChannel = () =>
 export const useSyncChannel = () => useChannelMutation((id: string) => whatsappApi.sync(id));
 export const useRetrySetup = () => useChannelMutation((id: string) => whatsappApi.retrySetup(id));
 export const useRegisterPin = () =>
-  useChannelMutation(({ id, pin }: { id: string; pin: string }) => whatsappApi.register(id, pin));
+  useChannelMutation(({ id, pin }: { id: string; pin?: string }) => whatsappApi.register(id, pin));
 export const useCoexistenceSync = () =>
   useChannelMutation((id: string) => whatsappApi.coexistenceSync(id));
 export const useDisconnectChannel = () =>

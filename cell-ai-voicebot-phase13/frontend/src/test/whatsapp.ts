@@ -31,6 +31,7 @@ export const fakeChannel = (overrides: Partial<WhatsAppChannel> = {}): WhatsAppC
   billing: { metaPayer: 'platform', creditLine: { status: 'attached' }, paymentMethodOk: null },
   coexistence: null,
   registration: { status: 'registered' },
+  canRegister: false,
   subscription: { status: 'subscribed' },
   restriction: null,
   webhook: { lastEventAt: '2026-10-22T09:00:00.000Z', lastField: 'messages' },

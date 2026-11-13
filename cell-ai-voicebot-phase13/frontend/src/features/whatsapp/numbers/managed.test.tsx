@@ -1,6 +1,8 @@
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ApiError } from '@/services/api/errors';
 import type { WhatsAppChannel, WhatsAppChannelList } from '@/services/api/types';
 import { whatsappApi } from '@/services/api/whatsapp';
 import { signInAs } from '@/test/auth';
@@ -132,5 +134,53 @@ describe('managed numbers for the owner (PN-T10)', () => {
       }),
     ).toBe('server text');
     expect(channelReasonText({ managed: true, statusReason: null })).toBeNull();
+  });
+});
+
+describe('"Register number" (number still pending at Meta)', () => {
+  const pending = () =>
+    fakeChannel({
+      status: 'action_needed',
+      phoneStatus: 'PENDING',
+      canRegister: true,
+      registration: { status: 'pending' },
+      statusReason: {
+        code: 'register_failed',
+        message: "Meta couldn't register the number.",
+        step: 'register',
+      },
+    } as Partial<WhatsAppChannel>);
+
+  it('registers with the saved PIN (no PIN sent)', async () => {
+    api.register.mockResolvedValue({ channel: fakeChannel(), outcome: 'connected' });
+    open([pending()]);
+    const region = await card();
+    await userEvent.click(within(region).getByRole('button', { name: 'Register number' }));
+    expect(api.register).toHaveBeenCalledWith(fakeChannel().id, undefined);
+    expect(await screen.findByText('Number registered')).toBeInTheDocument();
+  });
+
+  it('the number has its own PIN: the PIN form opens', async () => {
+    api.register.mockRejectedValue(
+      new ApiError({
+        status: 422,
+        code: 'VALIDATION_FAILED',
+        kind: 'http',
+        message: 'Validation failed',
+        details: [{ path: 'pin', message: 'Enter the 6-digit two-step verification PIN.' }],
+      }),
+    );
+    open([pending()]);
+    const region = await card();
+    await userEvent.click(within(region).getByRole('button', { name: 'Register number' }));
+    expect(await screen.findByRole('dialog', { name: 'Enter PIN' })).toBeInTheDocument();
+  });
+
+  it('hidden once the number is registered', async () => {
+    open([fakeChannel()]);
+    const region = await card();
+    expect(
+      within(region).queryByRole('button', { name: 'Register number' }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -146,8 +146,14 @@ export const whatsappApi = {
     unwrap(apiClient.post<SuccessEnvelope<ChannelActionResult>>(channel(id, '/sync'))),
   retrySetup: (id: string) =>
     unwrap(apiClient.post<SuccessEnvelope<ChannelActionResult>>(channel(id, '/retry-setup'))),
-  register: (id: string, pin: string) =>
-    unwrap(apiClient.post<SuccessEnvelope<ChannelActionResult>>(channel(id, '/register'), { pin })),
+  /** Registers the number; without a PIN the platform's configured one is used. */
+  register: (id: string, pin?: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<ChannelActionResult>>(
+        channel(id, '/register'),
+        pin ? { pin } : {},
+      ),
+    ),
   coexistenceSync: (id: string) =>
     unwrap(
       apiClient.post<SuccessEnvelope<{ channel: WhatsAppChannel }>>(

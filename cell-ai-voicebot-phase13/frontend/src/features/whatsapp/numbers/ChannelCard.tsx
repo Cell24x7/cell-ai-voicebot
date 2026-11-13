@@ -30,6 +30,7 @@ import {
 import {
   useCoexistenceSync,
   useDisconnectChannel,
+  useRegisterPin,
   useRetrySetup,
   useSyncChannel,
 } from '../queries';
@@ -147,6 +148,7 @@ export function ChannelCard({
   const sync = useSyncChannel();
   const retry = useRetrySetup();
   const disconnect = useDisconnectChannel();
+  const register = useRegisterPin();
   const fail = (err: unknown) =>
     enqueueSnackbar(whatsappErrorMessage(toApiError(err)), { variant: 'error' });
   const done = (r: { outcome: string }) =>
@@ -157,7 +159,33 @@ export function ChannelCard({
 
   const { status } = channel;
   const needsPin = status === 'action_needed' && channel.statusReason?.code === 'pin_required';
-  const working = sync.isPending || retry.isPending || disconnect.isPending;
+  const working = sync.isPending || retry.isPending || disconnect.isPending || register.isPending;
+  /** Not registered on WhatsApp yet (Meta shows "Pending"): register with the saved PIN. */
+  const onRegister = () =>
+    register.mutate(
+      { id: channel.id },
+      {
+        onSuccess: (r) =>
+          enqueueSnackbar(
+            r.outcome === 'connected'
+              ? 'Number registered'
+              : 'Number registered — still needs attention',
+            { variant: r.outcome === 'connected' ? 'success' : 'warning' },
+          ),
+        onError: (err) => {
+          const apiErr = toApiError(err);
+          // the number has its own two-step PIN: ask for it
+          if (
+            apiErr.code === 'VALIDATION_FAILED' &&
+            apiErr.details?.some((d) => d.path === 'pin')
+          ) {
+            onPin();
+            return;
+          }
+          fail(err);
+        },
+      },
+    );
   const showReason = ['action_needed', 'needs_reconnect', 'restricted'].includes(status);
 
   const onDisconnect = async () => {
@@ -245,6 +273,11 @@ export function ChannelCard({
             {needsPin && (
               <Button size="small" variant="contained" onClick={onPin}>
                 Enter PIN
+              </Button>
+            )}
+            {channel.canRegister && !needsPin && (
+              <Button size="small" variant="contained" disabled={working} onClick={onRegister}>
+                Register number
               </Button>
             )}
             {status === 'action_needed' && !needsPin && (

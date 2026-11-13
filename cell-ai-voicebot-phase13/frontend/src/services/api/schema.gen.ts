@@ -32983,7 +32983,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Finish registration with the number’s two-step PIN (whatsapp.manage) */
+    /** Register the number on the Cloud API — PIN optional, the configured one is used without it (whatsapp.manage) */
     post: {
       parameters: {
         query?: never;
@@ -40048,6 +40048,7 @@ export interface components {
         /** @enum {string} */
         status: 'not_needed' | 'pending' | 'registered' | 'failed';
       };
+      canRegister: boolean;
       subscription: {
         /** @enum {string|null} */
         status: 'subscribed' | 'failed' | null;
@@ -40764,7 +40765,7 @@ export interface components {
       label: string;
     };
     WhatsAppRegisterPinInput: {
-      pin: string;
+      pin?: string;
     };
     WhatsAppAdminDisconnectInput: {
       reason: string;
