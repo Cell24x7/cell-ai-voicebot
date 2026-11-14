@@ -367,6 +367,14 @@ describe('session messages', () => {
       { kind: 'finish', wabaId: '1' },
     ],
     [
+      {
+        type: 'WA_EMBEDDED_SIGNUP',
+        event: 'FINISH',
+        data: { waba_ids: ['5', '4'], phone_number_id: '2', business_id: '9' },
+      },
+      { kind: 'finish', wabaId: '5', phoneNumberId: '2' },
+    ],
+    [
       { type: 'WA_EMBEDDED_SIGNUP', event: 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING', data: {} },
       { kind: 'finish' },
     ],

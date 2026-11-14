@@ -146,7 +146,9 @@ export const parseSessionMessage = (
       'FINISH_GRANT_ONLY_API_ACCESS',
     ].includes(kind)
   ) {
-    const wabaId = str(data.waba_id);
+    // multi-WABA flows send `waba_ids` (newest first) instead of / besides `waba_id`
+    const wabaIds = Array.isArray(data.waba_ids) ? data.waba_ids.map(str) : [];
+    const wabaId = str(data.waba_id) ?? wabaIds.find(Boolean);
     const phoneNumberId = str(data.phone_number_id);
     const waacId = str(data.waac_id);
     return {
