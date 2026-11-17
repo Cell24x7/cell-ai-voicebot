@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
+import { useAuthStore } from '@/features/auth/store';
 import type {
   WhatsAppChannel,
   WhatsAppChannelDetail,
@@ -20,15 +21,16 @@ const settling = (channels: { status: WhatsAppChannel['status'] }[]) =>
   channels.some((c) => SETTLING_STATUSES.includes(c.status));
 
 /** Signup config (public values only); 503 `WHATSAPP_NOT_CONFIGURED` when the server has WhatsApp off. */
-export const useWhatsAppConfig = (enabled = true) =>
-  useQuery({
-    queryKey: whatsappKeys.config,
+export const useWhatsAppConfig = (enabled = true) => {
+  const accountId = useAuthStore((state) => state.session?.account.id ?? 'anonymous');
+  return useQuery({
+    queryKey: whatsappKeys.config(accountId),
     queryFn: whatsappApi.config,
-    enabled,
+    enabled: enabled && accountId !== 'anonymous',
     staleTime: Infinity,
-    // the page explains "not set up" (503) itself
     meta: { silent: true },
   });
+};
 
 export const useChannels = (enabled = true) =>
   useQuery({

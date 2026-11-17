@@ -55,6 +55,13 @@ export const adminWhatsappApi = {
         { metaPayer },
       ),
     ),
+  setSolutionId: (solutionId: string | null) =>
+    unwrap(
+      apiClient.patch<SuccessEnvelope<{ solutionIdConfigured: boolean }>>(
+        '/admin/whatsapp/solution-id',
+        { solutionId },
+      ),
+    ),
   manualConnect: (accountId: string, body: ManualConnectInput) =>
     unwrap(
       apiClient.post<SuccessEnvelope<WhatsAppConnectResult>>(

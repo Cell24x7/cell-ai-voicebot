@@ -6,10 +6,11 @@ import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { enqueueSnackbar } from 'notistack';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { CopyButton } from '@/components/CopyButton';
 import { DataTable } from '@/components/DataTable';
@@ -25,6 +26,7 @@ const FLAG_LABELS: Record<keyof WhatsAppAdminStatus['configured'], string> = {
   appId: 'Meta app id',
   appSecret: 'App secret',
   configId: 'Embedded Signup configuration',
+  solutionIdConfigured: 'Partner Solution ID',
   verifyToken: 'Webhook verify token',
   creditLine: 'Platform credit line',
   systemUserToken: 'System User token',
@@ -59,6 +61,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 /** Superadmin `/admin/whatsapp`: Meta setup status, webhook URL to paste in Meta, failed events. */
 export function AdminWhatsAppPage() {
+  const [solutionId, setSolutionId] = useState('');
   const queryClient = useQueryClient();
   const status = useQuery({
     queryKey: whatsappKeys.adminStatus,
@@ -76,6 +79,17 @@ export function AdminWhatsAppPage() {
     onSuccess: () => {
       enqueueSnackbar('Event queued again', { variant: 'success' });
       void queryClient.invalidateQueries({ queryKey: whatsappKeys.adminEvents('failed') });
+    },
+    onError: (err) => enqueueSnackbar(whatsappErrorMessage(toApiError(err)), { variant: 'error' }),
+  });
+  const saveSolutionId = useMutation({
+    mutationFn: (value: string | null) => adminWhatsappApi.setSolutionId(value),
+    meta: { silent: true },
+    onSuccess: () => {
+      enqueueSnackbar('Partner Solution setting updated', { variant: 'success' });
+      setSolutionId('');
+      void queryClient.invalidateQueries({ queryKey: whatsappKeys.adminStatus });
+      void queryClient.invalidateQueries({ queryKey: whatsappKeys.all });
     },
     onError: (err) => enqueueSnackbar(whatsappErrorMessage(toApiError(err)), { variant: 'error' }),
   });
@@ -127,6 +141,42 @@ export function AdminWhatsAppPage() {
               </Section>
             </Grid>
           </Grid>
+          <Section title="Embedded Signup Partner Solution">
+            <Stack spacing={1}>
+              <Typography variant="body2">
+                {s.configured.solutionIdConfigured
+                  ? 'A Partner Solution ID is configured.'
+                  : 'No Partner Solution ID is configured. Platform-payer signups are blocked until one is set.'}{' '}
+                The ID is stored in platform settings and is never shown after saving.
+              </Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                <TextField
+                  label="Partner Solution ID"
+                  value={solutionId}
+                  onChange={(event) => setSolutionId(event.target.value)}
+                  slotProps={{ htmlInput: { inputMode: 'numeric', pattern: '[0-9]*' } }}
+                  helperText="Digits only. Leave blank and save to clear the configured ID."
+                  size="small"
+                />
+                <Button
+                  variant="contained"
+                  disabled={saveSolutionId.isPending || !/^\d{1,64}$/.test(solutionId.trim())}
+                  onClick={() => saveSolutionId.mutate(solutionId.trim())}
+                >
+                  Save Partner Solution ID
+                </Button>
+                {s.configured.solutionIdConfigured && (
+                  <Button
+                    color="inherit"
+                    disabled={saveSolutionId.isPending}
+                    onClick={() => saveSolutionId.mutate(null)}
+                  >
+                    Clear Partner Solution ID
+                  </Button>
+                )}
+              </Stack>
+            </Stack>
+          </Section>
           <Section title="Numbers by status">
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
               {Object.entries(s.channelsByStatus).map(([k, n]) => (

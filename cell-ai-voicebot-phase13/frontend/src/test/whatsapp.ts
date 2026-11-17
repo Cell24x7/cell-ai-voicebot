@@ -77,6 +77,8 @@ export const fakeWhatsAppConfig = (overrides: Partial<WhatsAppConfig> = {}): Wha
   appId: null,
   configId: null,
   graphVersion: 'v26.0',
+  metaPayer: 'platform',
+  solutionId: null,
   ...overrides,
 });
 
@@ -90,6 +92,7 @@ export const fakeAdminWhatsAppStatus = (
     appId: false,
     appSecret: true,
     configId: false,
+    solutionIdConfigured: false,
     verifyToken: true,
     creditLine: true,
     systemUserToken: true,

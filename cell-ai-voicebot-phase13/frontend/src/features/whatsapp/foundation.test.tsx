@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useAuthStore } from '@/features/auth/store';
 import { ApiError } from '@/services/api/errors';
 import { metaPublicApi } from '@/services/api/meta-public';
 import type { WhatsAppChannelList } from '@/services/api/types';
@@ -136,6 +137,7 @@ describe('queries', () => {
   );
   beforeEach(() => {
     client.clear();
+    signInAs('owner');
     for (const fn of Object.values(api)) fn.mockReset();
     api.config.mockResolvedValue(fakeWhatsAppConfig());
     api.channels.mockResolvedValue(list());
@@ -146,6 +148,7 @@ describe('queries', () => {
   it('config, list and detail', async () => {
     const config = renderHook(() => useWhatsAppConfig(), { wrapper });
     await waitFor(() => expect(config.result.current.data?.provider).toBe('fake'));
+    expect(client.getQueryCache().findAll({ queryKey: ['whatsapp', 'config'] })).toHaveLength(1);
     const channels = renderHook(() => useChannels(), { wrapper });
     await waitFor(() => expect(channels.result.current.data?.items).toHaveLength(1));
     const detail = renderHook(() => useChannel('wa1'), { wrapper });
@@ -155,6 +158,19 @@ describe('queries', () => {
     expect(renderHook(() => useWhatsAppConfig(false), { wrapper }).result.current.fetchStatus).toBe(
       'idle',
     );
+  });
+
+  it('refetches WhatsApp config when the authenticated account changes', async () => {
+    const hook = renderHook(() => useWhatsAppConfig(), { wrapper });
+    await waitFor(() => expect(hook.result.current.data?.metaPayer).toBe('platform'));
+    api.config.mockResolvedValueOnce(fakeWhatsAppConfig({ metaPayer: 'customer' }));
+    const session = useAuthStore.getState().session;
+    if (!session) throw new Error('test session missing');
+    useAuthStore.setState({
+      session: { ...session, account: { ...session.account, id: 'different-account' } },
+    });
+    await waitFor(() => expect(hook.result.current.data?.metaPayer).toBe('customer'));
+    expect(api.config).toHaveBeenCalledTimes(2);
   });
 
   it('polls while a number is settling, stops when final', async () => {
@@ -438,7 +454,12 @@ describe('session messages', () => {
 });
 
 describe('Embedded Signup run', () => {
-  const config = fakeWhatsAppConfig({ provider: 'meta', appId: '1', configId: '99' });
+  const config = fakeWhatsAppConfig({
+    provider: 'meta',
+    appId: '1',
+    configId: '99',
+    solutionId: '123456789012345',
+  });
   let respond: (r: FbLoginResponse) => void;
   const login = vi.fn((cb: (r: FbLoginResponse) => void, _options: Record<string, unknown>) => {
     respond = cb;
@@ -458,24 +479,34 @@ describe('Embedded Signup run', () => {
     );
 
   it('login options per mode', () => {
-    expect(loginOptions('99', 'cloud_api')).toEqual({
+    const config = { metaPayer: 'platform' as const, solutionId: '123456789012345' };
+    expect(loginOptions('99', 'cloud_api', config)).toEqual({
       config_id: '99',
       response_type: 'code',
       override_default_response_type: true,
-      extras: {},
+      extras: { setup: { solutionID: '123456789012345' } },
     });
-    expect(loginOptions('99', 'coexistence')).toEqual({
+    expect(loginOptions('99', 'coexistence', config)).toEqual({
       config_id: '99',
       response_type: 'code',
       override_default_response_type: true,
-      extras: { featureType: 'whatsapp_business_app_onboarding' },
+      extras: {
+        setup: { solutionID: '123456789012345' },
+        featureType: 'whatsapp_business_app_onboarding',
+      },
     });
+    expect(
+      loginOptions('99', 'cloud_api', { metaPayer: 'customer', solutionId: null }).extras,
+    ).toEqual({});
+    expect(
+      loginOptions('99', 'coexistence', { metaPayer: 'customer', solutionId: null }).extras,
+    ).toEqual({ featureType: 'whatsapp_business_app_onboarding' });
   });
 
   it('finished with session info (before or after the code), or without it after the wait', async () => {
     const run = runEmbeddedSignup(config, 'coexistence', { sessionWaitMs: 50 });
     await waitFor(() => expect(login).toHaveBeenCalled());
-    expect(login.mock.calls[0]?.[1]).toEqual(loginOptions('99', 'coexistence'));
+    expect(login.mock.calls[0]?.[1]).toEqual(loginOptions('99', 'coexistence', config));
     post('FINISH', { waba_id: '1', phone_number_id: '2' });
     respond({ authResponse: { code: 'CODE' } });
     expect(await run).toEqual({
@@ -492,6 +523,14 @@ describe('Embedded Signup run', () => {
     await waitFor(() => expect(login).toHaveBeenCalledTimes(3));
     respond({ authResponse: { code: 'C3' } });
     expect(await none).toEqual({ kind: 'finished', code: 'C3', sessionInfo: {} });
+  });
+
+  it('blocks platform signup before loading Meta when the Solution ID is missing', async () => {
+    const result = await runEmbeddedSignup({ ...config, solutionId: null }, 'cloud_api');
+    expect(result.kind === 'sdk_failed' && result.message.includes('Partner Solution ID')).toBe(
+      true,
+    );
+    expect(login).not.toHaveBeenCalled();
   });
 
   it('error, cancel, popup blocked, plain cancel, SDK failure', async () => {

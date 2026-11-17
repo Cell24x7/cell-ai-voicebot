@@ -33787,6 +33787,86 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/whatsapp/solution-id': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Set or clear the platform Partner Solution id (value is never returned) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['WhatsAppSolutionIdInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                solutionIdConfigured: boolean;
+              };
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
   '/api/v1/admin/whatsapp/events': {
     parameters: {
       query?: never;
@@ -40121,6 +40201,10 @@ export interface components {
       /** @description Embedded Signup configuration id (meta provider only) */
       configId: string | null;
       graphVersion: string;
+      /** @enum {string} */
+      metaPayer: 'platform' | 'customer';
+      /** @description Partner Solution id for this platform-payer account; null otherwise */
+      solutionId: string | null;
     };
     WhatsAppChannelList: {
       items: components['schemas']['WhatsAppChannel'][];
@@ -40143,6 +40227,7 @@ export interface components {
         appId: boolean;
         appSecret: boolean;
         configId: boolean;
+        solutionIdConfigured: boolean;
         verifyToken: boolean;
         creditLine: boolean;
         systemUserToken: boolean;
@@ -40766,6 +40851,9 @@ export interface components {
     };
     WhatsAppRegisterPinInput: {
       pin?: string;
+    };
+    WhatsAppSolutionIdInput: {
+      solutionId: string | null;
     };
     WhatsAppAdminDisconnectInput: {
       reason: string;

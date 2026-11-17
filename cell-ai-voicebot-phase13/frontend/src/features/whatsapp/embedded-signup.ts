@@ -32,12 +32,23 @@ const POPUP_BLOCKED_MS = 800;
  * session info is always sent (no `sessionInfoVersion`); coexistence still names the
  * Business app onboarding feature.
  */
-export const loginOptions = (configId: string, mode: WhatsAppMode): Record<string, unknown> => ({
-  config_id: configId,
-  response_type: 'code',
-  override_default_response_type: true,
-  extras: mode === 'coexistence' ? { featureType: 'whatsapp_business_app_onboarding' } : {},
-});
+export const loginOptions = (
+  configId: string,
+  mode: WhatsAppMode,
+  config: Pick<WhatsAppConfig, 'metaPayer' | 'solutionId'>,
+): Record<string, unknown> => {
+  const setup =
+    config.metaPayer === 'platform' && config.solutionId ? { solutionID: config.solutionId } : {};
+  return {
+    config_id: configId,
+    response_type: 'code',
+    override_default_response_type: true,
+    extras: {
+      ...(Object.keys(setup).length ? { setup } : {}),
+      ...(mode === 'coexistence' ? { featureType: 'whatsapp_business_app_onboarding' } : {}),
+    },
+  };
+};
 
 const sessionInfoOf = (msg: SessionMessage | null): SessionInfo =>
   msg?.kind === 'finish'
@@ -54,10 +65,17 @@ const sessionInfoOf = (msg: SessionMessage | null): SessionInfo =>
  * codes expire in ~30 s) plus the session ids when they arrive within 3 s.
  */
 export const runEmbeddedSignup = async (
-  config: Pick<WhatsAppConfig, 'appId' | 'configId' | 'graphVersion'>,
+  config: Pick<WhatsAppConfig, 'appId' | 'configId' | 'graphVersion' | 'metaPayer' | 'solutionId'>,
   mode: WhatsAppMode,
   { sessionWaitMs = SESSION_INFO_WAIT_MS, now = () => Date.now() } = {},
 ): Promise<SignupOutcome> => {
+  if (config.metaPayer === 'platform' && !config.solutionId) {
+    return {
+      kind: 'sdk_failed',
+      message:
+        'Meta Partner Solution ID is not configured. Ask a platform administrator to set it in Admin → WhatsApp.',
+    };
+  }
   let sdk;
   try {
     sdk = await loadMetaSdk({ appId: config.appId ?? '', version: config.graphVersion });
@@ -76,7 +94,7 @@ export const runEmbeddedSignup = async (
   const started = now();
   try {
     const response = await new Promise<FbLoginResponse>((resolve) => {
-      sdk.login(resolve, loginOptions(config.configId ?? '', mode));
+      sdk.login(resolve, loginOptions(config.configId ?? '', mode, config));
     });
     const code = response.authResponse?.code;
     if (code) {
