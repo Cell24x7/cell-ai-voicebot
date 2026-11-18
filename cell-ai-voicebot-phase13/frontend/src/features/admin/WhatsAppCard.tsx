@@ -234,6 +234,38 @@ function DisconnectDialog({
   );
 }
 
+function ConfirmCreditLineAction({
+  row,
+  onDone,
+}: {
+  row: AdminWhatsAppChannelRow;
+  onDone: () => void;
+}) {
+  const confirm = useConfirm();
+  const mutation = useMutation({
+    mutationFn: () => adminWhatsappApi.confirmCreditLine(row.id),
+    meta: { silent: true },
+    onSuccess: () => {
+      enqueueSnackbar('Platform credit line marked active by admin', { variant: 'success' });
+      onDone();
+    },
+    onError: (err) => enqueueSnackbar(whatsappErrorMessage(toApiError(err)), { variant: 'error' }),
+  });
+  const run = async () => {
+    const ok = await confirm({
+      title: 'Confirm platform credit line',
+      message: `Confirm that the platform credit line is attached in Meta Business Settings to this exact WhatsApp number (${row.displayPhoneNumber ?? row.label}) and its WABA. Cell24x7 will trust this confirmation and mark billing active; it will not make another Meta attachment call.`,
+      confirmText: 'Yes, it is attached',
+    });
+    if (ok) mutation.mutate();
+  };
+  return (
+    <Button size="small" disabled={mutation.isPending} onClick={() => void run()}>
+      Confirm credit line active
+    </Button>
+  );
+}
+
 function ManualConnectDialog({
   accountId,
   onClose,
@@ -393,19 +425,37 @@ export function WhatsAppCard({ detail }: { detail: AdminAccountDetail }) {
             {
               key: 'payer',
               header: 'Meta billed to',
-              render: (r) =>
-                r.managed
-                  ? `Partner credit line (${r.creditLineStatus === 'partner_active' ? 'active' : 'requested'})`
-                  : `${PAYER_LABELS[r.metaPayer]} (${r.creditLineStatus.replace('_', ' ')})`,
+              render: (r) => (
+                <Stack spacing={0.5}>
+                  <span>
+                    {r.managed
+                      ? `Partner credit line (${r.creditLineStatus === 'partner_active' ? 'active' : 'requested'})`
+                      : `${PAYER_LABELS[r.metaPayer]} (${r.creditLineStatus.replace('_', ' ')})`}
+                  </span>
+                  {r.creditLineAdminConfirmedAt && (
+                    <Chip size="small" color="success" label="Admin confirmed in Meta" />
+                  )}
+                </Stack>
+              ),
             },
             {
               key: 'actions',
               header: '',
               render: (r) =>
                 r.status === 'disconnected' ? null : (
-                  <Button size="small" color="error" onClick={() => setForce(r)}>
-                    Force disconnect
-                  </Button>
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                    {!r.managed &&
+                      r.provider === 'meta' &&
+                      r.metaPayer === 'platform' &&
+                      r.creditLineStatus === 'failed' &&
+                      r.statusReasonStep === 'billing' &&
+                      !r.creditLineAdminConfirmedAt && (
+                        <ConfirmCreditLineAction row={r} onDone={refresh} />
+                      )}
+                    <Button size="small" color="error" onClick={() => setForce(r)}>
+                      Force disconnect
+                    </Button>
+                  </Stack>
                 ),
             },
           ]}

@@ -97,4 +97,11 @@ export const adminWhatsappApi = {
         { status },
       ),
     ),
+  confirmCreditLine: (channelId: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<WhatsAppChannel>>(
+        `/admin/whatsapp/channels/${channelId}/credit-line/confirm`,
+        { confirmed: true },
+      ),
+    ),
 };

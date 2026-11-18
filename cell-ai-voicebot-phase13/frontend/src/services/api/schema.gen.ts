@@ -34733,6 +34733,104 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/whatsapp/channels/{id}/credit-line/confirm': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Record a superadmin confirmation that the platform credit line is attached in Meta */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['WhatsAppCreditLineConfirmationInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppChannel'];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/dev/meta/managed-number': {
     parameters: {
       query?: never;
@@ -35799,6 +35897,7 @@ export interface components {
         | 'template.variables_updated'
         | 'whatsapp.rate_card_saved'
         | 'whatsapp.billing_settings_updated'
+        | 'whatsapp.embedded_signup_solution_updated'
         | 'account.whatsapp_billing_updated'
         | 'contact.whatsapp_marketing_changed'
         | 'whatsapp.calling_settings_updated'
@@ -35891,7 +35990,8 @@ export interface components {
         | 'whatsapp.managed_number_added'
         | 'whatsapp.managed_key_replaced'
         | 'whatsapp.managed_webhook_reset'
-        | 'whatsapp.credit_line_updated';
+        | 'whatsapp.credit_line_updated'
+        | 'whatsapp.credit_line_admin_confirmed';
       actor: {
         /** @enum {string} */
         type: 'user' | 'api_key' | 'system';
@@ -36095,6 +36195,8 @@ export interface components {
         /** @enum {string} */
         metaPayer: 'platform' | 'customer';
         creditLineStatus: string;
+        creditLineAdminConfirmedAt: string | null;
+        statusReasonStep: string | null;
         connectedAt: string | null;
         provider: string;
         managed: boolean;
@@ -40907,6 +41009,10 @@ export interface components {
        * @enum {string}
        */
       status: 'partner_pending' | 'partner_active';
+    };
+    WhatsAppCreditLineConfirmationInput: {
+      /** @enum {boolean} */
+      confirmed: true;
     };
     DevSeedManagedNumberInput: {
       businessName?: string;

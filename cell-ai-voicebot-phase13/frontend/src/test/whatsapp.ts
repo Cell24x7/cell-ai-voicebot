@@ -125,6 +125,8 @@ export const fakeAdminWhatsAppRow = (
   messagingLimitTier: 'TIER_1K',
   metaPayer: 'platform',
   creditLineStatus: 'attached',
+  creditLineAdminConfirmedAt: null,
+  statusReasonStep: null,
   connectedAt: '2026-10-22T08:00:00.000Z',
   provider: 'fake',
   managed: false,
