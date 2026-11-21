@@ -24,7 +24,7 @@ import {
 } from 'react-router';
 
 import { PageHeader } from '@/components/PageHeader';
-import { useCan, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, useCan, useSession } from '@/features/auth/hooks';
 import { useAuthStore } from '@/features/auth/store';
 import { outcomeLabel, useDispositions } from '@/features/insights/queries';
 import { FilterBar } from '@/features/reports/FilterBar';
@@ -102,7 +102,7 @@ export function ReportsPage() {
   const report = useReport(current, toQuery(filters, current), valid);
   const dispositions = useDispositions(current === 'calls');
   const can = useCan();
-  const impersonating = Boolean(useSession()?.impersonation);
+  const impersonating = isLimitedImpersonation(useSession());
   const canExport = can('reports.export') && !impersonating;
   if (!valid) return <Navigate to="/reports" replace />;
 

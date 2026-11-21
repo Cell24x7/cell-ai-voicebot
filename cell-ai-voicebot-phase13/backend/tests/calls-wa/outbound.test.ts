@@ -7,7 +7,7 @@ import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { pulsesFor } from '../../src/core/billing/whatsapp-calls';
-import { FAKE_CALL_KNOBS } from '../../src/core/meta';
+import { FAKE_CALL_KNOBS, networkError } from '../../src/core/meta';
 import { setRealtime } from '../../src/core/realtime';
 import type { CallLeg, HangupCause, LegStatus } from '../../src/core/telephony/types';
 import { hasTone } from '../../src/core/telephony/whatsapp/tones';
@@ -491,6 +491,8 @@ describe('business-initiated WhatsApp calls', () => {
     const res = await start(contact._id, 'ai', { kind: 'agent', id: await agentId() });
     const done = await ended(res.callId);
     expect(done).toMatchObject({ status: 'completed', mode: 'ai', disposition: 'Paid' });
+    // SAC-T12: how long the customer waited for the first word
+    expect(typeof done.metrics.firstAudioMs).toBe('number');
     await vi.waitFor(
       async () => expect((await callOf(res.callId))?.billing.whatsapp?.status).toBe('settled'),
       {
@@ -533,6 +535,82 @@ describe('business-initiated WhatsApp calls', () => {
     // we sent terminate for the unanswered one
     expect(world.w.fake.calls.map((c) => c.op)).toContain('terminateCall');
     expect((await WalletModel.findOne({ accountId: actor.accountId }).lean())?.holdMicros).toBe(0);
+  });
+
+  it('SAC: a superadmin full access session places the call as the owner (actedBy), view never', async () => {
+    const superadmin = new Types.ObjectId();
+    const never = await contactFor(customer(FAKE_CALL_KNOBS.neverAnswers));
+    const res = await calls().startOutbound(
+      { ...actor, impersonatorId: superadmin, impersonationMode: 'full' },
+      { channelId: state.channel._id.toString(), contactId: never._id.toString(), mode: 'human' },
+    );
+    const call = await callOf(res.callId);
+    expect(call?.actedBy).toEqual({ userId: actor.userId, impersonatorId: superadmin });
+    await ended(res.callId);
+    const other = await contactFor(customer(FAKE_CALL_KNOBS.rejects));
+    await expect(
+      calls().startOutbound(
+        { ...actor, impersonatorId: superadmin, impersonationMode: 'view' },
+        { channelId: state.channel._id.toString(), contactId: other._id.toString(), mode: 'human' },
+      ),
+    ).rejects.toMatchObject({ code: 'AUTH_FORBIDDEN' });
+    // a plain call has no actedBy
+    const plain = await start(other._id);
+    expect((await callOf(plain.callId))?.actedBy).toBeNull();
+    await ended(plain.callId);
+  });
+
+  it('SAC-T8: a scheduled call try is placed once — a replay returns the same call', async () => {
+    const contact = await contactFor(customer(FAKE_CALL_KNOBS.neverAnswers));
+    const agent = await createAgentDoc(state.acc.account._id, 'Scheduled caller');
+    const scheduled = { id: new Types.ObjectId().toString(), attempt: 1 };
+    const input = {
+      channelId: state.channel._id.toString(),
+      contactId: contact._id.toString(),
+      mode: 'ai' as const,
+      program: { kind: 'agent' as const, id: agent.toString() },
+      scheduled,
+    };
+    const first = await calls().startOutbound(actor, input);
+    const replay = await calls().startOutbound(actor, input);
+    expect(replay.callId).toBe(first.callId);
+    const call = await callOf(first.callId);
+    expect(call?.scheduledCallId?.toString()).toBe(scheduled.id);
+    expect(call?.attempt).toBe(1);
+    await ended(first.callId);
+  });
+
+  it('SAC-T12: Meta never answers our connect → no redial; a late ringing call is terminated', async () => {
+    const contact = await contactFor(customer(FAKE_CALL_KNOBS.neverAnswers));
+    world.w.fake.failNext('startCall', networkError(true));
+    const before = await CallModel.countDocuments({ contactId: contact._id });
+    await expect(start(contact._id)).rejects.toBeTruthy();
+    const failed = await CallModel.findOne({ contactId: contact._id }).sort({ _id: -1 }).lean();
+    expect(await CallModel.countDocuments({ contactId: contact._id })).toBe(before + 1);
+    expect(failed?.whatsapp?.timeline.map((t) => t.event)).toContain('connect_uncertain');
+    // Meta did place it after all: its status arrives with our call id as biz opaque
+    const ops = world.w.fake.calls.length;
+    await calls().onWebhook(
+      state.channel,
+      {
+        messaging_product: 'whatsapp',
+        metadata: { phone_number_id: state.channel.phoneNumberId },
+        statuses: [
+          {
+            id: 'wacid.late.1',
+            type: 'call',
+            status: 'RINGING',
+            timestamp: String(Math.floor(Date.now() / 1000)),
+            recipient_id: customer(FAKE_CALL_KNOBS.neverAnswers),
+            biz_opaque_callback_data: failed!._id.toString(),
+          },
+        ],
+      },
+      { eventId: new Types.ObjectId().toString() },
+    );
+    expect(world.w.fake.calls.slice(ops).map((c) => c.op)).toContain('terminateCall');
+    const after = await callOf(failed!._id.toString());
+    expect(after?.whatsapp?.timeline.map((t) => t.event)).toContain('late_terminate');
   });
 
   it('the customer hangs up after 5 s (00027): ended by Meta, 1 pulse charged', async () => {

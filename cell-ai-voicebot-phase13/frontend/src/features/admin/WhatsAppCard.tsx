@@ -24,6 +24,7 @@ import {
   QUALITY_LABELS,
   whatsappErrorMessage,
 } from '@/features/whatsapp/labels';
+import { WebhookChip, WebhookFixButton } from '@/features/whatsapp/numbers/WebhookCheck';
 import {
   adminWhatsappApi,
   type ManagedCreditLine,
@@ -410,11 +411,25 @@ export function WhatsAppCard({ detail }: { detail: AdminAccountDetail }) {
               key: 'status',
               header: 'Status',
               render: (r) => (
-                <Chip
-                  size="small"
-                  color={channelStatusColor(r.status)}
-                  label={CHANNEL_STATUS_LABELS[r.status]}
-                />
+                <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap' }}>
+                  <Chip
+                    size="small"
+                    color={channelStatusColor(r.status)}
+                    label={CHANNEL_STATUS_LABELS[r.status]}
+                  />
+                  {r.webhookStatus && r.status !== 'disconnected' && (
+                    <WebhookChip
+                      check={{
+                        status: r.webhookStatus,
+                        appSubscribed: null,
+                        missingFields: [],
+                        checkedAt: null,
+                        fixedAt: null,
+                        error: null,
+                      }}
+                    />
+                  )}
+                </Stack>
               ),
             },
             {
@@ -452,6 +467,12 @@ export function WhatsAppCard({ detail }: { detail: AdminAccountDetail }) {
                       !r.creditLineAdminConfirmedAt && (
                         <ConfirmCreditLineAction row={r} onDone={refresh} />
                       )}
+                    {!r.managed && (
+                      <WebhookFixButton
+                        run={() => adminWhatsappApi.fixChannelWebhook(r.id)}
+                        invalidate={[adminKeys.account(id)]}
+                      />
+                    )}
                     <Button size="small" color="error" onClick={() => setForce(r)}>
                       Force disconnect
                     </Button>

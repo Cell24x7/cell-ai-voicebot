@@ -15,7 +15,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { enqueueSnackbar } from 'notistack';
 import { useState } from 'react';
 
-import { usePermission, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, usePermission, useSession } from '@/features/auth/hooks';
 import { getErrorMessage } from '@/services/api/errors';
 import { insightsApi } from '@/services/api/insights';
 import type { AccountDisposition, InsightsSettings } from '@/services/api/types';
@@ -214,7 +214,8 @@ export function InsightsSettingsTab() {
   const canUpdate = usePermission('account.update');
   const settings = useInsightsSettings();
   const dispositions = useDispositions();
-  const canEdit = canUpdate && session?.account.status !== 'suspended' && !session?.impersonation;
+  const canEdit =
+    canUpdate && session?.account.status !== 'suspended' && !isLimitedImpersonation(session);
   return (
     <Stack spacing={3}>
       <Paper

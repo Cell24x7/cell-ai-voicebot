@@ -23,6 +23,7 @@ import { ChannelCard } from './ChannelCard';
 import { PinDialog, RenameDialog } from './ChannelDialogs';
 import { ChannelDrawer } from './ChannelDrawer';
 import { ConnectWizard } from './ConnectWizard';
+import { SwitchToMetaDialog } from './SwitchToMetaDialog';
 import { READ_ONLY_HINT } from './texts';
 
 const REQUIREMENTS = [
@@ -44,6 +45,7 @@ export function NumbersPanel() {
   const [wizard, setWizard] = useState<{ reconnect: WhatsAppChannel | null } | null>(null);
   const [details, setDetails] = useState<string | null>(null);
   const [rename, setRename] = useState<WhatsAppChannel | null>(null);
+  const [switching, setSwitching] = useState<WhatsAppChannel | null>(null);
   const [pin, setPin] = useState<WhatsAppChannel | null>(null);
 
   if (notSetUp) {
@@ -119,6 +121,7 @@ export function NumbersPanel() {
               onRename={() => setRename(channel)}
               onPin={() => setPin(channel)}
               onReconnect={() => setWizard({ reconnect: channel })}
+              onSwitchToMeta={() => setSwitching(channel)}
             />
           ))}
         </Stack>
@@ -129,6 +132,13 @@ export function NumbersPanel() {
           config={config.data}
           reconnect={wizard.reconnect}
           onClose={() => setWizard(null)}
+        />
+      )}
+      {switching && (
+        <SwitchToMetaDialog
+          channel={switching}
+          config={config.data}
+          onClose={() => setSwitching(null)}
         />
       )}
       {rename && <RenameDialog channel={rename} onClose={() => setRename(null)} />}

@@ -17,7 +17,7 @@ import { useState, type ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router';
 
 import { useConfirm } from '@/components/confirm-context';
-import { useCan, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, useCan, useSession } from '@/features/auth/hooks';
 import { useCanWriteWaCampaigns } from '@/features/whatsapp-campaigns/permissions';
 import { contactsApi, type BulkAction, type BulkRequest } from '@/services/api/contacts';
 import { getErrorMessage } from '@/services/api/errors';
@@ -62,7 +62,7 @@ export function BulkActionsBar({
   const can = useCan();
   const canWaCampaign = useCanWriteWaCampaigns();
   const session = useSession();
-  const canErase = can('contacts.erase') && !session?.impersonation;
+  const canErase = can('contacts.erase') && !isLimitedImpersonation(session);
   const [erasing, setErasing] = useState(false);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [picker, setPicker] = useState<Picker | null>(null);

@@ -16,7 +16,7 @@ import Typography from '@mui/material/Typography';
 import { useMutation } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
-import { useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, useSession } from '@/features/auth/hooks';
 import { useExportJob } from '@/features/contact-exports/useExportJob';
 import { getErrorMessage } from '@/services/api/errors';
 import { recordExportsApi, type ExportFormat } from '@/services/api/record-exports';
@@ -63,7 +63,7 @@ export function RecordExportButton({
     onSuccess: (job) => setJobId(job.id),
   });
   const job = useExportJob(jobId, recordExportsApi.get);
-  if (session?.impersonation) return null;
+  if (isLimitedImpersonation(session)) return null;
   const j = job.data;
   const running = begin.isPending || (j && (j.status === 'pending' || j.status === 'processing'));
   const pct =

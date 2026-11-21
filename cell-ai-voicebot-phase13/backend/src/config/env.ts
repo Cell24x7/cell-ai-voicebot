@@ -69,6 +69,16 @@ const RawEnvSchema = z.object({
   MFA_ENFORCED_FOR_ADMINS: z
     .enum(['true', 'false'], { message: 'must be true or false' })
     .optional(),
+  /** SAC-T8: scheduled AI WhatsApp calls (Schedule AI call, AI callbacks). */
+  WA_SCHEDULED_CALLS_ENABLED: z
+    .enum(['true', 'false'], { message: 'must be true or false' })
+    .default('true')
+    .transform((v) => v === 'true'),
+  /** SAC: superadmin "Full access" login-as (acts as the owner everywhere, audited). */
+  LOGIN_AS_FULL_ENABLED: z
+    .enum(['true', 'false'], { message: 'must be true or false' })
+    .default('true')
+    .transform((v) => v === 'true'),
 
   MONGODB_URI: z
     .string()
@@ -200,6 +210,24 @@ const RawEnvSchema = z.object({
   WA_MEDIA_PORT_MAX: z.coerce.number().int().min(1024).max(65535).default(40_999),
   /** Comma list of `stun:host:port` (or `off`). Default Google's STUN; none in tests. */
   WA_STUN_URLS: optionalString,
+  /** SAC-T12: optional TURN relay for strict customer networks (comma-separated `turn:` URLs). */
+  WA_TURN_URLS: z
+    .string()
+    .optional()
+    .transform((v) =>
+      Object.freeze(
+        (v ?? '')
+          .split(',')
+          .map((u) => u.trim())
+          .filter(Boolean),
+      ),
+    )
+    .refine((list) => list.every((u) => /^turns?:/.test(u)), {
+      message: 'must be turn: or turns: URLs',
+    }),
+  WA_TURN_USERNAME: optionalString,
+  /** Secret: never logged. */
+  WA_TURN_CREDENTIAL: optionalString,
   /** WhatsApp calls with media per process. */
   WA_MEDIA_MAX_CALLS: z.coerce.number().int().min(1).max(1000).default(50),
   /**

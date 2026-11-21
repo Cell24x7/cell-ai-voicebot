@@ -163,3 +163,29 @@ export const CALL_ERROR_TEXT: Record<string, string> = {
   WALLET_BUDGET_EXCEEDED: 'The monthly call budget is reached. Raise it in Wallet → Settings.',
   RATE_LIMITED: 'Too many tries. Wait a minute and try again.',
 };
+
+/** SAC-T10: scheduled AI call statuses (Hinglish). */
+export const SCHEDULED_STATUS_LABELS: Record<string, string> = {
+  scheduled: 'Scheduled',
+  dispatching: 'Lag raha hai',
+  calling: 'Call chal rahi hai',
+  done: 'Ho gaya',
+  skipped: 'Skip hua',
+  failed: 'Fail',
+  cancelled: 'Cancel',
+};
+
+/** SAC-T10: why a scheduled AI call was not placed. */
+export const SCHEDULED_SKIP_LABELS: Record<string, string> = {
+  no_permission: 'Customer ki call permission nahi thi',
+  dnd: 'Number DND par hai',
+  opted_out: 'Customer ne opt out kiya',
+  outside_window: 'Calling time (09:00–21:00) ke bahar',
+  channel_down: 'WhatsApp number connected nahi tha',
+  calling_disabled: 'Number par calling band thi',
+  program_inactive: 'Flow / AI agent chalu nahi tha',
+  wallet: 'Wallet mein balance nahi tha',
+  capacity: 'Saari lines busy thin',
+  contact_deleted: 'Contact delete ho gaya',
+  not_allowed: 'Call ki ijazat nahi thi',
+};

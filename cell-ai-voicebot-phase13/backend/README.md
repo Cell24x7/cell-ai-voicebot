@@ -242,6 +242,14 @@ Voice calls on WhatsApp numbers: WebRTC media in our own process (`werift`, Opus
 - **Google Sheets:** scheduled imports from a published CSV; an Apps Script receiver and Zapier / Make / n8n guides in `docs/integrations/`.
 - **Try it:** `npm run db:seed` prints a demo API key (`cav_test_…`) and adds a webhook to the dev receiver (`/api/v1/mock/webhook-receiver`), two rules and a paused sheet. Deploy notes: [docs/ops/release-phase-15.md](docs/ops/release-phase-15.md).
 
+## Superadmin full access + WhatsApp calling (SAC)
+
+- **Full access** (Admin → account → **Full access**): the superadmin works as the owner for 4 h (Extend up to 12 h, banner with **Ring me too** / Exit). Danger actions ask for the superadmin's own password + code (`POST /auth/login-as/step-up`, 5 min). Add money stays with Admin → Wallet. Every write is audited with the superadmin. [ADR 0052](docs/adr/0052-superadmin-full-access-and-wa-calling.md)
+- **Webhook check / Fix**: onboarding subscribes our app and checks Meta's webhook fields (`messages`, `calls`); the number card shows Webhook ✓ / ✗ with a Fix button. [Setup](docs/setup/meta-whatsapp.md)
+- **Incoming WhatsApp calls**: "AI se incoming calls uthao" per number and as the account default (Settings → Calls); the team is rung when the AI can't take a call; missed calls are callback tasks.
+- **Schedule AI call**: inbox / contact **Call ▾ → Call myself · Call with AI · Schedule AI call**; Calls → Scheduled. [API guide](docs/api/scheduled-calls.md)
+- **Switch to Meta direct** for managed (Pinnacle) numbers. [Pinnacle](docs/integrations/pinnacle.md)
+
 ## Database (MongoDB)
 
 - Connection: `src/db/mongo.ts` (Mongoose 9, `strictQuery`, `autoIndex` off in production, credentials never logged). Indexes are synced at startup in development/test; in production run `npm run db:sync-indexes` as a deploy step.
@@ -467,6 +475,11 @@ Copy `.env.example` → `.env` (gitignored). Every variable is validated at star
 | `HSTS_BY_PROXY`                    | no                                         | 16      | `true` when nginx sends Strict-Transport-Security, so the API leaves it out (default `false`)                                                                                                                      |
 | `TLS_CERT_PATH`                    | no                                         | 17      | Site certificate file; Admin → System shows the days left                                                                                                                                                          |
 | `MFA_ENFORCED_FOR_ADMINS`          | no                                         | 16      | `true`: impersonate, account purge and Add account need a fresh two-step code. A superadmin who hasn't set it up isn't locked out                                                                                  |
+| `LOGIN_AS_FULL_ENABLED`            | no                                         | SAC     | `false` turns off superadmin **Full access** (default `true`): 4 h, acts as the owner, danger actions need a step-up                                                                                               |
+| `WA_SCHEDULED_CALLS_ENABLED`       | no                                         | SAC     | `false` turns off scheduled AI WhatsApp calls (default `true`); placed by the process that runs WhatsApp call media                                                                                                |
+| `WA_TURN_URLS`                     | no                                         | SAC     | Comma list of `turn:` / `turns:` URLs — a TURN relay for WhatsApp call audio (Admin → System shows it)                                                                                                             |
+| `WA_TURN_USERNAME`                 | no                                         | SAC     | TURN login user for `WA_TURN_URLS`                                                                                                                                                                                 |
+| `WA_TURN_CREDENTIAL`               | no (secret)                                | SAC     | TURN password; never logged                                                                                                                                                                                        |
 | `MONGODB_URI`                      | yes                                        | 1       | MongoDB connection string (replica set)                                                                                                                                                                            |
 | `REDIS_URL`                        | yes                                        | 1       | Redis connection string                                                                                                                                                                                            |
 | `WORKERS_ENABLED`                  | no                                         | 1       | `true` (default) / `false` — run BullMQ workers in the API process                                                                                                                                                 |

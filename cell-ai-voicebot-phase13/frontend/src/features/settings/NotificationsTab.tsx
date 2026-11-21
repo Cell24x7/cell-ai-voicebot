@@ -21,7 +21,7 @@ import { useState } from 'react';
 
 import { useConfirm } from '@/components/confirm-context';
 import { DataTable } from '@/components/DataTable';
-import { usePermission, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, usePermission, useSession } from '@/features/auth/hooks';
 import { getErrorMessage } from '@/services/api/errors';
 import { reportSubscriptionsApi } from '@/services/api/report-subscriptions';
 import type { ReportSubscription } from '@/services/api/types';
@@ -149,7 +149,7 @@ function ReportEmailDialog({
 export function NotificationsTab() {
   const canReports = usePermission('reports.read');
   const session = useSession();
-  const readOnly = Boolean(session?.impersonation);
+  const readOnly = isLimitedImpersonation(session);
   const timezone = session?.account.timezone ?? 'Asia/Kolkata';
   const confirm = useConfirm();
   const queryClient = useQueryClient();

@@ -18,11 +18,13 @@ import { useCallPermission, useCanCall, useCanRequestPermission } from '../queri
 
 import { CallWithAiDialog } from './CallWithAiDialog';
 import { placeCall } from './controller';
+import { ScheduleAiCallDialog } from './ScheduleAiCallDialog';
 import { isLive, useLiveCallStore } from './store';
 
 /**
  * Chat header (and contact panel) call control from the customer's permission:
- * "Request permission" · "Requested · waiting" · "Call" (Call yourself / Call with AI)
+ * "Request permission" · "Requested · waiting" · "Call" (Call myself / Call with AI /
+ * Schedule AI call)
  * · "Can't call" with the reason. Hidden for people who can't place calls.
  */
 export function CallButton({
@@ -48,7 +50,7 @@ export function CallButton({
   const session = useSession();
   const live = useLiveCallStore((s) => isLive(s.active));
   const [menu, setMenu] = useState<HTMLElement | null>(null);
-  const [dialog, setDialog] = useState<'ai' | 'human' | 'request' | null>(null);
+  const [dialog, setDialog] = useState<'ai' | 'human' | 'request' | 'schedule' | null>(null);
   const key = useRef<string | null>(null);
   if (!canCall) return null;
   const p = permission.data;
@@ -141,7 +143,7 @@ export function CallButton({
             setDialog('human');
           }}
         >
-          <ListItemText primary="Call yourself" secondary="Talk from this browser" />
+          <ListItemText primary="Call myself" secondary="Is browser se baat karo" />
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -149,7 +151,15 @@ export function CallButton({
             setDialog('ai');
           }}
         >
-          <ListItemText primary="Call with AI" secondary="A flow or an AI agent talks" />
+          <ListItemText primary="Call with AI" secondary="Flow ya AI agent baat karega" />
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setMenu(null);
+            setDialog('schedule');
+          }}
+        >
+          <ListItemText primary="Schedule AI call" secondary="Baad mein AI call karega" />
         </MenuItem>
       </Menu>
       {(dialog === 'ai' || dialog === 'human') && (
@@ -161,6 +171,16 @@ export function CallButton({
           contactLabel={label}
           phoneE164={phoneE164}
           onCall={(program) => call(dialog, program)}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'schedule' && (
+        <ScheduleAiCallDialog
+          channelId={channelId}
+          contactId={contactId}
+          conversationId={conversationId}
+          contactLabel={label}
+          phoneE164={phoneE164}
           onClose={() => setDialog(null)}
         />
       )}

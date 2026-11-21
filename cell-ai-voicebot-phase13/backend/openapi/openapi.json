@@ -249,9 +249,12 @@
             "properties": {
               "impersonatorId": { "type": "string" },
               "expiresAt": { "type": "string" },
-              "mode": { "type": "string", "enum": ["view", "act"] },
+              "mode": { "type": "string", "enum": ["view", "act", "full"] },
               "kind": { "type": "string", "enum": ["superadmin", "reseller"] },
-              "returnTo": { "type": "string" }
+              "returnTo": { "type": "string" },
+              "startedAt": { "type": "string" },
+              "maxUntil": { "type": "string" },
+              "ringMeToo": { "type": "boolean" }
             },
             "required": ["impersonatorId", "expiresAt", "mode", "kind", "returnTo"]
           }
@@ -276,9 +279,12 @@
             "properties": {
               "impersonatorId": { "type": "string" },
               "expiresAt": { "type": "string" },
-              "mode": { "type": "string", "enum": ["view", "act"] },
+              "mode": { "type": "string", "enum": ["view", "act", "full"] },
               "kind": { "type": "string", "enum": ["superadmin", "reseller"] },
-              "returnTo": { "type": "string" }
+              "returnTo": { "type": "string" },
+              "startedAt": { "type": "string" },
+              "maxUntil": { "type": "string" },
+              "ringMeToo": { "type": "boolean" }
             },
             "required": ["impersonatorId", "expiresAt", "mode", "kind", "returnTo"]
           }
@@ -1322,7 +1328,17 @@
               "whatsapp.managed_key_replaced",
               "whatsapp.managed_webhook_reset",
               "whatsapp.credit_line_updated",
-              "whatsapp.credit_line_admin_confirmed"
+              "whatsapp.credit_line_admin_confirmed",
+              "auth.login_as_full_started",
+              "auth.login_as_full_extended",
+              "auth.login_as_step_up",
+              "auth.login_as_step_up_failed",
+              "auth.login_as_ring_me_too",
+              "whatsapp.webhook_fixed",
+              "whatsapp.webhook_fix_failed",
+              "whatsapp.incoming_default_updated",
+              "whatsapp.ai_calls_stopped",
+              "whatsapp.channel_switched_to_meta"
             ]
           },
           "actor": {
@@ -1675,6 +1691,10 @@
                 "metaPayer": { "type": "string", "enum": ["platform", "customer"] },
                 "creditLineStatus": { "type": "string" },
                 "creditLineAdminConfirmedAt": { "type": ["string", "null"] },
+                "webhookStatus": {
+                  "type": ["string", "null"],
+                  "enum": ["ok", "failed", "unknown", null]
+                },
                 "statusReasonStep": { "type": ["string", "null"] },
                 "connectedAt": { "type": ["string", "null"] },
                 "provider": { "type": "string" },
@@ -1710,6 +1730,7 @@
                 "metaPayer",
                 "creditLineStatus",
                 "creditLineAdminConfirmedAt",
+                "webhookStatus",
                 "statusReasonStep",
                 "connectedAt",
                 "provider",
@@ -1844,7 +1865,10 @@
                 "properties": { "reason": { "type": "string" }, "at": { "type": "string" } },
                 "required": ["reason", "at"]
               },
-              "failedSetups15m": { "type": "integer" }
+              "failedSetups15m": { "type": "integer" },
+              "webhookMissing": { "type": "integer" },
+              "turnSet": { "type": "boolean" },
+              "aiFirstAudioP95Ms": { "type": ["number", "null"] }
             },
             "required": [
               "mediaEnabled",
@@ -1853,7 +1877,10 @@
               "liveCalls",
               "lastSetupMs",
               "lastError",
-              "failedSetups15m"
+              "failedSetups15m",
+              "webhookMissing",
+              "turnSet",
+              "aiFirstAudioP95Ms"
             ],
             "description": "Phase 18B: WhatsApp call audio; null when WhatsApp is off"
           }
@@ -3099,6 +3126,7 @@
                 },
                 "required": ["setupMs", "packetsIn", "packetsOut", "lossPct", "jitterMs", "rttMs"]
               },
+              "firstAudioMs": { "type": "number" },
               "latency": {
                 "type": "object",
                 "properties": {
@@ -7338,7 +7366,9 @@
               "whatsapp_campaign.completed",
               "whatsapp_campaign.paused",
               "voice_api.provider_error",
-              "whatsapp.provider_balance_low"
+              "whatsapp.provider_balance_low",
+              "whatsapp.webhook_missing",
+              "whatsapp.scheduled_call_failed"
             ]
           },
           "title": { "type": "string" },
@@ -8916,6 +8946,97 @@
           "createdAt"
         ]
       },
+      "WhatsAppScheduledCall": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "channelId": { "type": "string" },
+          "contactId": { "type": "string" },
+          "conversationId": { "type": ["string", "null"] },
+          "program": {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string", "enum": ["flow", "agent"] },
+              "id": { "type": "string" }
+            },
+            "required": ["kind", "id"]
+          },
+          "purpose": { "type": ["string", "null"] },
+          "dueAt": { "type": "string" },
+          "timezone": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "dispatching",
+              "calling",
+              "done",
+              "skipped",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "skipReason": { "type": ["string", "null"] },
+          "origin": { "type": "string", "enum": ["manual", "ai_callback", "api"] },
+          "attempt": { "type": "integer" },
+          "retry": {
+            "type": "object",
+            "properties": {
+              "max": { "type": "integer" },
+              "gapMin": { "type": "integer" },
+              "on": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["no_answer", "busy", "failed"] }
+              }
+            },
+            "required": ["max", "gapMin", "on"]
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": { "type": "string" },
+                "callId": { "type": ["string", "null"] },
+                "result": {
+                  "type": "string",
+                  "enum": ["answered", "no_answer", "busy", "failed", "skipped"]
+                },
+                "reason": { "type": ["string", "null"] }
+              },
+              "required": ["at", "callId", "result", "reason"]
+            }
+          },
+          "shiftedAt": { "type": ["string", "null"] },
+          "callIds": { "type": "array", "items": { "type": "string" } },
+          "createdBy": { "type": "string" },
+          "cancelledAt": { "type": ["string", "null"] },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        },
+        "required": [
+          "id",
+          "channelId",
+          "contactId",
+          "conversationId",
+          "program",
+          "purpose",
+          "dueAt",
+          "timezone",
+          "status",
+          "skipReason",
+          "origin",
+          "attempt",
+          "retry",
+          "attempts",
+          "shiftedAt",
+          "callIds",
+          "createdBy",
+          "cancelledAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "WhatsAppChannel": {
         "type": "object",
         "properties": {
@@ -9076,6 +9197,25 @@
             },
             "required": ["lastEventAt", "lastField"]
           },
+          "webhookCheck": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string", "enum": ["ok", "failed", "unknown"] },
+              "appSubscribed": { "type": ["boolean", "null"] },
+              "missingFields": { "type": "array", "items": { "type": "string" } },
+              "checkedAt": { "type": ["string", "null"] },
+              "fixedAt": { "type": ["string", "null"] },
+              "error": { "type": ["string", "null"] }
+            },
+            "required": [
+              "status",
+              "appSubscribed",
+              "missingFields",
+              "checkedAt",
+              "fixedAt",
+              "error"
+            ]
+          },
           "connectedBy": { "type": ["string", "null"] },
           "connectedAt": { "type": ["string", "null"] },
           "syncedAt": { "type": ["string", "null"] },
@@ -9111,6 +9251,7 @@
           "subscription",
           "restriction",
           "webhook",
+          "webhookCheck",
           "connectedBy",
           "connectedAt",
           "syncedAt",
@@ -10415,6 +10556,32 @@
         "required": ["label"],
         "additionalProperties": false
       },
+      "WhatsAppSwitchToMetaInput": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "description": "Code from FB.login (single use)"
+          },
+          "wabaId": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^(\\d+|fake_[a-z]+_[0-9a-f]{12})$",
+            "example": "106540352242922"
+          },
+          "phoneNumberId": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^(\\d+|fake_[a-z]+_[0-9a-f]{12})$",
+            "example": "106540352242922"
+          },
+          "mode": { "type": "string", "enum": ["cloud_api", "coexistence"] }
+        },
+        "required": ["code", "wabaId", "phoneNumberId"],
+        "additionalProperties": false
+      },
       "WhatsAppRegisterPinInput": {
         "type": "object",
         "properties": { "pin": { "type": "string", "pattern": "^\\d{6}$" } },
@@ -11204,7 +11371,7 @@
                     "format": "password"
                   }
                 },
-                "required": ["currentPassword", "newPassword"],
+                "required": ["newPassword"],
                 "additionalProperties": false
               }
             }
@@ -23504,7 +23671,6 @@
                   "password": { "type": "string", "minLength": 1, "maxLength": 200 },
                   "includeRecordings": { "type": "boolean" }
                 },
-                "required": ["password"],
                 "additionalProperties": false
               }
             }
@@ -23638,7 +23804,7 @@
                   "password": { "type": "string", "minLength": 1, "maxLength": 200 },
                   "confirmName": { "type": "string", "minLength": 1, "maxLength": 80 }
                 },
-                "required": ["password", "confirmName"],
+                "required": ["confirmName"],
                 "additionalProperties": false
               }
             }
@@ -24286,6 +24452,154 @@
                     "data": {
                       "type": "array",
                       "items": { "$ref": "#/components/schemas/PhoneNumber" }
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login-as/extend": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Superadmin full access: 4 more hours (at most 12 hours from the start)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": { "$ref": "#/components/schemas/AuthSession" }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login-as/step-up": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Superadmin full access: confirm with the superadmin's own password (+ two-step code) for 5 minutes",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "format": "password"
+                  },
+                  "code": { "type": "string", "minLength": 6, "maxLength": 20 }
+                },
+                "required": ["password"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": { "stepUpUntil": { "type": "string" } },
+                      "required": ["stepUpUntil"]
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "422": {
+            "description": "Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "429": {
+            "description": "Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login-as/ring-me-too": {
+      "put": {
+        "tags": ["Auth"],
+        "summary": "Superadmin full access: let incoming calls of this account ring this session too",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "on": { "type": "boolean" } },
+                "required": ["on"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": { "ringMeToo": { "type": "boolean" } },
+                      "required": ["ringMeToo"]
                     }
                   },
                   "required": ["success", "data"]
@@ -34345,7 +34659,7 @@
                     "format": "password"
                   }
                 },
-                "required": ["userId", "password"],
+                "required": ["userId"],
                 "additionalProperties": false
               }
             }
@@ -37642,6 +37956,8 @@
                         "contact.opted_in",
                         "whatsapp_campaign.completed",
                         "whatsapp_campaign.paused",
+                        "whatsapp_call.scheduled",
+                        "whatsapp_call.scheduled_skipped",
                         "*"
                       ]
                     },
@@ -37775,6 +38091,8 @@
                         "contact.opted_in",
                         "whatsapp_campaign.completed",
                         "whatsapp_campaign.paused",
+                        "whatsapp_call.scheduled",
+                        "whatsapp_call.scheduled_skipped",
                         "*"
                       ]
                     },
@@ -37890,7 +38208,9 @@
                       "contact.opted_out",
                       "contact.opted_in",
                       "whatsapp_campaign.completed",
-                      "whatsapp_campaign.paused"
+                      "whatsapp_campaign.paused",
+                      "whatsapp_call.scheduled",
+                      "whatsapp_call.scheduled_skipped"
                     ]
                   }
                 },
@@ -38061,7 +38381,9 @@
                 "contact.opted_out",
                 "contact.opted_in",
                 "whatsapp_campaign.completed",
-                "whatsapp_campaign.paused"
+                "whatsapp_campaign.paused",
+                "whatsapp_call.scheduled",
+                "whatsapp_call.scheduled_skipped"
               ]
             },
             "required": false,
@@ -40621,6 +40943,724 @@
         }
       }
     },
+    "/api/v1/whatsapp/incoming-default": {
+      "get": {
+        "tags": ["WhatsApp calling"],
+        "summary": "Who answers incoming WhatsApp calls on numbers connected from now on (calls.read)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "route": {
+                          "type": "string",
+                          "enum": ["team", "ai", "ai_then_team", "team_then_ai"]
+                        },
+                        "aiProgram": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["flow", "agent"] },
+                            "id": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" }
+                          },
+                          "required": ["kind", "id"]
+                        },
+                        "ringTimeoutSec": { "type": "integer", "minimum": 10, "maximum": 30 }
+                      },
+                      "required": ["route", "aiProgram", "ringTimeoutSec"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["WhatsApp calling"],
+        "summary": "Set the default — AI answers (ai / ai_then_team / team_then_ai, needs a program, call audio and wallet money) or the team (whatsapp.calling.manage)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "route": {
+                    "type": "string",
+                    "enum": ["team", "ai", "ai_then_team", "team_then_ai"]
+                  },
+                  "aiProgram": {
+                    "type": ["object", "null"],
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["flow", "agent"] },
+                      "id": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" }
+                    },
+                    "required": ["kind", "id"]
+                  },
+                  "ringTimeoutSec": { "type": "integer", "minimum": 10, "maximum": 30 }
+                },
+                "required": ["route", "aiProgram", "ringTimeoutSec"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "route": {
+                          "type": "string",
+                          "enum": ["team", "ai", "ai_then_team", "team_then_ai"]
+                        },
+                        "aiProgram": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["flow", "agent"] },
+                            "id": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" }
+                          },
+                          "required": ["kind", "id"]
+                        },
+                        "ringTimeoutSec": { "type": "integer", "minimum": 10, "maximum": 30 }
+                      },
+                      "required": ["route", "aiProgram", "ringTimeoutSec"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "422": {
+            "description": "Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "429": {
+            "description": "Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/whatsapp/channels/{id}/calling/stop-ai-calls": {
+      "post": {
+        "tags": ["WhatsApp calling"],
+        "summary": "End every live AI call on this number politely (calls with a person stay)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "schema": { "type": "string" }, "required": true, "name": "id", "in": "path" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": { "stopped": { "type": "integer" } },
+                      "required": ["stopped"]
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/whatsapp/scheduled-calls": {
+      "post": {
+        "tags": ["WhatsApp calling", "Public API"],
+        "security": [{ "bearerAuth": [] }, { "apiKeyAuth": [] }],
+        "summary": "Schedule an AI WhatsApp call (calls.trigger)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channelId": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+                  "contactId": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+                  "conversationId": { "type": ["string", "null"], "pattern": "^[a-f0-9]{24}$/i" },
+                  "program": {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["flow", "agent"] },
+                      "id": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" }
+                    },
+                    "required": ["kind", "id"]
+                  },
+                  "purpose": { "type": ["string", "null"], "maxLength": 500 },
+                  "dueAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-21T05:30:00.000Z"
+                  },
+                  "retry": {
+                    "type": ["object", "null"],
+                    "properties": {
+                      "max": { "type": "integer", "minimum": 0, "maximum": 2 },
+                      "gapMin": { "type": "integer", "minimum": 15, "maximum": 240 },
+                      "on": {
+                        "type": "array",
+                        "items": { "type": "string", "enum": ["no_answer", "busy", "failed"] },
+                        "maxItems": 3
+                      }
+                    },
+                    "required": ["max", "gapMin", "on"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["channelId", "contactId", "program", "dueAt"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "scheduledCall": { "$ref": "#/components/schemas/WhatsAppScheduledCall" },
+                        "warnings": {
+                          "type": "object",
+                          "properties": {
+                            "noPermission": { "type": "boolean" },
+                            "permissionExpiresBeforeDue": { "type": "boolean" },
+                            "outsideWindow": { "type": "boolean" },
+                            "lowWallet": { "type": "boolean" }
+                          },
+                          "required": [
+                            "noPermission",
+                            "permissionExpiresBeforeDue",
+                            "outsideWindow",
+                            "lowWallet"
+                          ]
+                        },
+                        "replay": { "type": "boolean" }
+                      },
+                      "required": ["scheduledCall", "warnings", "replay"]
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "scheduledCall": { "$ref": "#/components/schemas/WhatsAppScheduledCall" },
+                        "warnings": {
+                          "type": "object",
+                          "properties": {
+                            "noPermission": { "type": "boolean" },
+                            "permissionExpiresBeforeDue": { "type": "boolean" },
+                            "outsideWindow": { "type": "boolean" },
+                            "lowWallet": { "type": "boolean" }
+                          },
+                          "required": [
+                            "noPermission",
+                            "permissionExpiresBeforeDue",
+                            "outsideWindow",
+                            "lowWallet"
+                          ]
+                        },
+                        "replay": { "type": "boolean" }
+                      },
+                      "required": ["scheduledCall", "warnings", "replay"]
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "422": {
+            "description": "Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "429": {
+            "description": "Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "503": { "description": "WhatsApp calling or media capacity unavailable" }
+        }
+      },
+      "get": {
+        "tags": ["WhatsApp calling", "Public API"],
+        "security": [{ "bearerAuth": [] }, { "apiKeyAuth": [] }],
+        "summary": "Scheduled AI WhatsApp calls, newest first (calls.read)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "scheduled",
+                "dispatching",
+                "calling",
+                "done",
+                "skipped",
+                "failed",
+                "cancelled"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": false,
+            "name": "contactId",
+            "in": "query"
+          },
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": false,
+            "name": "channelId",
+            "in": "query"
+          },
+          {
+            "schema": { "type": "string", "format": "date-time" },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": { "type": "string", "format": "date-time" },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100 },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/WhatsAppScheduledCall" }
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "422": {
+            "description": "Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "429": {
+            "description": "Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "503": { "description": "WhatsApp calling or media capacity unavailable" }
+        }
+      }
+    },
+    "/api/v1/whatsapp/scheduled-calls/{id}": {
+      "get": {
+        "tags": ["WhatsApp calling", "Public API"],
+        "security": [{ "bearerAuth": [] }, { "apiKeyAuth": [] }],
+        "summary": "One scheduled AI WhatsApp call (calls.read)",
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": { "$ref": "#/components/schemas/WhatsAppScheduledCall" }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "422": {
+            "description": "Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "429": {
+            "description": "Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "503": { "description": "WhatsApp calling or media capacity unavailable" }
+        }
+      },
+      "patch": {
+        "tags": ["WhatsApp calling", "Public API"],
+        "security": [{ "bearerAuth": [] }, { "apiKeyAuth": [] }],
+        "summary": "Reschedule / change a waiting scheduled call (calls.trigger)",
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dueAt": { "type": "string", "format": "date-time" },
+                  "program": {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["flow", "agent"] },
+                      "id": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" }
+                    },
+                    "required": ["kind", "id"]
+                  },
+                  "purpose": { "type": ["string", "null"], "maxLength": 500 },
+                  "retry": {
+                    "type": "object",
+                    "properties": {
+                      "max": { "type": "integer", "minimum": 0, "maximum": 2 },
+                      "gapMin": { "type": "integer", "minimum": 15, "maximum": 240 },
+                      "on": {
+                        "type": "array",
+                        "items": { "type": "string", "enum": ["no_answer", "busy", "failed"] },
+                        "maxItems": 3
+                      }
+                    },
+                    "required": ["max", "gapMin", "on"],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": { "$ref": "#/components/schemas/WhatsAppScheduledCall" }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "422": {
+            "description": "Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "429": {
+            "description": "Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "503": { "description": "WhatsApp calling or media capacity unavailable" }
+        }
+      }
+    },
+    "/api/v1/whatsapp/scheduled-calls/{id}/cancel": {
+      "post": {
+        "tags": ["WhatsApp calling", "Public API"],
+        "security": [{ "bearerAuth": [] }, { "apiKeyAuth": [] }],
+        "summary": "Cancel a waiting scheduled call (calls.trigger)",
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": { "$ref": "#/components/schemas/WhatsAppScheduledCall" }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "422": {
+            "description": "Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "429": {
+            "description": "Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "503": { "description": "WhatsApp calling or media capacity unavailable" }
+        }
+      }
+    },
     "/api/v1/whatsapp/config": {
       "get": {
         "tags": ["WhatsApp"],
@@ -40857,6 +41897,276 @@
                   "properties": {
                     "success": { "type": "boolean", "enum": [true] },
                     "data": { "$ref": "#/components/schemas/WhatsAppChannel" }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "422": {
+            "description": "Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "429": {
+            "description": "Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "502": { "description": "Meta returned an error (META_API_ERROR)" },
+          "503": { "description": "WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED)" }
+        }
+      }
+    },
+    "/api/v1/whatsapp/channels/{id}/switch-to-meta": {
+      "post": {
+        "tags": ["WhatsApp"],
+        "summary": "SAC-T11: switch a managed (partner) number to Meta direct — our Embedded Signup for the same WABA and number; same channel id, the partner credit line keeps paying (whatsapp.manage)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WhatsAppSwitchToMetaInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "channel": { "$ref": "#/components/schemas/WhatsAppChannel" },
+                        "outcome": { "type": "string" },
+                        "partnerWebhookCleared": { "type": "boolean" }
+                      },
+                      "required": ["channel", "outcome", "partnerWebhookCleared"]
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "422": {
+            "description": "Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "429": {
+            "description": "Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "502": { "description": "Meta returned an error (META_API_ERROR)" },
+          "503": { "description": "WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED)" }
+        }
+      }
+    },
+    "/api/v1/whatsapp/channels/{id}/webhook": {
+      "get": {
+        "tags": ["WhatsApp"],
+        "summary": "SAC-T4: the last check that Meta delivers this number's events to us (whatsapp.read)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "provider": { "type": "string", "enum": ["meta", "pinnacle"] },
+                        "webhookCheck": {
+                          "type": "object",
+                          "properties": {
+                            "status": { "type": "string", "enum": ["ok", "failed", "unknown"] },
+                            "appSubscribed": { "type": ["boolean", "null"] },
+                            "missingFields": { "type": "array", "items": { "type": "string" } },
+                            "checkedAt": { "type": ["string", "null"] },
+                            "fixedAt": { "type": ["string", "null"] },
+                            "error": { "type": ["string", "null"] }
+                          },
+                          "required": [
+                            "status",
+                            "appSubscribed",
+                            "missingFields",
+                            "checkedAt",
+                            "fixedAt",
+                            "error"
+                          ]
+                        }
+                      },
+                      "required": ["provider", "webhookCheck"]
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "503": { "description": "WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED)" }
+        }
+      }
+    },
+    "/api/v1/whatsapp/channels/{id}/webhook/fix": {
+      "post": {
+        "tags": ["WhatsApp"],
+        "summary": "SAC-T4: Webhook check / Fix — subscribe our app to the WABA, add missing app webhook fields, check again (whatsapp.manage; 6 / 10 min / number)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "webhookCheck": {
+                          "type": "object",
+                          "properties": {
+                            "status": { "type": "string", "enum": ["ok", "failed", "unknown"] },
+                            "appSubscribed": { "type": ["boolean", "null"] },
+                            "missingFields": { "type": "array", "items": { "type": "string" } },
+                            "checkedAt": { "type": ["string", "null"] },
+                            "fixedAt": { "type": ["string", "null"] },
+                            "error": { "type": ["string", "null"] }
+                          },
+                          "required": [
+                            "status",
+                            "appSubscribed",
+                            "missingFields",
+                            "checkedAt",
+                            "fixedAt",
+                            "error"
+                          ]
+                        },
+                        "steps": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "enum": ["app_subscribed", "fields", "fix_app", "fix_fields"]
+                              },
+                              "ok": { "type": "boolean" },
+                              "detail": { "type": ["string", "null"] }
+                            },
+                            "required": ["key", "ok", "detail"]
+                          }
+                        }
+                      },
+                      "required": ["webhookCheck", "steps"]
+                    }
                   },
                   "required": ["success", "data"]
                 }
@@ -42203,6 +43513,102 @@
           },
           "502": {
             "description": "The partner refused the request or didn't keep our webhook (WA_PROVIDER_ERROR / PINNACLE_WEBHOOK_NOT_SET)"
+          },
+          "503": { "description": "WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED)" }
+        }
+      }
+    },
+    "/api/v1/admin/whatsapp/channels/{id}/webhook/fix": {
+      "post": {
+        "tags": ["Superadmin"],
+        "summary": "SAC-T4: Webhook check / Fix of any account's Meta number (superadmin, audited)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "schema": { "type": "string", "pattern": "^[a-f0-9]{24}$/i" },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "enum": [true] },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "webhookCheck": {
+                          "type": "object",
+                          "properties": {
+                            "status": { "type": "string", "enum": ["ok", "failed", "unknown"] },
+                            "appSubscribed": { "type": ["boolean", "null"] },
+                            "missingFields": { "type": "array", "items": { "type": "string" } },
+                            "checkedAt": { "type": ["string", "null"] },
+                            "fixedAt": { "type": ["string", "null"] },
+                            "error": { "type": ["string", "null"] }
+                          },
+                          "required": [
+                            "status",
+                            "appSubscribed",
+                            "missingFields",
+                            "checkedAt",
+                            "fixedAt",
+                            "error"
+                          ]
+                        },
+                        "steps": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "enum": ["app_subscribed", "fields", "fix_app", "fix_fields"]
+                              },
+                              "ok": { "type": "boolean" },
+                              "detail": { "type": ["string", "null"] }
+                            },
+                            "required": ["key", "ok", "detail"]
+                          }
+                        }
+                      },
+                      "required": ["webhookCheck", "steps"]
+                    }
+                  },
+                  "required": ["success", "data"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "403": {
+            "description": "Missing permission, disabled user, suspended account or impersonation block",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "404": {
+            "description": "Not found in this account (RESOURCE_NOT_FOUND)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
+          },
+          "409": {
+            "description": "Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } }
+            }
           },
           "503": { "description": "WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED)" }
         }

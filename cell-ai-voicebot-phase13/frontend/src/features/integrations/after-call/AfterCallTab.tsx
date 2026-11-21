@@ -20,7 +20,7 @@ import { useState } from 'react';
 
 import { useConfirm } from '@/components/confirm-context';
 import { DataTable } from '@/components/DataTable';
-import { usePermission, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, usePermission, useSession } from '@/features/auth/hooks';
 import { useDispositions } from '@/features/insights/queries';
 import { buildPreview } from '@/features/templates/preview';
 import { useTemplate, useTemplates } from '@/features/templates/queries';
@@ -343,7 +343,7 @@ function RuleDialog({ rule, onClose }: { rule: OutcomeRule | null; onClose: () =
 /** Integrations → After the call: WhatsApp templates sent by outcome rules. */
 export function AfterCallTab() {
   const session = useSession();
-  const canManage = usePermission('integrations.manage') && !session?.impersonation;
+  const canManage = usePermission('integrations.manage') && !isLimitedImpersonation(session);
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [editing, setEditing] = useState<{ rule: OutcomeRule | null } | null>(null);

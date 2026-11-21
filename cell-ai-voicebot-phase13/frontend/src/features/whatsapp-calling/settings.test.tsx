@@ -249,9 +249,10 @@ describe('number → Calling settings', () => {
   it('routing: AI routes need a program; a ring list of people who can answer', async () => {
     show();
     const s = await section();
-    await userEvent.click(within(s).getByRole('combobox', { name: 'Answered by' }));
-    await userEvent.click(await screen.findByRole('option', { name: 'AI first, then the team' }));
+    // SAC-T7: the switch turns the AI on (AI first, then the team)
+    await userEvent.click(within(s).getByRole('switch', { name: 'AI se incoming calls uthao' }));
     expect(within(s).getByText('Choose a flow or an AI agent')).toBeInTheDocument();
+    expect(within(s).getByText('Abhi: AI uthayega (AI na mile to team)')).toBeInTheDocument();
     await userEvent.click(within(s).getByRole('combobox', { name: 'Published flow' }));
     await userEvent.click(await screen.findByRole('option', { name: 'Loan recovery' }));
     await userEvent.click(within(s).getByRole('switch', { name: /Ring everyone/ }));
@@ -269,6 +270,29 @@ describe('number → Calling settings', () => {
         ringUserIds: ['u2'],
       },
     });
+  });
+
+  it('SAC-T7: AI only, the advanced team-first route and back to the team', async () => {
+    show();
+    const s = await section();
+    await userEvent.click(within(s).getByRole('switch', { name: 'AI se incoming calls uthao' }));
+    await userEvent.click(within(s).getByRole('combobox', { name: 'Published flow' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Loan recovery' }));
+    await userEvent.click(within(s).getByRole('radio', { name: 'Sirf AI' }));
+    expect(within(s).getByText('Abhi: AI har call uthayega')).toBeInTheDocument();
+    // AI only: nobody is rung
+    expect(within(s).queryByRole('switch', { name: /Ring everyone/ })).toBeNull();
+    await userEvent.click(
+      within(s).getByRole('checkbox', { name: 'Advanced: team pehle, koi na uthaye to AI' }),
+    );
+    expect(within(s).getByText('Abhi: pehle team, koi na uthaye to AI')).toBeInTheDocument();
+    await userEvent.click(within(s).getByRole('button', { name: 'Save call settings' }));
+    await waitFor(() => expect(api.updateSettings).toHaveBeenCalled());
+    expect(api.updateSettings.mock.calls[0]?.[1]).toMatchObject({
+      inbound: { route: 'team_then_ai', aiProgram: { kind: 'flow', id: 'f1' } },
+    });
+    await userEvent.click(within(s).getByRole('switch', { name: 'AI se incoming calls uthao' }));
+    expect(within(s).getByText('Abhi: team uthayegi')).toBeInTheDocument();
   });
 
   it('server errors show the calling text', async () => {

@@ -11,9 +11,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { enqueueSnackbar } from 'notistack';
 import { useState } from 'react';
 
-import { usePermission, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, usePermission, useSession } from '@/features/auth/hooks';
 import { reloadMe } from '@/features/auth/session';
 import { CallingWindowField } from '@/features/campaigns/fields/CallingWindowField';
+import { IncomingDefaultCard } from '@/features/whatsapp-calling/settings/IncomingDefaultCard';
 import { accountApi, type AccountUpdate } from '@/services/api/account';
 import { getErrorMessage } from '@/services/api/errors';
 import type { AccountWithWarning, PublicAccount } from '@/services/api/types';
@@ -53,14 +54,18 @@ export function CallsTab() {
   const canUpdate = usePermission('account.update');
   const account = session?.account;
   if (!account) return null;
-  const canEdit = canUpdate && account.status !== 'suspended' && !session.impersonation;
+  const canEdit = canUpdate && account.status !== 'suspended' && !isLimitedImpersonation(session);
   return (
-    <CallsForm
-      key={JSON.stringify(draftOf(account))}
-      account={account}
-      canEdit={canEdit}
-      canEditCaps={canEdit && ['owner', 'admin'].includes(session.role.key)}
-    />
+    <>
+      <CallsForm
+        key={JSON.stringify(draftOf(account))}
+        account={account}
+        canEdit={canEdit}
+        canEditCaps={canEdit && ['owner', 'admin'].includes(session.role.key)}
+      />
+      {/* SAC-T7: who answers incoming WhatsApp calls on new numbers */}
+      <IncomingDefaultCard />
+    </>
   );
 }
 

@@ -94,6 +94,9 @@ describe('Admin → System', () => {
         lastSetupMs: 850,
         lastError: { reason: 'media_timeout', at: hoursAgo(1) },
         failedSetups15m: 3,
+        webhookMissing: 0,
+        turnSet: false,
+        aiFirstAudioP95Ms: null,
       },
     });
     open();

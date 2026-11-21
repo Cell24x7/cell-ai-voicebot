@@ -105,6 +105,7 @@ const detail = (over: Partial<AdminAccountDetail> = {}): AdminAccountDetail => (
       managed: false,
       pinnacle: null,
       statusReasonCode: null,
+      webhookStatus: 'ok',
     },
     {
       id: 'wa2',
@@ -124,6 +125,7 @@ const detail = (over: Partial<AdminAccountDetail> = {}): AdminAccountDetail => (
       managed: false,
       pinnacle: null,
       statusReasonCode: null,
+      webhookStatus: 'ok',
     },
   ],
   recentAudit: [],

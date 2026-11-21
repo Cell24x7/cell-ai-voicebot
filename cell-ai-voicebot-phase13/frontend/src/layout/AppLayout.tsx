@@ -3,6 +3,7 @@ import Toolbar from '@mui/material/Toolbar';
 import { lazy, Suspense, useState } from 'react';
 import { Outlet } from 'react-router';
 
+import { StepUpDialog } from '@/features/auth/StepUpDialog';
 import { MfaPrompt } from '@/features/settings/MfaSection';
 import { useWalletLiveUpdates } from '@/features/wallet/useWalletLiveUpdates';
 
@@ -30,6 +31,7 @@ export function AppLayout() {
         <Toolbar />
         <Banners />
         <MfaPrompt />
+        <StepUpDialog />
         <Outlet />
       </Box>
       <Suspense fallback={null}>

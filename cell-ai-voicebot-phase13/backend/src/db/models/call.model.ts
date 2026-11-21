@@ -140,6 +140,8 @@ export interface CallMetrics {
     rttMs: number | null;
   };
   latency: CallLatency;
+  /** SAC-T12: answer → the first audio we played (AI greeting / prompt), ms. */
+  firstAudioMs?: number | null;
   bargeIns: number;
   silencePrompts: number;
   framesIn: number;
@@ -265,6 +267,10 @@ export interface CallDoc {
   campaignContactId: Types.ObjectId | null;
   attempt: number | null;
   startedBy: Types.ObjectId | null;
+  /** SAC-T8: placed by a scheduled AI call (`attempt` = its 1-based try). */
+  scheduledCallId?: Types.ObjectId | null;
+  /** SAC: a superadmin full access session started / answered this call as the owner. */
+  actedBy: { userId: Types.ObjectId; impersonatorId: Types.ObjectId } | null;
   status: CallStatus;
   endReason: CallEndReason | null;
   hangupCause: string | null;
@@ -417,6 +423,17 @@ const schema = new Schema<CallDoc>(
     campaignContactId: { type: Schema.Types.ObjectId, default: null },
     attempt: { type: Number, default: null, min: 1 },
     startedBy: { type: Schema.Types.ObjectId, default: null },
+    scheduledCallId: { type: Schema.Types.ObjectId, default: null },
+    actedBy: {
+      type: new Schema(
+        {
+          userId: { type: Schema.Types.ObjectId, required: true },
+          impersonatorId: { type: Schema.Types.ObjectId, required: true },
+        },
+        { _id: false },
+      ),
+      default: null,
+    },
     status: { type: String, enum: CALL_STATUSES, default: 'queued', required: true },
     endReason: { type: String, enum: [...CALL_END_REASONS, null], default: null },
     hangupCause: { type: String, default: null },
@@ -536,6 +553,11 @@ schema.index(
   { partialFilterExpression: { provider: 'whatsapp' }, name: 'wa_channel_calls' },
 );
 schema.index({ createdAt: 1 });
+// SAC-T8: one call per scheduled call try (a replayed dispatch finds it)
+schema.index(
+  { accountId: 1, scheduledCallId: 1, attempt: 1 },
+  { unique: true, partialFilterExpression: { scheduledCallId: { $type: 'objectId' } } },
+);
 // Phase 20: the missed-calls list (callbacks still to make, newest first)
 schema.index(
   { accountId: 1, 'missed.callback.status': 1, createdAt: -1 },

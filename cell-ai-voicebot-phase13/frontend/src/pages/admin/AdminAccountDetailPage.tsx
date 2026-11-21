@@ -207,7 +207,7 @@ export function AdminAccountDetailPage() {
     },
   });
   const impersonate = useMutation({
-    mutationFn: (mode: 'view' | 'act') => adminApi.impersonate(id, mode),
+    mutationFn: (mode: 'view' | 'act' | 'full') => adminApi.impersonate(id, mode),
     onSuccess: (session) => {
       queryClient.clear();
       useAuthStore.getState().startImpersonation(session);
@@ -249,21 +249,29 @@ export function AdminAccountDetailPage() {
   const { account } = detail.data;
   const suspended = account.status === 'suspended';
 
-  const onImpersonate = async (mode: 'view' | 'act') => {
+  const onImpersonate = async (mode: 'view' | 'act' | 'full') => {
     const ok = await confirm(
-      mode === 'view'
+      mode === 'full'
         ? {
-            title: `View as the owner of ${account.name}?`,
+            title: `Full access to ${account.name}?`,
             message:
-              'You will see the app exactly as the account owner does, read-only, for up to an hour. Everything you do is recorded in their audit log.',
-            confirmText: 'Start viewing',
+              'You will work in this account as its owner — everything the owner can do, including calls. Account delete / export, ownership, the owner’s password and API keys ask for your own password first. Add money stays with Admin → Wallet. Up to 4 hours (extendable to 12). Everything you do is recorded in their audit log.',
+            confirmText: 'Enter with full access',
+            destructive: true,
           }
-        : {
-            title: `Log in as the owner of ${account.name}?`,
-            message:
-              'You can work in the account for up to an hour. Password, sign-in, API keys, payments, ownership and account delete / export stay blocked. Everything you do is recorded in their audit log.',
-            confirmText: 'Log in',
-          },
+        : mode === 'view'
+          ? {
+              title: `View as the owner of ${account.name}?`,
+              message:
+                'You will see the app exactly as the account owner does, read-only, for up to an hour. Everything you do is recorded in their audit log.',
+              confirmText: 'Start viewing',
+            }
+          : {
+              title: `Log in as the owner of ${account.name}?`,
+              message:
+                'You can work in the account for up to an hour. Password, sign-in, API keys, payments, ownership and account delete / export stay blocked. Everything you do is recorded in their audit log.',
+              confirmText: 'Log in',
+            },
     );
     if (ok) impersonate.mutate(mode);
   };
@@ -310,6 +318,14 @@ export function AdminAccountDetailPage() {
               disabled={impersonate.isPending || !detail.data.owner}
             >
               Log in as
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={() => void onImpersonate('full')}
+              disabled={impersonate.isPending || !detail.data.owner}
+            >
+              Full access
             </Button>
           </>
         }

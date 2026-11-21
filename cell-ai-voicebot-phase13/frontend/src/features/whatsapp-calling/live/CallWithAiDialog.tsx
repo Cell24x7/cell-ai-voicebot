@@ -40,7 +40,7 @@ export function CallWithAiDialog({
     ? { call: quote.data.callPerMinuteMicros, ai: quote.data.aiPerMinuteMicros }
     : null;
   const human = mode === 'human';
-  const title = human ? 'Call yourself' : 'Call with AI';
+  const title = human ? 'Call myself' : 'Call with AI';
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>{title}</DialogTitle>

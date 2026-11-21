@@ -32,6 +32,7 @@ import { SENTIMENT_LABELS, sentimentColor, type SentimentLabel } from '@/feature
 import { outcomeLabel, useDispositions } from '@/features/insights/queries';
 import { RecordExportButton } from '@/features/reports/RecordExportButton';
 import { NewWhatsAppCallDialog } from '@/features/whatsapp-calling/panel/NewWhatsAppCallDialog';
+import { ScheduledCallsPanel } from '@/features/whatsapp-calling/ScheduledCallsPanel';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import type { ListCallsQuery } from '@/services/api/calls';
 import { recordExportsApi } from '@/services/api/record-exports';
@@ -94,6 +95,8 @@ export function CallsPage() {
     meta: { silent: true },
   });
   const missedView = params.get('view') === 'missed';
+  // SAC-T10: scheduled AI calls (bells link to `?tab=scheduled`)
+  const scheduledView = params.get('view') === 'scheduled' || params.get('tab') === 'scheduled';
   const campaignId = params.get('campaignId') ?? '';
   // Phase 14 record filters
   const outcomes = (params.get('disposition') ?? '')
@@ -294,17 +297,18 @@ export function CallsPage() {
       />
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
         <Tabs
-          value={missedView ? 'missed' : 'all'}
-          onChange={(_e, v: string) =>
-            setParams(v === 'missed' ? { view: 'missed' } : {}, { replace: true })
-          }
+          value={scheduledView ? 'scheduled' : missedView ? 'missed' : 'all'}
+          onChange={(_e, v: string) => setParams(v === 'all' ? {} : { view: v }, { replace: true })}
           aria-label="Call lists"
         >
           <Tab value="all" label="All calls" />
           <Tab value="missed" label="Missed" />
+          <Tab value="scheduled" label="Scheduled" />
         </Tabs>
       </Box>
-      {missedView ? (
+      {scheduledView ? (
+        <ScheduledCallsPanel />
+      ) : missedView ? (
         <MissedCalls />
       ) : (
         <Stack spacing={2}>

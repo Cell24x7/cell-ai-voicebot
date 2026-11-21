@@ -2,6 +2,7 @@ import { apiClient, unwrap } from './client';
 import type {
   MetaWebhookEventRow,
   SuccessEnvelope,
+  WebhookFixResult,
   WhatsAppAdminStatus,
   WhatsAppChannel,
   WhatsAppConnectResult,
@@ -82,6 +83,13 @@ export const adminWhatsappApi = {
       apiClient.post<SuccessEnvelope<WhatsAppChannel>>(
         `/admin/whatsapp/channels/${channelId}/managed/api-key`,
         { apiKey },
+      ),
+    ),
+  /** SAC-T4: Webhook check / Fix of any account's Meta number. */
+  fixChannelWebhook: (channelId: string) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<WebhookFixResult>>(
+        `/admin/whatsapp/channels/${channelId}/webhook/fix`,
       ),
     ),
   resetManagedWebhook: (channelId: string) =>

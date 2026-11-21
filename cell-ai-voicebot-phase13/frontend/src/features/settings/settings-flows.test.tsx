@@ -463,7 +463,7 @@ describe('Profile + audit tabs', () => {
     renderWithProviders({ route: '/settings/audit' });
     expect(await screen.findByText('API key')).toBeInTheDocument();
     expect(screen.getByText('Platform admin')).toBeInTheDocument();
-    expect(screen.getByText('Asha (via support)')).toBeInTheDocument();
+    expect(screen.getByText('Asha (by the platform team)')).toBeInTheDocument();
     expect(screen.getByText('System')).toBeInTheDocument();
     expect(screen.getByText('reason: x · fields: a, b')).toBeInTheDocument();
     await userEvent.click(screen.getByLabelText('Show'));

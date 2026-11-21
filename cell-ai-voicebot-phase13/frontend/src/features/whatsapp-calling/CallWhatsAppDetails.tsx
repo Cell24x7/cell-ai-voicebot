@@ -25,6 +25,10 @@ const TIMELINE_LABELS: Record<string, string> = {
   terminate: 'Call ended at WhatsApp',
   connect_failed: 'WhatsApp could not connect',
   owner_lost: 'Server restarted during the call',
+  // SAC-T12
+  connect_uncertain: 'WhatsApp did not answer in time (not called again)',
+  late_terminate: 'The late call was ended at WhatsApp',
+  busy_refused: 'Every line was busy',
 };
 
 /** Call detail → WhatsApp: direction, who answered / took over, Meta's timeline. */
@@ -63,6 +67,8 @@ export function CallWhatsAppDetails({ call, timezone }: { call: Call; timezone: 
         {row('Talked with', call.mode === 'ai' && !transferred ? 'AI' : 'Team member')}
         {answered && row('Answered by', answered)}
         {transferred && row('Taken over by', transferred)}
+        {typeof call.metrics.firstAudioMs === 'number' &&
+          row('First word after', `${(call.metrics.firstAudioMs / 1000).toFixed(1)} s`)}
         {wa.metaDuration !== null &&
           row('WhatsApp time', `${String(wa.metaDuration)} s (charged in 6-second steps)`)}
         {wa.conversationId && (

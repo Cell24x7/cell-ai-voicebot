@@ -23,7 +23,7 @@ import { CopyButton } from '@/components/CopyButton';
 import { DataTable } from '@/components/DataTable';
 import { RelativeTime } from '@/components/RelativeTime';
 import { StatusChip } from '@/components/StatusChip';
-import { usePermission, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, usePermission, useSession } from '@/features/auth/hooks';
 import { apiKeysApi, type ApiKeyScope } from '@/services/api/api-keys';
 import { getErrorMessage } from '@/services/api/errors';
 import type { ApiKey, ApiRequestLog } from '@/services/api/types';
@@ -295,7 +295,7 @@ type Open =
 export function ApiKeysTab() {
   const session = useSession();
   const canManageKeys = usePermission('apikeys.manage');
-  const canManage = canManageKeys && !session?.impersonation;
+  const canManage = canManageKeys && !isLimitedImpersonation(session);
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [open, setOpen] = useState<Open>(null);

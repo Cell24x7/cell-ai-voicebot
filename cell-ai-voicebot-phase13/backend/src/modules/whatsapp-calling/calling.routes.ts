@@ -16,6 +16,7 @@ import {
   requirePermission,
 } from '../../shared/middlewares/require-permission';
 import { handle } from '../../shared/middlewares/validate';
+import { recordAudit } from '../audit/audit.service';
 import { findCall, viewOne } from '../calls/calls.service';
 
 import type { CallCommand } from './bus';
@@ -30,7 +31,16 @@ import {
   PermissionRequestBody,
   StartWhatsAppCallBody,
 } from './calling-api.schema';
-import { CallAvailabilityBody, CallingSettingsPatch } from './calling.schema';
+import {
+  CallAvailabilityBody,
+  CallingSettingsPatch,
+  IncomingDefaultBody,
+  ScheduledCallBody,
+  ScheduledCallParams,
+  ScheduledCallPatch,
+  ScheduledCallsQuery,
+} from './calling.schema';
+import { getIncomingDefault, setIncomingDefault } from './incoming-default';
 import { callPricePreview } from './price.service';
 import type { CallingRuntime } from './runtime';
 
@@ -48,6 +58,7 @@ const actor = (req: Request) => {
     userId,
     accountId: new Types.ObjectId(auth.accountId),
     impersonatorId: auth.impersonatorId ? new Types.ObjectId(auth.impersonatorId) : null,
+    impersonationMode: auth.impersonatorId ? (auth.impersonationMode ?? 'view') : null,
     ip: req.ip ?? null,
   };
 };
@@ -73,6 +84,8 @@ export const createCallingRouter = ({ runtime, stores = {} }: CallingRouterDeps)
   // mounted at /api/v1 next to other routers: authenticate only our own paths
   router.use(
     [
+      '/whatsapp/scheduled-calls',
+      '/whatsapp/incoming-default',
       '/whatsapp/channels/:id/calling',
       '/whatsapp/call-permissions',
       '/whatsapp/calls',
@@ -130,6 +143,136 @@ export const createCallingRouter = ({ runtime, stores = {} }: CallingRouterDeps)
         ok(res, await runtime.settings.updateCalling(who, who.accountId, params.id, body));
       },
     ),
+  );
+  // SAC-T8: scheduled AI calls ("Schedule AI call")
+  const scheduledOn = (): void => {
+    if (!runtime.env.WA_SCHEDULED_CALLS_ENABLED)
+      throw new AppError('PROVIDER_UNAVAILABLE', 'Scheduled calls are turned off on this server.');
+  };
+  const scheduledLimit = limiter('wa-scheduled-calls', 30, 60_000, stores.settings);
+  const scheduledActor = (req: Request) => {
+    const who = caller(req);
+    return {
+      accountId: who.accountId,
+      userId: who.userId,
+      impersonatorId: who.impersonatorId ?? null,
+    };
+  };
+  router.post(
+    '/whatsapp/scheduled-calls',
+    access({ permission: 'calls.trigger', scope: 'calls:write' }),
+    blockWhenImpersonating(),
+    scheduledLimit,
+    ...handle({ body: ScheduledCallBody }, async ({ req, res, body }) => {
+      scheduledOn();
+      const key = req.get('Idempotency-Key')?.trim().slice(0, 100) || null;
+      const out = await runtime.scheduled.create(scheduledActor(req), {
+        channelId: body.channelId,
+        contactId: body.contactId,
+        conversationId: body.conversationId ?? null,
+        program: body.program,
+        purpose: body.purpose ?? null,
+        dueAt: new Date(body.dueAt),
+        retry: body.retry ?? null,
+        origin: requireAuth(req).kind === 'api_key' ? 'api' : 'manual',
+        idempotencyKey: key,
+      });
+      if (out.replay) ok(res, out);
+      else created(res, out);
+    }),
+  );
+  router.get(
+    '/whatsapp/scheduled-calls',
+    access({ permission: 'calls.read', scope: 'calls:read' }),
+    ...handle({ query: ScheduledCallsQuery }, async ({ req, res, query }) => {
+      const page = await runtime.scheduled.list(tenantFilter(req).accountId, {
+        status: query.status,
+        contactId: query.contactId,
+        channelId: query.channelId,
+        from: query.from ? new Date(query.from) : undefined,
+        to: query.to ? new Date(query.to) : undefined,
+        cursor: query.cursor,
+        limit: query.limit,
+      });
+      ok(res, page.items, { nextCursor: page.nextCursor, hasMore: page.nextCursor !== null });
+    }),
+  );
+  router.get(
+    '/whatsapp/scheduled-calls/:id',
+    access({ permission: 'calls.read', scope: 'calls:read' }),
+    ...handle({ params: ScheduledCallParams }, async ({ req, res, params }) => {
+      ok(res, await runtime.scheduled.get(tenantFilter(req).accountId, params.id));
+    }),
+  );
+  router.patch(
+    '/whatsapp/scheduled-calls/:id',
+    access({ permission: 'calls.trigger', scope: 'calls:write' }),
+    blockWhenImpersonating(),
+    scheduledLimit,
+    ...handle(
+      { params: ScheduledCallParams, body: ScheduledCallPatch },
+      async ({ req, res, params, body }) => {
+        scheduledOn();
+        ok(
+          res,
+          await runtime.scheduled.update(scheduledActor(req), params.id, {
+            ...(body.dueAt ? { dueAt: new Date(body.dueAt) } : {}),
+            ...(body.program ? { program: body.program } : {}),
+            ...(body.purpose !== undefined ? { purpose: body.purpose } : {}),
+            ...(body.retry ? { retry: body.retry } : {}),
+          }),
+        );
+      },
+    ),
+  );
+  router.post(
+    '/whatsapp/scheduled-calls/:id/cancel',
+    access({ permission: 'calls.trigger', scope: 'calls:write' }),
+    blockWhenImpersonating(),
+    ...handle({ params: ScheduledCallParams }, async ({ req, res, params }) => {
+      ok(res, await runtime.scheduled.cancel(scheduledActor(req), params.id));
+    }),
+  );
+  // SAC-T6: the account default for incoming calls ("AI se incoming calls uthao")
+  router.get('/whatsapp/incoming-default', read, async (req, res) => {
+    ok(res, await getIncomingDefault(actor(req).accountId));
+  });
+  router.put(
+    '/whatsapp/incoming-default',
+    ...manage,
+    settingsLimit,
+    ...handle({ body: IncomingDefaultBody }, async ({ req, res, body }) => {
+      const who = actor(req);
+      ok(
+        res,
+        await setIncomingDefault(runtime.env, who.accountId, body, {
+          type: 'user',
+          id: who.userId,
+          impersonatorId: who.impersonatorId,
+          ip: who.ip,
+        }),
+      );
+    }),
+  );
+  // SAC-T6: end every live AI call on the number (calls with a person stay)
+  router.post(
+    '/whatsapp/channels/:id/calling/stop-ai-calls',
+    ...manage,
+    ...handle({ params: CallingParams }, async ({ req, res, params }) => {
+      const who = actor(req);
+      if (!runtime.calls) throw new AppError('PROVIDER_UNAVAILABLE', 'Calls do not run here.');
+      const channel = await runtime.settings.getCalling(who.accountId, params.id);
+      const stopped = await runtime.calls.stopAiCalls(who.accountId, new Types.ObjectId(params.id));
+      await recordAudit({
+        accountId: who.accountId,
+        actor: { type: 'user', id: who.userId, impersonatorId: who.impersonatorId },
+        action: 'whatsapp.ai_calls_stopped',
+        target: { type: 'whatsapp_channel', id: params.id },
+        meta: { stopped, status: channel.status },
+        ip: who.ip,
+      });
+      ok(res, { stopped });
+    }),
   );
   router.post(
     '/whatsapp/channels/:id/calling/sync',

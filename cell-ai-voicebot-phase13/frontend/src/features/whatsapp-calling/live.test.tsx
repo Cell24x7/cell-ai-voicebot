@@ -264,7 +264,7 @@ describe('live call controller', () => {
     expect(active()).toMatchObject({ callId: 'wc2', phase: 'starting', ended: null });
   });
 
-  it('Call yourself: mic → start (Idempotency-Key) → media socket → ringing → in call → ended', async () => {
+  it('Call myself: mic → start (Idempotency-Key) → media socket → ringing → in call → ended', async () => {
     const { deps } = make();
     const p = place();
     await waitFor(() => expect(FakeMediaWs.instances).toHaveLength(1));
@@ -457,16 +457,16 @@ const button = () =>
   });
 
 describe('call button states', () => {
-  it('allowed: Call → Call yourself starts the call; the bar shows it', async () => {
+  it('allowed: Call → Call myself starts the call; the bar shows it', async () => {
     make();
     button();
     await userEvent.click(await screen.findByRole('button', { name: 'Call' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: /Call yourself/ }));
-    const confirm = await screen.findByRole('dialog', { name: 'Call yourself' });
+    await userEvent.click(screen.getByRole('menuitem', { name: /Call myself/ }));
+    const confirm = await screen.findByRole('dialog', { name: 'Call myself' });
     await waitFor(() =>
-      expect(within(confirm).getByRole('button', { name: 'Call yourself' })).toBeEnabled(),
+      expect(within(confirm).getByRole('button', { name: 'Call myself' })).toBeEnabled(),
     );
-    await userEvent.click(within(confirm).getByRole('button', { name: 'Call yourself' }));
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Call myself' }));
     await waitFor(() => expect(api.start).toHaveBeenCalled());
     const bar = await screen.findByRole('region', { name: 'WhatsApp call' });
     expect(within(bar).getByText('Asha Verma')).toBeInTheDocument();

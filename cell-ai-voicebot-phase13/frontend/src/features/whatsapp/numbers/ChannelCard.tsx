@@ -14,7 +14,9 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { CallingReadyChip } from '@/features/whatsapp-calling/settings/CallingReadiness';
 import { toApiError } from '@/services/api/errors';
 import type { WhatsAppChannel } from '@/services/api/types';
+import { whatsappApi } from '@/services/api/whatsapp';
 
+import { whatsappKeys } from '../keys';
 import {
   CHANNEL_STATUS_LABELS,
   channelReasonText,
@@ -36,6 +38,7 @@ import {
 } from '../queries';
 
 import { DISCONNECT_TEXT, WHATSAPP_MANAGER_URL } from './texts';
+import { WebhookChip, WebhookFixButton } from './WebhookCheck';
 
 const RETRYABLE_SYNC = new Set(['not_requested', 'failed', 'declined']);
 
@@ -136,6 +139,7 @@ export function ChannelCard({
   onRename,
   onPin,
   onReconnect,
+  onSwitchToMeta,
 }: {
   channel: WhatsAppChannel;
   canManage: boolean;
@@ -143,6 +147,8 @@ export function ChannelCard({
   onRename: () => void;
   onPin: () => void;
   onReconnect: () => void;
+  /** SAC-T11: managed numbers only. */
+  onSwitchToMeta?: () => void;
 }) {
   const confirm = useConfirm();
   const sync = useSyncChannel();
@@ -226,6 +232,10 @@ export function ChannelCard({
           />
           <Chip size="small" variant="outlined" label={MODE_LABELS[channel.mode]} />
           {channel.managed && <Chip size="small" color="info" variant="outlined" label="Managed" />}
+          {channel.managed && <Chip size="small" variant="outlined" label="Calls via partner" />}
+          {!channel.managed && status !== 'disconnected' && (
+            <WebhookChip check={channel.webhookCheck} />
+          )}
           {status === 'connected' && <CallingReadyChip channelId={channel.id} />}
         </Stack>
         <Typography sx={{ mt: 1 }}>
@@ -268,6 +278,18 @@ export function ChannelCard({
                 onClick={() => sync.mutate(channel.id, { onSuccess: done, onError: fail })}
               >
                 Sync now
+              </Button>
+            )}
+            {!channel.managed && ['connected', 'restricted', 'action_needed'].includes(status) && (
+              <WebhookFixButton
+                disabled={working}
+                run={() => whatsappApi.fixWebhook(channel.id)}
+                invalidate={[whatsappKeys.channels, whatsappKeys.channel(channel.id)]}
+              />
+            )}
+            {channel.managed && onSwitchToMeta && status !== 'disconnected' && (
+              <Button size="small" onClick={onSwitchToMeta}>
+                Switch to Meta direct
               </Button>
             )}
             {needsPin && (

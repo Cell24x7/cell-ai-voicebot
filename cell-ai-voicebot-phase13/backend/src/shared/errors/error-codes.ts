@@ -253,6 +253,22 @@ export const ERROR_CODES = {
   REAUTH_FAILED: { status: 422, message: 'That password is not correct.' },
   MFA_REQUIRED: { status: 403, message: 'Enter your two-step code to continue.' },
   MFA_INVALID: { status: 422, message: 'That code is not correct.' },
+  WHATSAPP_SWITCH_MISMATCH: {
+    status: 422,
+    message: 'The number from the Meta popup is not this managed number.',
+  },
+  WHATSAPP_SWITCH_NOT_MANAGED: {
+    status: 409,
+    message: 'Only a managed (partner) number can switch to Meta direct.',
+  },
+  STEP_UP_REQUIRED: {
+    status: 428,
+    message: 'Confirm with your own password to do this in full access.',
+  },
+  WALLET_TOPUP_IMPERSONATION: {
+    status: 403,
+    message: 'Add money is not available in full access — use Admin → Wallet → Adjust.',
+  },
   SENSITIVE_FIELD_NOT_ALLOWED: {
     status: 422,
     message: "A field marked sensitive can't be searched or filtered.",

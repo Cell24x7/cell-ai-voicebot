@@ -3,6 +3,7 @@ import Button from '@mui/material/Button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 
+import { FullAccessBanner } from '@/features/auth/FullAccessBanner';
 import { useSession } from '@/features/auth/hooks';
 import { endImpersonation } from '@/features/auth/session';
 import { useAuthStore } from '@/features/auth/store';
@@ -23,7 +24,8 @@ export function Banners() {
   const imp = session.impersonation;
   return (
     <>
-      {imp && (
+      {imp?.mode === 'full' && <FullAccessBanner />}
+      {imp && imp.mode !== 'full' && (
         <Alert
           severity="warning"
           sx={{ mb: 2 }}

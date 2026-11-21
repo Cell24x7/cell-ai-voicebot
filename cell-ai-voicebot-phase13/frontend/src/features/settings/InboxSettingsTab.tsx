@@ -13,7 +13,7 @@ import Typography from '@mui/material/Typography';
 import { enqueueSnackbar } from 'notistack';
 import { useState } from 'react';
 
-import { usePermission, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, usePermission, useSession } from '@/features/auth/hooks';
 import { NOTIFY_MODE_LABELS } from '@/features/inbox/labels';
 import { useInboxConfig, useInboxSettings, useUpdateInboxSettings } from '@/features/inbox/queries';
 import { getErrorMessage } from '@/services/api/errors';
@@ -40,7 +40,8 @@ export function InboxSettingsTab() {
   const canUpdate = usePermission('account.update');
   const settings = useInboxSettings();
   const config = useInboxConfig();
-  const canEdit = canUpdate && session?.account.status === 'active' && !session.impersonation;
+  const canEdit =
+    canUpdate && session?.account.status === 'active' && !isLimitedImpersonation(session);
   if (settings.isPending) return <Skeleton variant="rounded" height={320} />;
   if (settings.isError) return <Alert severity="error">{getErrorMessage(settings.error)}</Alert>;
   return (

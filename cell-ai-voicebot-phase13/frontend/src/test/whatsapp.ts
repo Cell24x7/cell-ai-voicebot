@@ -35,6 +35,14 @@ export const fakeChannel = (overrides: Partial<WhatsAppChannel> = {}): WhatsAppC
   subscription: { status: 'subscribed' },
   restriction: null,
   webhook: { lastEventAt: '2026-10-22T09:00:00.000Z', lastField: 'messages' },
+  webhookCheck: {
+    status: 'ok',
+    appSubscribed: true,
+    missingFields: [],
+    checkedAt: '2026-10-22T09:00:00.000Z',
+    fixedAt: null,
+    error: null,
+  },
   connectedBy: 'u1',
   connectedAt: '2026-10-22T08:00:00.000Z',
   syncedAt: '2026-10-22T08:00:00.000Z',
@@ -132,5 +140,6 @@ export const fakeAdminWhatsAppRow = (
   managed: false,
   pinnacle: null,
   statusReasonCode: null,
+  webhookStatus: 'ok',
   ...overrides,
 });

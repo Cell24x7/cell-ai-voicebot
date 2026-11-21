@@ -123,8 +123,8 @@ it('human confirmation shows sender, target and carrier-only price without requi
       },
     ],
   });
-  const dialog = within(screen.getByRole('dialog', { name: 'Call yourself' }));
-  const go = dialog.getByRole('button', { name: 'Call yourself' });
+  const dialog = within(screen.getByRole('dialog', { name: 'Call myself' }));
+  const go = dialog.getByRole('button', { name: 'Call myself' });
   await waitFor(() => expect(go).toBeEnabled());
   expect(dialog.getByText('WhatsApp from Sales · +919000000002')).toBeVisible();
   expect(dialog.getByLabelText('Estimated cost')).toHaveTextContent('₹2');

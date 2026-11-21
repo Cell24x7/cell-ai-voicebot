@@ -30,7 +30,17 @@ export const installAuthHooks = (next: AuthHooks | null): void => {
 const NO_REFRESH =
   /\/auth\/(login|refresh|logout|signup|verify-email|forgot-password|reset-password|accept-invite|invite-info)\b/;
 
-type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
+type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean; _steppedUp?: boolean };
+
+/**
+ * SAC: superadmin Full access — a danger action answers 428 `STEP_UP_REQUIRED`; the handler
+ * (a dialog asking for the superadmin's own password) resolves `true` once confirmed, and the
+ * request is sent once more.
+ */
+let stepUpHandler: (() => Promise<boolean>) | null = null;
+export const installStepUpHandler = (next: (() => Promise<boolean>) | null): void => {
+  stepUpHandler = next;
+};
 
 apiClient.interceptors.request.use((config) => {
   const token = hooks?.getToken();
@@ -63,6 +73,13 @@ apiClient.interceptors.response.use(
       if (token) {
         config._retried = true;
         config.headers.set('Authorization', `Bearer ${token}`);
+        return apiClient.request(config);
+      }
+      return Promise.reject(apiError);
+    }
+    if (apiError.code === 'STEP_UP_REQUIRED' && config && !config._steppedUp && stepUpHandler) {
+      if (await stepUpHandler()) {
+        config._steppedUp = true;
         return apiClient.request(config);
       }
       return Promise.reject(apiError);

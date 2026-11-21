@@ -9,7 +9,7 @@ import { DataTable, type Column } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { RelativeTime } from '@/components/RelativeTime';
 import { StatusChip } from '@/components/StatusChip';
-import { useCan, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, useCan, useSession } from '@/features/auth/hooks';
 import { InviteDialog } from '@/features/team/InviteDialog';
 import { teamKeys } from '@/features/team/keys';
 import { MemberActions } from '@/features/team/MemberActions';
@@ -56,7 +56,7 @@ export function TeamPage() {
 
   const callerIsOwner = session?.role.key === 'owner';
   const perms: MemberPermissions = {
-    canInvite: can('team.invite') && !session?.impersonation,
+    canInvite: can('team.invite') && !isLimitedImpersonation(session),
     canUpdate: can('team.update'),
     canRemove: can('team.remove'),
     callerIsOwner,
@@ -84,7 +84,7 @@ export function TeamPage() {
         subtitle="People who can use this account and what they can do."
         actions={
           <>
-            {callerIsOwner && !session?.impersonation && (
+            {callerIsOwner && !isLimitedImpersonation(session) && (
               <Button variant="outlined" onClick={() => setTransferOpen(true)}>
                 Transfer ownership
               </Button>

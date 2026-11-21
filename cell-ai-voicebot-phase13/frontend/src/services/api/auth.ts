@@ -65,9 +65,23 @@ export const authApi = {
     unwrap(apiClient.post<SuccessEnvelope<Message>>('/auth/forgot-password', { email })),
   resetPassword: (body: { token: string; password: string }) =>
     unwrap(apiClient.post<SuccessEnvelope<Message>>('/auth/reset-password', body)),
-  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+  /** `currentPassword` is left out only in superadmin Full access (after a step-up). */
+  changePassword: (body: { currentPassword?: string; newPassword: string }) =>
     unwrap(apiClient.post<SuccessEnvelope<AuthSession>>('/auth/change-password', body)),
   sessions: () => unwrap(apiClient.get<SuccessEnvelope<Session[]>>('/auth/sessions')),
+  /** SAC Full access: 4 more hours (at most 12 h from the start). */
+  extendLoginAs: () =>
+    unwrap(apiClient.post<SuccessEnvelope<AuthSession>>('/auth/login-as/extend')),
+  /** SAC Full access: the superadmin's own password (+ code) for 5 minutes of danger actions. */
+  stepUpLoginAs: (body: { password: string; code?: string }) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<{ stepUpUntil: string }>>('/auth/login-as/step-up', body),
+    ),
+  /** SAC Full access: incoming calls of this account ring this session too. */
+  setRingMeToo: (on: boolean) =>
+    unwrap(
+      apiClient.put<SuccessEnvelope<{ ringMeToo: boolean }>>('/auth/login-as/ring-me-too', { on }),
+    ),
   revokeSession: (id: string) =>
     apiClient.delete(`/auth/sessions/${encodeURIComponent(id)}`).then(() => undefined),
   inviteInfo: (token: string) =>

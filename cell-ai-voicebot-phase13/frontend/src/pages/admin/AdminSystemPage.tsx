@@ -234,6 +234,28 @@ export function AdminSystemPage() {
                     label={String(s.whatsappCalls.failedSetups15m)}
                   />
                 </Fact>
+                <Fact label="TURN relay">
+                  <State
+                    good={s.whatsappCalls.turnSet}
+                    label={s.whatsappCalls.turnSet ? 'Set' : 'Not set (optional)'}
+                  />
+                </Fact>
+                <Fact label="AI first word (p95, 30 min)">
+                  <State
+                    good={(s.whatsappCalls.aiFirstAudioP95Ms ?? 0) <= 2500}
+                    label={
+                      s.whatsappCalls.aiFirstAudioP95Ms === null
+                        ? 'Too few calls'
+                        : `${(s.whatsappCalls.aiFirstAudioP95Ms / 1000).toFixed(1)} s`
+                    }
+                  />
+                </Fact>
+                <Fact label="Numbers with webhook problems">
+                  <State
+                    good={s.whatsappCalls.webhookMissing === 0}
+                    label={String(s.whatsappCalls.webhookMissing)}
+                  />
+                </Fact>
               </Section>
             </Grid>
           )}

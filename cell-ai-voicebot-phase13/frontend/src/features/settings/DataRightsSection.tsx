@@ -15,7 +15,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { enqueueSnackbar } from 'notistack';
 import { useState } from 'react';
 
-import { useCan, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, useCan, useSession } from '@/features/auth/hooks';
 import { reloadMe } from '@/features/auth/session';
 import { accountApi } from '@/services/api/account';
 import { getErrorMessage } from '@/services/api/errors';
@@ -133,8 +133,8 @@ export function DataRightsSection() {
   const can = useCan();
   const session = useSession();
   const [dialog, setDialog] = useState<'export' | 'delete' | null>(null);
-  const canExport = can('account.export') && !session?.impersonation;
-  const canDelete = can('account.delete') && !session?.impersonation;
+  const canExport = can('account.export') && !isLimitedImpersonation(session);
+  const canDelete = can('account.delete') && !isLimitedImpersonation(session);
   const exports = useQuery({
     queryKey: EXPORTS_KEY,
     queryFn: () => accountApi.exports(),

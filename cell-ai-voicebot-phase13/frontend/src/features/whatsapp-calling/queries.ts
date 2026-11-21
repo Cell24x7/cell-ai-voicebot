@@ -8,6 +8,8 @@ import type {
   WhatsAppCallingSettings,
   WhatsAppCallingSettingsPatch,
   WhatsAppCallPermission,
+  ScheduledCallCreate,
+  ScheduledCallsFilter,
 } from '@/services/api/types';
 import {
   whatsappCallingApi,
@@ -132,6 +134,48 @@ export const useCallingLiveUpdates = (): void => {
   });
   useWsEvent('whatsapp.channel.updated', (event) => {
     void client.invalidateQueries({ queryKey: callingKeys.settings(event.data.channelId) });
+  });
+  // SAC-T10: a scheduled AI call changed (placed, done, skipped, cancelled)
+  useWsEvent('whatsapp_call.scheduled_updated', () => {
+    void client.invalidateQueries({ queryKey: callingKeys.scheduled });
+  });
+};
+
+/** SAC-T10: scheduled AI calls (a contact's, or the Calls page list). */
+export const useScheduledCalls = (filter: ScheduledCallsFilter, enabled = true) =>
+  useQuery({
+    queryKey: callingKeys.scheduledList(filter as Record<string, unknown>),
+    queryFn: () => whatsappCallingApi.scheduledCalls(filter),
+    enabled,
+    meta: { silent: true },
+  });
+
+export const useScheduleCall = () => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ body, key }: { body: ScheduledCallCreate; key: string }) =>
+      whatsappCallingApi.scheduleCall(body, key),
+    meta: { silent: true },
+    onSuccess: () => void client.invalidateQueries({ queryKey: callingKeys.scheduled }),
+  });
+};
+
+export const useCancelScheduledCall = () => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => whatsappCallingApi.cancelScheduledCall(id),
+    meta: { silent: true },
+    onSuccess: () => void client.invalidateQueries({ queryKey: callingKeys.scheduled }),
+  });
+};
+
+export const useRescheduleCall = () => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dueAt }: { id: string; dueAt: string }) =>
+      whatsappCallingApi.updateScheduledCall(id, { dueAt }),
+    meta: { silent: true },
+    onSuccess: () => void client.invalidateQueries({ queryKey: callingKeys.scheduled }),
   });
 };
 

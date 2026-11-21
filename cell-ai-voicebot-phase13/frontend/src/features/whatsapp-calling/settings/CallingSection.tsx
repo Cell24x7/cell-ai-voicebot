@@ -22,18 +22,16 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { teamKeys } from '@/features/team/keys';
 import { getErrorMessage, toApiError } from '@/services/api/errors';
 import { teamApi } from '@/services/api/team';
-import type { WhatsAppCallingSettings, WhatsAppInboundRoute } from '@/services/api/types';
+import type { WhatsAppCallingSettings } from '@/services/api/types';
 
 import { todayIn } from '../call-hours';
 import {
   CALL_ERROR_TEXT,
   CALLING_STATUS_LABELS,
   restrictionText,
-  ROUTE_LABELS,
   unavailableText,
 } from '../labels';
 import { PermissionTemplateNotice } from '../panel/PermissionTemplates';
-import { ProgramPicker } from '../ProgramPicker';
 import {
   useCallingReadiness,
   useCallingSettings,
@@ -45,7 +43,9 @@ import {
 import { CallHoursEditor } from './CallHoursEditor';
 import { CallingReadiness } from './CallingReadiness';
 import { CALLING_FORM_LIMITS, draftOf, settingsPatch, settingsProblems, type Draft } from './form';
+import { IncomingAnswerFields } from './IncomingAnswerFields';
 import { firstBlocking } from './readiness';
+import { StopAiCallsButton } from './StopAiCallsButton';
 
 const errorText = (err: unknown) => {
   const e = toApiError(err);
@@ -257,27 +257,14 @@ function CallingForm({
           <Typography variant="body2" sx={{ fontWeight: 500 }}>
             When a customer calls
           </Typography>
-          <TextField
-            select
-            size="small"
-            label="Answered by"
-            value={draft.inbound.route}
+          <IncomingAnswerFields
+            value={{ route: draft.inbound.route, aiProgram: draft.inbound.aiProgram }}
             disabled={!editable}
-            onChange={(e) => setInbound({ route: e.target.value as WhatsAppInboundRoute })}
-          >
-            {(Object.keys(ROUTE_LABELS) as WhatsAppInboundRoute[]).map((r) => (
-              <MenuItem key={r} value={r}>
-                {ROUTE_LABELS[r]}
-              </MenuItem>
-            ))}
-          </TextField>
-          {draft.inbound.route !== 'team' && (
-            <ProgramPicker
-              value={draft.inbound.aiProgram}
-              disabled={!editable}
-              error={problems.aiProgram ?? null}
-              onChange={(aiProgram) => setInbound({ aiProgram })}
-            />
+            programError={problems.aiProgram ?? null}
+            onChange={(next) => setInbound(next)}
+          />
+          {editable && saved.inbound.route !== 'team' && (
+            <StopAiCallsButton channelId={channelId} />
           )}
           {draft.inbound.route !== 'ai' && (
             <>

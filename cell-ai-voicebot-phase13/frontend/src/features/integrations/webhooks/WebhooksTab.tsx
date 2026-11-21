@@ -11,7 +11,7 @@ import { useConfirm } from '@/components/confirm-context';
 import { DataTable } from '@/components/DataTable';
 import { RelativeTime } from '@/components/RelativeTime';
 import { StatusChip } from '@/components/StatusChip';
-import { usePermission, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, usePermission, useSession } from '@/features/auth/hooks';
 import { getErrorMessage } from '@/services/api/errors';
 import type { WebhookEndpoint } from '@/services/api/types';
 import { webhooksApi } from '@/services/api/webhooks';
@@ -33,7 +33,7 @@ type Open =
 /** Integrations → Webhooks (`integrations.manage`). */
 export function WebhooksTab() {
   const session = useSession();
-  const canManage = usePermission('integrations.manage') && !session?.impersonation;
+  const canManage = usePermission('integrations.manage') && !isLimitedImpersonation(session);
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [open, setOpen] = useState<Open>(null);

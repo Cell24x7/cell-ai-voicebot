@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { useCan, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, useCan, useSession } from '@/features/auth/hooks';
 import { exportKeys } from '@/features/contacts/keys';
 import { contactExportsApi } from '@/services/api/contact-exports';
 import type { ExportJob } from '@/services/api/types';
@@ -13,7 +13,7 @@ export const EXPORT_POLL_MS = 3000;
 export const useCanExport = (): boolean => {
   const can = useCan();
   const session = useSession();
-  return can('contacts.export') && !session?.impersonation;
+  return can('contacts.export') && !isLimitedImpersonation(session);
 };
 
 type Job = Pick<ExportJob, 'status' | 'progress'>;

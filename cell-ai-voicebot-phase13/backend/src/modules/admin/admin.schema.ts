@@ -37,9 +37,12 @@ export const SignupSettingsBody = z.strictObject({
 });
 
 export const AccountIdParams = z.strictObject({ id: ObjectIdSchema });
-/** Phase 19: `view` = read-only (today), `act` = may work; sensitive actions refused in both. */
+/**
+ * Phase 19: `view` = read-only (today), `act` = may work; sensitive actions refused in both.
+ * SAC: `full` = act as the owner everywhere (danger actions need a step-up), 4 h.
+ */
 export const ImpersonateBody = z
-  .strictObject({ mode: z.enum(['view', 'act']).default('view') })
+  .strictObject({ mode: z.enum(['view', 'act', 'full']).default('view') })
   .default({ mode: 'view' });
 
 /** A customer account made by a superadmin, whose owner can sign in with this password at once. */
@@ -176,6 +179,7 @@ export const AdminAccountDetailSchema = registry.register(
         metaPayer: z.enum(META_PAYERS),
         creditLineStatus: z.string(),
         creditLineAdminConfirmedAt: z.string().nullable(),
+        webhookStatus: z.enum(['ok', 'failed', 'unknown']).nullable(),
         statusReasonStep: z.string().nullable(),
         connectedAt: z.string().nullable(),
         // PN: managed numbers (Pinnacle) — never the key or the webhook secret
@@ -496,6 +500,9 @@ export const SystemStatusSchema = registry.register(
         lastSetupMs: z.number().nullable(),
         lastError: z.object({ reason: z.string(), at: z.string() }).nullable(),
         failedSetups15m: z.number().int(),
+        webhookMissing: z.number().int(),
+        turnSet: z.boolean(),
+        aiFirstAudioP95Ms: z.number().nullable(),
       })
       .nullable()
       .openapi({ description: 'Phase 18B: WhatsApp call audio; null when WhatsApp is off' }),

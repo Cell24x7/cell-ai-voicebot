@@ -24,6 +24,7 @@ import {
   ListChannelsQuery,
   RegisterPinBody,
   RenameChannelBody,
+  SwitchToMetaBody,
 } from './whatsapp.schema';
 import type { WhatsAppService } from './whatsapp.service';
 
@@ -154,6 +155,33 @@ export const createWhatsAppRouter = ({
     ...manage,
     ...handle({ params: ChannelParams }, async ({ params, req, res }) => {
       ok(res, await service.sync(accountOf(req), params.id, actorOf(req)));
+    }),
+  );
+  // SAC-T11: a managed (partner) number moves to Meta direct
+  router.post(
+    '/channels/:id/switch-to-meta',
+    ...manage,
+    connectLimit,
+    ...handle(
+      { params: ChannelParams, body: SwitchToMetaBody },
+      async ({ params, body, req, res }) => {
+        ok(res, await service.switchToMeta(accountOf(req), params.id, body, actorOf(req)));
+      },
+    ),
+  );
+  // SAC-T4: Webhook check / Fix
+  router.get(
+    '/channels/:id/webhook',
+    requirePermission('whatsapp.read'),
+    ...handle({ params: ChannelParams }, async ({ params, req, res }) => {
+      ok(res, await service.webhookStatus(accountOf(req), params.id));
+    }),
+  );
+  router.post(
+    '/channels/:id/webhook/fix',
+    ...manage,
+    ...handle({ params: ChannelParams }, async ({ params, req, res }) => {
+      ok(res, await service.fixWebhook(accountOf(req), params.id, actorOf(req)));
     }),
   );
   router.post(

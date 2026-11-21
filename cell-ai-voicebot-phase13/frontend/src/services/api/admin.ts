@@ -124,8 +124,11 @@ export const adminApi = {
     ),
   enable: (id: string) =>
     unwrap(apiClient.post<SuccessEnvelope<PublicAccount>>(`/admin/accounts/${id}/enable`)),
-  /** Phase 19: `view` = read-only, `act` = work in the account (sensitive actions refused). */
-  impersonate: (id: string, mode: 'view' | 'act' = 'view') =>
+  /**
+   * Phase 19: `view` = read-only, `act` = work in the account (sensitive actions refused).
+   * SAC: `full` = act as the owner everywhere for 4 h (danger actions ask for a step-up).
+   */
+  impersonate: (id: string, mode: 'view' | 'act' | 'full' = 'view') =>
     unwrap(
       apiClient.post<SuccessEnvelope<AuthSession>>(`/admin/accounts/${id}/impersonate`, { mode }),
     ),

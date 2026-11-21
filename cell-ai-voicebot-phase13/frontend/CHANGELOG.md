@@ -4,6 +4,16 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- **Superadmin full access + WhatsApp calling (SAC)** — 2026-11-21
+  - Admin → account → **Full access**: red banner with time left, Extend, Ring me too, Exit; owner actions open up (top-up stays off); a step-up dialog asks for the superadmin's own password on danger actions (`STEP_UP_REQUIRED` → retry once); audit rows say "by the platform team".
+  - Numbers: **Webhook ✓ / ✗** chip and **Webhook check / Fix** (also on the superadmin account page); Admin → System shows numbers with webhook problems, TURN and AI first-word p95.
+  - **AI se incoming calls uthao** switch on the number's Calling page and as the account default in Settings → Calls; **Stop live AI calls**.
+  - Inbox / contact **Call ▾ → Call myself · Call with AI · Schedule AI call**; scheduled calls on the contact panel and Calls → Scheduled; chat lines for scheduled / skipped / cancelled / AI callback.
+  - Managed numbers: **Switch to Meta direct**, "Calls via partner" chip.
+  - Call detail: new timeline steps and "First word after".
+
 ### Fixed
 
 - Campaign creation now includes **WhatsApp bulk campaign** alongside SIP / Normal call and WhatsApp call in the same selector. The bulk choice opens channel → approved template → variables → audience → schedule → cost/review, preserving the selected audience and campaign name when switching wizards. Added sender/template loading recovery, stale-selection guards, a sender/template review summary and the corrected contact import link.

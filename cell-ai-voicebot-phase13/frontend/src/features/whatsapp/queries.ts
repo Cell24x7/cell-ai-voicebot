@@ -116,6 +116,13 @@ export const useRenameChannel = () =>
     whatsappApi.rename(id, label),
   );
 export const useSyncChannel = () => useChannelMutation((id: string) => whatsappApi.sync(id));
+/** SAC-T11: silent — the dialog shows every error itself. */
+export const useSwitchToMeta = () =>
+  useChannelMutation(
+    ({ id, ...body }: { id: string; code: string; wabaId: string; phoneNumberId: string }) =>
+      whatsappApi.switchToMeta(id, body),
+    true,
+  );
 export const useRetrySetup = () => useChannelMutation((id: string) => whatsappApi.retrySetup(id));
 export const useRegisterPin = () =>
   useChannelMutation(({ id, pin }: { id: string; pin?: string }) => whatsappApi.register(id, pin));

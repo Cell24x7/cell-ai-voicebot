@@ -72,6 +72,24 @@ export const SUBSCRIPTION_STATUSES = ['subscribed', 'failed'] as const;
 export const CONNECT_STEPS = ['phone', 'details', 'subscribe', 'billing', 'register'] as const;
 export type ConnectStep = (typeof CONNECT_STEPS)[number];
 
+export const WA_WEBHOOK_STATUSES = ['ok', 'failed', 'unknown'] as const;
+export interface WaWebhookState {
+  status: (typeof WA_WEBHOOK_STATUSES)[number];
+  appSubscribed: boolean | null;
+  missingFields: string[];
+  checkedAt: Date | null;
+  fixedAt: Date | null;
+  error: string | null;
+}
+export const defaultWebhookState = (): WaWebhookState => ({
+  status: 'unknown',
+  appSubscribed: null,
+  missingFields: [],
+  checkedAt: null,
+  fixedAt: null,
+  error: null,
+});
+
 export interface WaStatusReason {
   code: string;
   message: string;
@@ -305,6 +323,11 @@ export interface WhatsAppChannelDoc {
     error: string | null;
     at: Date | null;
   };
+  /**
+   * SAC-T4: does Meta deliver this number's events to us? Our app subscribed to the WABA and
+   * the app webhook has the needed fields (`messages`, `calls`). Meta numbers only.
+   */
+  webhookCheck: WaWebhookState;
   metaPayer: MetaPayer;
   creditLine: {
     status: (typeof CREDIT_LINE_STATUSES)[number];
@@ -329,6 +352,12 @@ export interface WhatsAppChannelDoc {
   webhook: { lastEventAt: Date | null; lastField: string | null };
   /** PN: managed (Pinnacle) numbers only; `null` otherwise. */
   pinnacle: WaPinnacle | null;
+  /** SAC-T11: the partner facts of a managed number switched to Meta direct (no secrets). */
+  pinnacleArchived?: {
+    keyLast4: string | null;
+    switchedAt: Date;
+    switchedBy: Types.ObjectId | null;
+  } | null;
   /** Last 10 volume pricing tier updates (Phase 11). */
   pricingTier?: WaPricingTier[];
   /** WhatsApp calling (Phase 12) — absent on channels created before migration 0013. */
@@ -503,6 +532,14 @@ const schema = new Schema<WhatsAppChannelDoc>({
     error: nullableString,
     at: { type: Date, default: null },
   },
+  webhookCheck: {
+    status: { type: String, enum: WA_WEBHOOK_STATUSES, default: 'unknown' },
+    appSubscribed: { type: Boolean, default: null },
+    missingFields: { type: [String], default: [] },
+    checkedAt: { type: Date, default: null },
+    fixedAt: { type: Date, default: null },
+    error: nullableString,
+  },
   metaPayer: { type: String, enum: META_PAYERS, required: true },
   creditLine: {
     status: { type: String, enum: CREDIT_LINE_STATUSES, default: 'not_needed' },
@@ -541,6 +578,17 @@ const schema = new Schema<WhatsAppChannelDoc>({
   webhook: {
     lastEventAt: { type: Date, default: null },
     lastField: nullableString,
+  },
+  pinnacleArchived: {
+    type: new Schema(
+      {
+        keyLast4: { type: String, default: null },
+        switchedAt: { type: Date, required: true },
+        switchedBy: { type: Schema.Types.ObjectId, default: null },
+      },
+      { _id: false },
+    ),
+    default: null,
   },
   pinnacle: {
     type: new Schema<WaPinnacle>(

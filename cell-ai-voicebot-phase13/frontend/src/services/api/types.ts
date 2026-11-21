@@ -193,6 +193,16 @@ export type AccountWithWarning = Schemas['AccountWithWarning'];
 
 /** WhatsApp (Phase 9). */
 export type WhatsAppChannel = Schemas['WhatsAppChannel'];
+/** SAC-T4: the webhook check of a number and the steps of a fix. */
+export type WebhookCheck = WhatsAppChannel['webhookCheck'];
+export interface WebhookFixResult {
+  webhookCheck: WebhookCheck;
+  steps: {
+    key: 'app_subscribed' | 'fields' | 'fix_app' | 'fix_fields';
+    ok: boolean;
+    detail: string | null;
+  }[];
+}
 export type WhatsAppChannelDetail = Schemas['WhatsAppChannelDetail'];
 export type WhatsAppChannelList = Schemas['WhatsAppChannelList'];
 export type WhatsAppConnectResult = Schemas['WhatsAppConnectResult'];
@@ -301,6 +311,39 @@ export type WhatsAppCallHoursEntry = WhatsAppCallHours['weekly'][number];
 export type WhatsAppCallHoliday = WhatsAppCallHours['holidays'][number];
 export type WhatsAppInboundRoute = WhatsAppCallingSettings['inbound']['route'];
 export type WhatsAppCallProgram = NonNullable<WhatsAppCallingSettings['inbound']['aiProgram']>;
+/** SAC-T8: a scheduled AI WhatsApp call. */
+export type WhatsAppScheduledCall = Schemas['WhatsAppScheduledCall'];
+export type ScheduledCallStatus = WhatsAppScheduledCall['status'];
+export interface ScheduledCallWarnings {
+  noPermission: boolean;
+  permissionExpiresBeforeDue: boolean;
+  outsideWindow: boolean;
+  lowWallet: boolean;
+}
+export interface ScheduledCallCreate {
+  channelId: string;
+  contactId: string;
+  conversationId?: string | null;
+  program: WhatsAppCallProgram;
+  purpose?: string | null;
+  dueAt: string;
+  retry?: { max: number; gapMin: number; on: ('no_answer' | 'busy' | 'failed')[] } | null;
+}
+export interface ScheduledCallsFilter {
+  status?: ScheduledCallStatus | 'open';
+  contactId?: string;
+  channelId?: string;
+  from?: string;
+  to?: string;
+  cursor?: string;
+  limit?: number;
+}
+/** SAC-T6: the account default for incoming WhatsApp calls. */
+export interface WhatsAppIncomingDefault {
+  route: WhatsAppCallingSettings['inbound']['route'];
+  aiProgram: WhatsAppCallProgram | null;
+  ringTimeoutSec: number;
+}
 export type WhatsAppCallPermission = Schemas['WhatsAppCallPermission'];
 export type WhatsAppCallPermissionStatus = WhatsAppCallPermission['status'];
 export type WhatsAppCallMediaTicket = Schemas['WhatsAppCallMediaTicket'];

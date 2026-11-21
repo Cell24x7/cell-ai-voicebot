@@ -4,6 +4,8 @@ Dashboard for the multi-tenant AI voice calling platform (React 19 + TypeScript 
 
 ## Status
 
+SAC — superadmin full access + WhatsApp calling: **Full access** login-as with step-up, **Webhook check / Fix**, **AI se incoming calls uthao**, **Schedule AI call** (inbox, contacts, Calls → Scheduled), **Switch to Meta direct** for managed numbers.
+
 Phase 16 — security and privacy: **Sensitive** switch in Contact fields, **Erase permanently** on contacts, **Your data** in Settings → Account (export, delete with 7 days to cancel), **Settings → Compliance**, two-step sign-in in Settings → Security, API key limits and deletions on the superadmin pages.
 
 Phase 14 — records, insights & reports: call detail AI insights (summary, outcome, mood, promise) with outcome editing, chat summaries, **Reports** (8 tabs, filters in the URL, compare, drill-down) and dashboard KPIs, exports, report e-mails (Settings → Notifications) and Settings → Data retention. Calls and report tabs export CSV or XLSX with live progress and recent downloads. Full phone numbers and summaries require their export permissions. Settings → Notifications manages your own daily, weekly or monthly report emails; the public unsubscribe page stops a subscription after a click.

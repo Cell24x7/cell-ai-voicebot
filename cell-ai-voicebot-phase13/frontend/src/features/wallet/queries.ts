@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { usePermission } from '@/features/auth/hooks';
+import { usePermission, isLimitedImpersonation } from '@/features/auth/hooks';
 import { useAuthStore } from '@/features/auth/store';
 import { billingApi } from '@/services/api/billing';
 import { walletApi } from '@/services/api/wallet';
@@ -31,12 +31,19 @@ export const useBillingProfile = (enabled = true) =>
 export const useGstStates = () =>
   useQuery({ queryKey: billingKeys.states, queryFn: billingApi.states, staleTime: Infinity });
 
-/** Can this user add money right now (permission, and never while impersonating)? */
+/**
+ * Can this user add money right now (permission, and never from a login-as session —
+ * SAC: Full access too; superadmins use Admin → Wallet → Adjust).
+ */
 export const useCanTopUp = (): boolean => {
   const canTopUp = usePermission('wallet.topup');
-  const impersonating = useImpersonating();
-  return canTopUp && !impersonating;
+  const loggedInAs = useAuthStore((s) => Boolean(s.session?.impersonation));
+  return canTopUp && !loggedInAs;
 };
 
+/**
+ * `true` while a login-as session can't act as the owner (`view` / `act`). SAC: a superadmin
+ * Full access session is not limited — it works like the owner.
+ */
 export const useImpersonating = (): boolean =>
-  useAuthStore((s) => Boolean(s.session?.impersonation));
+  useAuthStore((s) => isLimitedImpersonation(s.session));

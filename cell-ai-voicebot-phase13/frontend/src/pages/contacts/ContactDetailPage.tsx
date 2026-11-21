@@ -23,7 +23,7 @@ import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { useConfirm } from '@/components/confirm-context';
 import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/PageHeader';
-import { useCan, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, useCan, useSession } from '@/features/auth/hooks';
 import { useCanTriggerCalls } from '@/features/calls/queries';
 import { ContactFormDialog } from '@/features/contacts/ContactFormDialog';
 import { ContactStatusChips } from '@/features/contacts/ContactsTab';
@@ -285,7 +285,7 @@ export function ContactDetailPage() {
                       Delete
                     </MenuItem>
                   )}
-                  {can('contacts.erase') && !session?.impersonation && (
+                  {can('contacts.erase') && !isLimitedImpersonation(session) && (
                     <MenuItem
                       onClick={() => {
                         setMenu(null);

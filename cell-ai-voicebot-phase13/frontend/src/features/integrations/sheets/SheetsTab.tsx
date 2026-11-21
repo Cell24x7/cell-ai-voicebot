@@ -20,7 +20,7 @@ import { useConfirm } from '@/components/confirm-context';
 import { DataTable } from '@/components/DataTable';
 import { RelativeTime } from '@/components/RelativeTime';
 import { StatusChip } from '@/components/StatusChip';
-import { usePermission, useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, usePermission, useSession } from '@/features/auth/hooks';
 import {
   BASE_TARGETS,
   checkChoices,
@@ -225,7 +225,7 @@ function AddSheetDialog({ onClose }: { onClose: () => void }) {
 /** Integrations → Google Sheets (`contacts.import`). */
 export function SheetsTab() {
   const session = useSession();
-  const canManage = usePermission('contacts.import') && !session?.impersonation;
+  const canManage = usePermission('contacts.import') && !isLimitedImpersonation(session);
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [adding, setAdding] = useState(false);

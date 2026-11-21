@@ -24,6 +24,7 @@ import {
 import { useCallPermission, useCanRequestPermission } from '../queries';
 
 import { RequestPermissionDialog } from './RequestPermissionDialog';
+import { ScheduledCallsList } from './ScheduledCallsList';
 
 type PanelPermission = Omit<WhatsAppCallPermission, 'history'> & {
   history?: WhatsAppCallPermission['history'];
@@ -138,6 +139,7 @@ export function CallingPanelSection({
           ))}
         </Stack>
       )}
+      <ScheduledCallsList contactId={contactId} />
       {asking && (
         <RequestPermissionDialog
           channelId={channelId}

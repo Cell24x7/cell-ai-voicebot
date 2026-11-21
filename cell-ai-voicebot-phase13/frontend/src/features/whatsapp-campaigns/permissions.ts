@@ -4,7 +4,7 @@ import { usePermission, useSession } from '@/features/auth/hooks';
 export const useCanWriteWaCampaigns = (): boolean => {
   const canWrite = usePermission('whatsapp.campaigns.write');
   const session = useSession();
-  return canWrite && (!session?.impersonation || session.impersonation.mode === 'act');
+  return canWrite && (!session?.impersonation || session.impersonation.mode !== 'view');
 };
 
 /** `whatsapp.campaigns.read` (the list / detail / report). */

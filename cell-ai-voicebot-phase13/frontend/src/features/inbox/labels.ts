@@ -122,6 +122,15 @@ export const systemText = (system: InboxMessage['system']): string => {
         : 'The customer changed their number.';
     case 'customer_identity_changed':
       return "The customer's WhatsApp security code changed.";
+    // SAC-T10: scheduled AI calls
+    case 'call_scheduled':
+      return 'AI call scheduled for this customer.';
+    case 'call_callback_scheduled':
+      return 'The customer asked for a callback — the AI will call back at the agreed time.';
+    case 'call_schedule_skipped':
+      return 'The scheduled AI call was not placed (see Calls → Scheduled for why).';
+    case 'call_schedule_cancelled':
+      return 'The scheduled AI call was cancelled.';
     default:
       return 'WhatsApp sent an update about this chat.';
   }

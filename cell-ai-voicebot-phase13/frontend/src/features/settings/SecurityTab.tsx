@@ -12,9 +12,10 @@ import { useNavigate } from 'react-router';
 import { useConfirm } from '@/components/confirm-context';
 import { DataTable } from '@/components/DataTable';
 import { RelativeTime } from '@/components/RelativeTime';
-import { useSession } from '@/features/auth/hooks';
+import { isLimitedImpersonation, useSession } from '@/features/auth/hooks';
 import { PasswordField } from '@/features/auth/PasswordField';
 import { PASSWORD_MIN } from '@/features/auth/schemas';
+import { endImpersonation } from '@/features/auth/session';
 import { useAuthStore } from '@/features/auth/store';
 import { authApi } from '@/services/api/auth';
 import { getErrorMessage, toApiError } from '@/services/api/errors';
@@ -23,12 +24,16 @@ import type { Session } from '@/services/api/types';
 import { settingsKeys } from './keys';
 import { MfaSection } from './MfaSection';
 
-function ChangePassword() {
+/** SAC: in Full access the superadmin's step-up stands in for the owner's current password. */
+function ChangePassword({ fullAccess = false }: { fullAccess?: boolean }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [repeat, setRepeat] = useState('');
   const change = useMutation({
-    mutationFn: () => authApi.changePassword({ currentPassword: current, newPassword: next }),
+    mutationFn: () =>
+      authApi.changePassword(
+        fullAccess ? { newPassword: next } : { currentPassword: current, newPassword: next },
+      ),
     meta: { silent: true },
     onSuccess: (session) => {
       useAuthStore.getState().setSession(session);
@@ -45,15 +50,23 @@ function ChangePassword() {
   return (
     <Stack spacing={2} sx={{ maxWidth: 420 }}>
       <Typography variant="subtitle1">Change password</Typography>
+      {fullAccess && (
+        <Alert severity="warning">
+          Full access: this sets the owner&apos;s password and signs out all their sessions. You
+          confirm with your own password.
+        </Alert>
+      )}
       {error && (
         <Alert severity="error">{error.details[0]?.message ?? getErrorMessage(error)}</Alert>
       )}
-      <PasswordField
-        label="Current password"
-        autoComplete="current-password"
-        value={current}
-        onChange={(e) => setCurrent(e.target.value)}
-      />
+      {!fullAccess && (
+        <PasswordField
+          label="Current password"
+          autoComplete="current-password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+        />
+      )}
       <PasswordField
         label="New password"
         autoComplete="new-password"
@@ -72,7 +85,12 @@ function ChangePassword() {
       <Button
         variant="contained"
         sx={{ alignSelf: 'flex-start' }}
-        disabled={!current || next.length < PASSWORD_MIN || next !== repeat || change.isPending}
+        disabled={
+          (!fullAccess && !current) ||
+          next.length < PASSWORD_MIN ||
+          next !== repeat ||
+          change.isPending
+        }
         onClick={() => change.mutate()}
       >
         Change password
@@ -114,6 +132,13 @@ function Sessions() {
     });
     if (!ok) return;
     await authApi.logoutAll();
+    const imp = useAuthStore.getState().session?.impersonation;
+    if (imp) {
+      // SAC: the owner's sessions ended — and with them this Full access session
+      await endImpersonation(queryClient);
+      void navigate(imp.returnTo);
+      return;
+    }
     useAuthStore.getState().setAnonymous();
     queryClient.clear();
     void navigate('/login');
@@ -173,17 +198,18 @@ function Sessions() {
 
 export function SecurityTab() {
   const session = useSession();
+  const fullAccess = session?.impersonation?.mode === 'full';
   return (
     <Paper variant="outlined" sx={{ p: 3 }}>
       <Stack spacing={4}>
-        {session?.impersonation ? (
+        {isLimitedImpersonation(session) ? (
           <Alert severity="info">
             Password changes are not available while viewing as another user.
           </Alert>
         ) : (
-          <ChangePassword />
+          <ChangePassword fullAccess={fullAccess} />
         )}
-        {!session?.impersonation && <Sessions />}
+        {!isLimitedImpersonation(session) && <Sessions />}
         <MfaSection />
       </Stack>
     </Paper>

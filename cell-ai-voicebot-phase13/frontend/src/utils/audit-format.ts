@@ -5,7 +5,7 @@ export const auditActorText = (e: AuditEntry): string => {
   if (e.actor.type === 'api_key') return 'API key';
   if (e.actor.type === 'system') return 'System';
   const who = e.actor.name ?? (e.actor.platform ? 'Platform admin' : 'User');
-  return e.actor.impersonatorId ? `${who} (via support)` : who;
+  return e.actor.impersonatorId ? `${who} (by the platform team)` : who;
 };
 
 /** "Details" column — `key: value · key: a, b`. */

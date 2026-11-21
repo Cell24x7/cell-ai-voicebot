@@ -18,7 +18,15 @@ import {
   CallHoldBody,
   CallTransferBody,
 } from './calling-api.schema';
-import { CallAvailabilityBody, CallingSettingsPatch } from './calling.schema';
+import {
+  CallAvailabilityBody,
+  CallingSettingsPatch,
+  IncomingDefaultBody,
+  ScheduledCallBody,
+  ScheduledCallParams,
+  ScheduledCallPatch,
+  ScheduledCallsQuery,
+} from './calling.schema';
 import { READINESS_KEYS } from './readiness';
 
 const tags = ['WhatsApp calling'];
@@ -233,4 +241,146 @@ registry.registerPath({
   summary: 'Set your availability for incoming calls (calls.answer)',
   request: { body: body(CallAvailabilityBody) },
   responses: { 200: ok(CallAvailabilityBody), ...failures },
+});
+
+// SAC-T6: incoming calls — the account default and "Stop live AI calls"
+registry.registerPath({
+  method: 'get',
+  path: '/api/v1/whatsapp/incoming-default',
+  tags,
+  summary: 'Who answers incoming WhatsApp calls on numbers connected from now on (calls.read)',
+  security: bearer,
+  responses: { 200: ok(IncomingDefaultBody), 401: errors[401], 403: errors[403] },
+});
+registry.registerPath({
+  method: 'put',
+  path: '/api/v1/whatsapp/incoming-default',
+  tags,
+  summary:
+    'Set the default — AI answers (ai / ai_then_team / team_then_ai, needs a program, call audio and wallet money) or the team (whatsapp.calling.manage)',
+  security: bearer,
+  request: { body: { content: { 'application/json': { schema: IncomingDefaultBody } } } },
+  responses: {
+    200: ok(IncomingDefaultBody),
+    401: errors[401],
+    403: errors[403],
+    422: errors[422],
+    429: errors[429],
+  },
+});
+registry.registerPath({
+  method: 'post',
+  path: '/api/v1/whatsapp/channels/{id}/calling/stop-ai-calls',
+  tags,
+  summary: 'End every live AI call on this number politely (calls with a person stay)',
+  security: bearer,
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: ok(z.object({ stopped: z.number().int() })),
+    401: errors[401],
+    403: errors[403],
+    404: errors[404],
+  },
+});
+
+// SAC-T8: scheduled AI calls
+const ScheduledCallSchema = registry.register(
+  'WhatsAppScheduledCall',
+  z.object({
+    id: z.string(),
+    channelId: z.string(),
+    contactId: z.string(),
+    conversationId: z.string().nullable(),
+    program: z.object({ kind: z.enum(['flow', 'agent']), id: z.string() }),
+    purpose: z.string().nullable(),
+    dueAt: z.string(),
+    timezone: z.string(),
+    status: z.enum([
+      'scheduled',
+      'dispatching',
+      'calling',
+      'done',
+      'skipped',
+      'failed',
+      'cancelled',
+    ]),
+    skipReason: z.string().nullable(),
+    origin: z.enum(['manual', 'ai_callback', 'api']),
+    attempt: z.number().int(),
+    retry: z.object({
+      max: z.number().int(),
+      gapMin: z.number().int(),
+      on: z.array(z.enum(['no_answer', 'busy', 'failed'])),
+    }),
+    attempts: z.array(
+      z.object({
+        at: z.string(),
+        callId: z.string().nullable(),
+        result: z.enum(['answered', 'no_answer', 'busy', 'failed', 'skipped']),
+        reason: z.string().nullable(),
+      }),
+    ),
+    shiftedAt: z.string().nullable(),
+    callIds: z.array(z.string()),
+    createdBy: z.string(),
+    cancelledAt: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  }),
+);
+const ScheduledCreatedSchema = z.object({
+  scheduledCall: ScheduledCallSchema,
+  warnings: z.object({
+    noPermission: z.boolean(),
+    permissionExpiresBeforeDue: z.boolean(),
+    outsideWindow: z.boolean(),
+    lowWallet: z.boolean(),
+  }),
+  replay: z.boolean(),
+});
+const scheduledBase = '/api/v1/whatsapp/scheduled-calls';
+registry.registerPath({
+  method: 'post',
+  path: scheduledBase,
+  tags: publicTags,
+  security: bearerOrKey,
+  summary: 'Schedule an AI WhatsApp call (calls.trigger)',
+  request: { body: body(ScheduledCallBody) },
+  responses: { 200: ok(ScheduledCreatedSchema), 201: ok(ScheduledCreatedSchema), ...failures },
+});
+registry.registerPath({
+  method: 'get',
+  path: scheduledBase,
+  tags: publicTags,
+  security: bearerOrKey,
+  summary: 'Scheduled AI WhatsApp calls, newest first (calls.read)',
+  request: { query: ScheduledCallsQuery },
+  responses: { 200: ok(z.array(ScheduledCallSchema)), ...failures },
+});
+registry.registerPath({
+  method: 'get',
+  path: `${scheduledBase}/{id}`,
+  tags: publicTags,
+  security: bearerOrKey,
+  summary: 'One scheduled AI WhatsApp call (calls.read)',
+  request: { params: ScheduledCallParams },
+  responses: { 200: ok(ScheduledCallSchema), ...failures },
+});
+registry.registerPath({
+  method: 'patch',
+  path: `${scheduledBase}/{id}`,
+  tags: publicTags,
+  security: bearerOrKey,
+  summary: 'Reschedule / change a waiting scheduled call (calls.trigger)',
+  request: { params: ScheduledCallParams, body: body(ScheduledCallPatch) },
+  responses: { 200: ok(ScheduledCallSchema), ...failures },
+});
+registry.registerPath({
+  method: 'post',
+  path: `${scheduledBase}/{id}/cancel`,
+  tags: publicTags,
+  security: bearerOrKey,
+  summary: 'Cancel a waiting scheduled call (calls.trigger)',
+  request: { params: ScheduledCallParams },
+  responses: { 200: ok(ScheduledCallSchema), ...failures },
 });

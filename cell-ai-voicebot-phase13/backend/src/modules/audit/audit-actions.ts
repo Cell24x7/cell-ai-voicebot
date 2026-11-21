@@ -226,6 +226,20 @@ export const AUDIT_ACTIONS = [
   'whatsapp.managed_webhook_reset',
   'whatsapp.credit_line_updated',
   'whatsapp.credit_line_admin_confirmed',
+  // SAC: superadmin full access login-as
+  'auth.login_as_full_started',
+  'auth.login_as_full_extended',
+  'auth.login_as_step_up',
+  'auth.login_as_step_up_failed',
+  'auth.login_as_ring_me_too',
+  // SAC-T4: the Meta webhook of a number (Webhook check / Fix)
+  'whatsapp.webhook_fixed',
+  'whatsapp.webhook_fix_failed',
+  // SAC-T6: incoming WhatsApp calls — the account default, stop live AI calls
+  'whatsapp.incoming_default_updated',
+  'whatsapp.ai_calls_stopped',
+  // SAC-T11: a managed number moved to Meta direct
+  'whatsapp.channel_switched_to_meta',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
