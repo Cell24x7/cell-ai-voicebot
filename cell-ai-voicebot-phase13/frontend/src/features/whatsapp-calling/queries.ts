@@ -50,6 +50,12 @@ export const useCallingSettings = (channelId: string | null) =>
     enabled: Boolean(channelId),
   });
 
+export const useDiagnoseCalling = (channelId: string) =>
+  useMutation({
+    mutationFn: (input: { contactPhone?: string } = {}) =>
+      whatsappCallingApi.diagnose(channelId, input),
+  });
+
 const storeSettings = (
   client: ReturnType<typeof useQueryClient>,
   settings: WhatsAppCallingSettings,

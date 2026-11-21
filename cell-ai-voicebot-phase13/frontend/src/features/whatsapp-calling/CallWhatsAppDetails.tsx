@@ -1,3 +1,4 @@
+import Alert from '@mui/material/Alert';
 import Link from '@mui/material/Link';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -8,6 +9,7 @@ import Typography from '@mui/material/Typography';
 import { useQuery } from '@tanstack/react-query';
 import { Link as RouterLink } from 'react-router';
 
+import { CopyButton } from '@/components/CopyButton';
 import { usePermission } from '@/features/auth/hooks';
 import { teamKeys } from '@/features/team/keys';
 import { teamApi } from '@/services/api/team';
@@ -27,6 +29,8 @@ const TIMELINE_LABELS: Record<string, string> = {
   owner_lost: 'Server restarted during the call',
   // SAC-T12
   connect_uncertain: 'WhatsApp did not answer in time (not called again)',
+  meta_error: 'Meta rejected a call action',
+  sdp_shape: 'Call audio offer prepared',
   late_terminate: 'The late call was ended at WhatsApp',
   busy_refused: 'Every line was busy',
 };
@@ -46,6 +50,7 @@ export function CallWhatsAppDetails({ call, timezone }: { call: Call; timezone: 
     id ? (team.data?.data.find((m) => m.id === id)?.name ?? 'A team member') : null;
   const answered = name(wa.answeredBy ?? (call.mode === 'human' ? call.agentUserId : null));
   const transferred = name(wa.transferredTo);
+  const metaError = call.error?.meta;
   const row = (label: string, value: string) => (
     <Stack direction="row" spacing={1}>
       <Typography variant="body2" color="text.secondary" sx={{ width: 140, flexShrink: 0 }}>
@@ -60,6 +65,31 @@ export function CallWhatsAppDetails({ call, timezone }: { call: Call; timezone: 
         WhatsApp call
       </Typography>
       <Stack spacing={0.5}>
+        {metaError && (
+          <Alert
+            severity="error"
+            action={
+              metaError.fbtraceId ? (
+                <CopyButton value={metaError.fbtraceId} label="Copy Meta trace id" />
+              ) : undefined
+            }
+          >
+            <strong>
+              Meta error{metaError.op ? ` · ${metaError.op}` : ''}
+              {metaError.metaCode
+                ? ` · ${metaError.metaCode}${metaError.metaSubcode ? `/${metaError.metaSubcode}` : ''}`
+                : ''}
+            </strong>
+            <br />
+            {metaError.message}
+            {metaError.fbtraceId ? (
+              <>
+                <br />
+                fbtraceId: {metaError.fbtraceId}
+              </>
+            ) : null}
+          </Alert>
+        )}
         {row(
           'Direction',
           wa.direction === 'USER_INITIATED' ? 'The customer called' : 'Your business called',
@@ -83,7 +113,15 @@ export function CallWhatsAppDetails({ call, timezone }: { call: Call; timezone: 
             <ListItem key={`${t.event}-${t.at}`} disableGutters>
               <ListItemText
                 primary={TIMELINE_LABELS[t.event] ?? t.event.replace(/_/g, ' ')}
-                secondary={formatInAccountTz(t.at, timezone)}
+                secondary={
+                  <>
+                    {formatInAccountTz(t.at, timezone)}
+                    {t.event === 'meta_error' && t.data && typeof t.data.metaCode === 'number'
+                      ? ` · Meta ${t.data.metaCode}`
+                      : ''}
+                    {t.event === 'sdp_shape' && t.data ? ` · ${JSON.stringify(t.data)}` : ''}
+                  </>
+                }
               />
             </ListItem>
           ))}

@@ -36,6 +36,7 @@ import {
   useCallingReadiness,
   useCallingSettings,
   useCanManageCalling,
+  useDiagnoseCalling,
   useSyncCallingSettings,
   useUpdateCallingSettings,
 } from '../queries';
@@ -100,6 +101,9 @@ function CallingForm({
   const saved = draftOf(settings);
   const [draft, setDraft] = useState<Draft>(saved);
   const [confirm, setConfirm] = useState(false);
+  const [diagnoseOpen, setDiagnoseOpen] = useState(false);
+  const [contactPhone, setContactPhone] = useState('');
+  const diagnose = useDiagnoseCalling(channelId);
   const save = useUpdateCallingSettings(channelId);
   const sync = useSyncCallingSettings(channelId);
   const unavailable = settings.status === 'unavailable';
@@ -157,6 +161,11 @@ function CallingForm({
             Read again
           </Button>
         )}
+        {canManage && (
+          <Button size="small" onClick={() => setDiagnoseOpen(true)}>
+            Test calling API
+          </Button>
+        )}
       </Stack>
       {unavailable && <Alert severity="info">{unavailableText(settings.unavailableReason)}</Alert>}
       {active.map((r) => (
@@ -179,6 +188,49 @@ function CallingForm({
       {settings.lastError && <Alert severity="warning">{settings.lastError}</Alert>}
       <CallingReadiness channelId={settings.channelId} />
       <PermissionTemplateNotice channelId={settings.channelId} />
+      <Dialog open={diagnoseOpen} onClose={() => setDiagnoseOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Test calling API</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Safe read-only checks. No call will be placed.
+          </DialogContentText>
+          <TextField
+            fullWidth
+            size="small"
+            label="Customer number to check permission (optional)"
+            value={contactPhone}
+            onChange={(event) => setContactPhone(event.target.value)}
+            placeholder="+919876543210"
+          />
+          {diagnose.data && (
+            <Stack spacing={1} sx={{ mt: 2 }}>
+              {diagnose.data.steps.map((step) => (
+                <Alert key={step.key} severity={step.ok ? 'success' : 'warning'}>
+                  {step.key}: {step.detail}
+                  {step.metaCode ? ` (Meta ${step.metaCode})` : ''}
+                </Alert>
+              ))}
+            </Stack>
+          )}
+          {diagnose.error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {errorText(diagnose.error)}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDiagnoseOpen(false)}>Close</Button>
+          <Button
+            variant="contained"
+            disabled={diagnose.isPending}
+            onClick={() =>
+              diagnose.mutate(contactPhone.trim() ? { contactPhone: contactPhone.trim() } : {})
+            }
+          >
+            Run checks
+          </Button>
+        </DialogActions>
+      </Dialog>
       {!enabled && blocking && <Alert severity="warning">{blocking.fix ?? blocking.detail}</Alert>}
       {!unavailable && (
         <FormControlLabel

@@ -26,7 +26,11 @@ export interface ActiveWaCall {
   recording: boolean;
   failure: string | null;
   walletEndsInSec: number | null;
-  ended: { reason: string; durationSec: number } | null;
+  ended: {
+    reason: string;
+    durationSec: number;
+    error?: { code: string; metaCode: number | null; message: string; op?: string };
+  } | null;
 }
 
 /** A ringing call: WhatsApp (Phase 12) or a phone call to one of the numbers (Phase 20). */

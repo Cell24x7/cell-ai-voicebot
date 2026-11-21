@@ -99,6 +99,7 @@ describe('Admin → System', () => {
         aiFirstAudioP95Ms: null,
         metaCallingOn: 1,
         metaCallingBroken: 1,
+        metaCallErrors1h: 0,
       },
     });
     open();
@@ -106,6 +107,7 @@ describe('Admin → System', () => {
     expect(screen.getByText('Not set (WA_MEDIA_PUBLIC_IP)')).toBeInTheDocument();
     expect(screen.getByText('40000-40999')).toBeInTheDocument();
     expect(screen.getByText('850 ms')).toBeInTheDocument();
+    expect(screen.getByText('Meta call errors (1 h)')).toBeInTheDocument();
     expect(screen.getByText(/media timeout/)).toBeInTheDocument();
   });
 

@@ -18,6 +18,7 @@ import type { WhatsAppCallMediaTicket, WhatsAppCallProgram } from '@/services/ap
 import { whatsappCallingApi } from '@/services/api/whatsapp-calling';
 
 import { CALL_ERROR_TEXT } from '../labels';
+import { metaErrorText } from '../meta-error';
 
 import { newActiveCall, useLiveCallStore, type ActiveWaCall } from './store';
 
@@ -79,6 +80,14 @@ const patch = (p: Partial<ActiveWaCall>) => store().patchActive(p);
 
 export const callErrorText = (err: unknown): string => {
   const e = toApiError(err);
+  const meta = metaErrorText(e);
+  if (
+    meta &&
+    (e.code === 'META_API_ERROR' ||
+      e.code === 'WHATSAPP_CALL_FAILED' ||
+      e.details.some((d) => d.metaCode !== undefined))
+  )
+    return meta;
   return (
     (e.kind === 'http' && e.code ? CALL_ERROR_TEXT[e.code] : undefined) ?? getErrorMessage(err)
   );
@@ -143,7 +152,19 @@ const connectLeg = async (
         }
         if (m.type === 'call.ended') {
           endedByServer = true;
-          patch({ phase: 'ending', ended: { reason: m.reason, durationSec: m.durationSec } });
+          patch({
+            phase: 'ending',
+            ended: { reason: m.reason, durationSec: m.durationSec, error: m.error },
+          });
+          if (m.error)
+            patch({
+              failure:
+                metaErrorText({
+                  metaCode: m.error.metaCode ?? undefined,
+                  message: m.error.message,
+                  op: m.error.op,
+                }) ?? m.error.message,
+            });
         }
       },
       onAudio: (frame) => {
@@ -521,15 +542,32 @@ export const onCallStatus = (callId: string, status: string): void => {
 
 export const onCallEnded = (
   callId: string,
-  ended: { endReason: string | null; durationSec: number },
+  ended: {
+    endReason: string | null;
+    durationSec: number;
+    error?: { code: string; metaCode: number | null; message: string; op?: string };
+  },
 ): void => {
   const call = store().active;
   if (call?.callId !== callId) return;
-  const summary = { reason: ended.endReason ?? 'ended', durationSec: ended.durationSec };
+  const summary = {
+    reason: ended.endReason ?? 'ended',
+    durationSec: ended.durationSec,
+    error: ended.error,
+  };
   attempt += 1;
   endedByServer = true;
   release();
   patch({ phase: 'ended', ended: summary });
+  if (ended.error)
+    patch({
+      failure:
+        metaErrorText({
+          metaCode: ended.error.metaCode ?? undefined,
+          message: ended.error.message,
+          op: ended.error.op,
+        }) ?? ended.error.message,
+    });
 };
 
 /** Closes the bar after the call ended. */

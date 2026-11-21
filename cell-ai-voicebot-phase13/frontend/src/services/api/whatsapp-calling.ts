@@ -16,6 +16,7 @@ import type {
   WhatsAppCallingReadiness,
   WhatsAppCallingSettings,
   WhatsAppCallingSettingsPatch,
+  WhatsAppCallingDiagnose,
   WhatsAppIncomingDefault,
   WhatsAppScheduledCall,
 } from './types';
@@ -36,6 +37,10 @@ export interface RequestCallPermissionInput {
   templateId?: string;
 }
 
+export interface CallingDiagnoseInput {
+  contactPhone?: string;
+}
+
 /** Phase 18B: exactly one target. */
 export type BulkPermissionTarget =
   { contactIds: string[] } | { listId: string } | { segmentId: string };
@@ -53,6 +58,13 @@ const call = (id: string, action: string) => `/whatsapp/calls/${id}/${action}`;
 
 /** `/api/v1/whatsapp/…` calling routes (PHASE_12_PLAN §1o, api.md §14f). */
 export const whatsappCallingApi = {
+  diagnose: (channelId: string, body: CallingDiagnoseInput = {}) =>
+    unwrap(
+      apiClient.post<SuccessEnvelope<WhatsAppCallingDiagnose>>(
+        settings(channelId, '/diagnose'),
+        body,
+      ),
+    ),
   quote: (channelId: string, contactId: string) =>
     unwrap(
       apiClient.get<SuccessEnvelope<WhatsAppCallPrice>>(settings(channelId, '/quote'), {

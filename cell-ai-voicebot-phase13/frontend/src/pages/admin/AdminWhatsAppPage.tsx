@@ -62,6 +62,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 /** Superadmin `/admin/whatsapp`: Meta setup status, webhook URL to paste in Meta, failed events. */
 export function AdminWhatsAppPage() {
   const [solutionId, setSolutionId] = useState('');
+  const [errorAccountId, setErrorAccountId] = useState('');
+  const [errorChannelId, setErrorChannelId] = useState('');
   const queryClient = useQueryClient();
   const status = useQuery({
     queryKey: whatsappKeys.adminStatus,
@@ -72,6 +74,14 @@ export function AdminWhatsAppPage() {
     queryKey: whatsappKeys.adminEvents('failed'),
     queryFn: () => adminWhatsappApi.events('failed'),
     enabled: status.isSuccess,
+  });
+  const metaErrors = useQuery({
+    queryKey: ['admin', 'whatsapp', 'meta-call-errors', errorAccountId, errorChannelId],
+    queryFn: () =>
+      adminWhatsappApi.metaCallErrors({
+        accountId: errorAccountId || undefined,
+        channelId: errorChannelId || undefined,
+      }),
   });
   const replay = useMutation({
     mutationFn: (id: string) => adminWhatsappApi.replay(id),
@@ -192,6 +202,77 @@ export function AdminWhatsAppPage() {
               )}
             </Stack>
           </Section>
+          <div>
+            <Stack spacing={1}>
+              <Typography variant="subtitle1" component="h2">
+                Meta call errors
+              </Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                <TextField
+                  size="small"
+                  label="Account ID"
+                  value={errorAccountId}
+                  onChange={(e) => setErrorAccountId(e.target.value)}
+                />
+                <TextField
+                  size="small"
+                  label="Number / channel ID"
+                  value={errorChannelId}
+                  onChange={(e) => setErrorChannelId(e.target.value)}
+                />
+                <Button onClick={() => void metaErrors.refetch()}>Refresh</Button>
+              </Stack>
+              <DataTable
+                aria-label="Meta call errors"
+                loading={metaErrors.isPending}
+                error={metaErrors.error}
+                columns={[
+                  { key: 'at', header: 'Time', render: (row) => <RelativeTime value={row.at} /> },
+                  {
+                    key: 'account',
+                    header: 'Account / number',
+                    render: (row) => `${row.accountName} · ••••${row.numberLast4}`,
+                  },
+                  { key: 'op', header: 'Operation', render: (row) => <code>{row.op}</code> },
+                  {
+                    key: 'code',
+                    header: 'Meta code',
+                    render: (row) =>
+                      `${row.metaCode ?? '—'}${row.metaSubcode ? `/${row.metaSubcode}` : ''}`,
+                  },
+                  { key: 'message', header: 'Message', render: (row) => row.message },
+                  {
+                    key: 'trace',
+                    header: 'fbtraceId',
+                    render: (row) =>
+                      row.fbtraceId ? (
+                        <Stack direction="row" sx={{ alignItems: 'center' }}>
+                          <code>{row.fbtraceId}</code>
+                          <CopyButton value={row.fbtraceId} label="Copy fbtraceId" />
+                        </Stack>
+                      ) : (
+                        '—'
+                      ),
+                  },
+                  {
+                    key: 'call',
+                    header: 'Call',
+                    render: (row) =>
+                      row.callId ? (
+                        <Button size="small" href={`/calls/${row.callId}`}>
+                          Open
+                        </Button>
+                      ) : (
+                        '—'
+                      ),
+                  },
+                ]}
+                rows={metaErrors.data}
+                getRowId={(row) => row.id}
+                emptyTitle="No Meta call errors"
+              />
+            </Stack>
+          </div>
           <div>
             <Typography variant="subtitle1" component="h2" sx={{ mb: 1 }}>
               Failed events

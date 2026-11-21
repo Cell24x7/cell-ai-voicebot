@@ -31317,6 +31317,220 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/whatsapp/channels/{id}/calling/diagnose': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Run safe, read-only checks against this number calling API (whatsapp.manage) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['WhatsAppCallingDiagnoseInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCallingDiagnose'];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp calling or media capacity unavailable */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/whatsapp/channels/{id}/calling/diagnose': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Run read-only calling checks on a channel as a superadmin */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['WhatsAppCallingDiagnoseInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppCallingDiagnose'];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp calling or media capacity unavailable */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/whatsapp/channels/{id}/calling/sync': {
     parameters: {
       query?: never;
@@ -35667,6 +35881,84 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/whatsapp/meta-call-errors': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Recent, masked Meta calling errors across accounts (superadmin only) */
+    get: {
+      parameters: {
+        query?: {
+          accountId?: string;
+          channelId?: string;
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['AdminMetaCallError'][];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/whatsapp/events/{id}/replay': {
     parameters: {
       query?: never;
@@ -37352,6 +37644,8 @@ export interface components {
       metaSubcode?: number;
       /** @description On META_API_ERROR: Meta trace id */
       fbtraceId?: string;
+      /** @description On META_API_ERROR: Graph operation */
+      op?: string;
     };
     ErrorEnvelope: {
       /** @enum {boolean} */
@@ -38156,6 +38450,7 @@ export interface components {
         | 'whatsapp.channel_switched_to_meta'
         | 'whatsapp.meta_calling_enabled'
         | 'whatsapp.meta_calling_disabled'
+        | 'whatsapp.calling_diagnosed'
         | 'whatsapp.meta_calling_failed'
         | 'whatsapp.meta_calling_checked';
       actor: {
@@ -38452,6 +38747,8 @@ export interface components {
         metaCallingOn: number;
         /** @description PMC: managed numbers whose Meta calling broke (wa-meta-calling-broken) */
         metaCallingBroken: number;
+        /** @description WCF: failed Meta call actions recorded during the last hour */
+        metaCallErrors1h: number;
       } | null;
     };
     AgentFunction: {
@@ -38967,6 +39264,9 @@ export interface components {
         timeline: {
           event: string;
           at: string;
+          data?: {
+            [key: string]: unknown;
+          };
         }[];
       } | null;
       isTest: boolean;
@@ -39141,6 +39441,15 @@ export interface components {
       flowRunId: string | null;
       error: {
         code: string;
+        meta?: {
+          op: string;
+          metaCode: number | null;
+          metaSubcode: number | null;
+          type: string | null;
+          message: string;
+          fbtraceId: string | null;
+          at: string;
+        };
       } | null;
       createdAt: string;
     };
@@ -42279,6 +42588,17 @@ export interface components {
       expiresAt: string;
       wsPath: string;
     };
+    WhatsAppCallingDiagnose: {
+      channelId: string;
+      checkedAt: string;
+      steps: {
+        /** @enum {string} */
+        key: 'token' | 'phone' | 'settings' | 'webhook' | 'permission';
+        ok: boolean;
+        detail: string;
+        metaCode: number | null;
+      }[];
+    };
     WhatsAppCallingReadiness: {
       /** @description No blocking item is false */
       ready: boolean;
@@ -42621,6 +42941,24 @@ export interface components {
       channelId: string | null;
       receivedAt: string;
       processedAt: string | null;
+    };
+    AdminMetaCallError: {
+      id: string;
+      accountId: string;
+      accountName: string;
+      channelId: string;
+      numberLast4: string;
+      callId: string | null;
+      op: string;
+      metaCode: number | null;
+      metaSubcode: number | null;
+      type: string | null;
+      message: string;
+      fbtraceId: string | null;
+      httpStatus: number | null;
+      /** @enum {string} */
+      via: 'meta' | 'meta_direct' | 'pinnacle';
+      at: string;
     };
     VoiceCredentialsBody:
       | {
@@ -43186,6 +43524,9 @@ export interface components {
         ringUserIds?: string[] | null;
       };
       permissionRequestBody?: string;
+    };
+    WhatsAppCallingDiagnoseInput: {
+      contactPhone?: string;
     };
     CallAvailability: {
       /** @enum {string} */

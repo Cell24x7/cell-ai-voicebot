@@ -7,6 +7,7 @@ import type {
   WhatsAppChannel,
   WhatsAppConnectResult,
   WhatsAppMetaPayer,
+  AdminMetaCallError,
 } from './types';
 
 /** PN: a number onboarded at the partner (Pinnacle) — what the partner panel shows. */
@@ -28,6 +29,12 @@ export interface ManualConnectInput {
 
 /** Superadmin WhatsApp tools (`/api/v1/admin/whatsapp/*`, account billing / manual connect). */
 export const adminWhatsappApi = {
+  metaCallErrors: (params: { accountId?: string; channelId?: string; limit?: number } = {}) =>
+    unwrap(
+      apiClient.get<SuccessEnvelope<AdminMetaCallError[]>>('/admin/whatsapp/meta-call-errors', {
+        params,
+      }),
+    ),
   status: () =>
     unwrap(apiClient.get<SuccessEnvelope<WhatsAppAdminStatus>>('/admin/whatsapp/status')),
   events: (status?: MetaWebhookEventRow['status']) =>

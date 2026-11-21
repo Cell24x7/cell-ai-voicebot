@@ -19,7 +19,13 @@ export type MediaServerMessage =
   | { type: 'audio.clear' }
   | { type: 'wallet.empty_warning'; endsInSec: number }
   | { type: 'call.hold'; on: boolean }
-  | { type: 'call.ended'; reason: string; durationSec: number; costMicros: number }
+  | {
+      type: 'call.ended';
+      reason: string;
+      durationSec: number;
+      costMicros: number;
+      error?: { code: string; metaCode: number | null; message: string; op?: string };
+    }
   | { type: 'error'; code: string };
 
 export type MediaCloseReason =

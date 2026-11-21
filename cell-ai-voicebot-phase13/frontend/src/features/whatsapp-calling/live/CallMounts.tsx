@@ -36,7 +36,11 @@ export function CallMounts() {
   });
   useWsEvent('call.ended', (e) => {
     if (e.data.provider === 'whatsapp' || e.data.provider === 'sip')
-      onCallEnded(e.data.callId, { endReason: e.data.endReason, durationSec: e.data.durationSec });
+      onCallEnded(e.data.callId, {
+        endReason: e.data.endReason,
+        durationSec: e.data.durationSec,
+        error: e.data.error,
+      });
   });
   useWsEvent('whatsapp.call.incoming', (e) => {
     if (canAnswer) ring(e.data);

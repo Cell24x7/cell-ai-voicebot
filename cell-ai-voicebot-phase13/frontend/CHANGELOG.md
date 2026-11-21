@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **WhatsApp call error diagnostics (WCF)** — 2026-11-21: Call failure popup and Call details show Meta's code/message; number Calling includes read-only **Test calling API** checks; Admin → WhatsApp lists recent Meta call errors and Admin → System shows the one-hour count.
+
+### Added
+
 - **Calls via Meta direct for managed (Pinnacle) numbers (PMC)** — 2026-11-21
   - Number details → **Calls via Meta direct**: **Calling on karo (Meta direct)** opens Continue with Facebook for the same number. A superadmin in Full access also has an **Advanced** System User token field.
   - Progress steps ✅ / ❌; **Check / Fix**, **Retry check**, **Calling off** (optionally at WhatsApp too).

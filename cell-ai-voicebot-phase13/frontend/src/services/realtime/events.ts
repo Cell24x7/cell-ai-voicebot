@@ -47,6 +47,7 @@ export interface WsEventMap {
     durationSec: number;
     disposition: string | null;
     costMicros: number;
+    error?: { code: string; metaCode: number | null; message: string; op?: string };
   };
   'campaign.status': {
     campaignId: string;

@@ -33,6 +33,7 @@ export interface ApiErrorDetail {
   metaCode?: number;
   metaSubcode?: number;
   fbtraceId?: string;
+  op?: string;
 }
 
 interface ApiErrorInit {
@@ -88,6 +89,7 @@ const ErrorEnvelopeSchema = z.object({
           metaCode: z.number().optional(),
           metaSubcode: z.number().optional(),
           fbtraceId: z.string().optional(),
+          op: z.string().optional(),
         }),
       )
       .optional(),

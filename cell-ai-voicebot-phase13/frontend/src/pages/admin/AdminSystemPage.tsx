@@ -234,6 +234,12 @@ export function AdminSystemPage() {
                     label={String(s.whatsappCalls.failedSetups15m)}
                   />
                 </Fact>
+                <Fact label="Meta call errors (1 h)">
+                  <State
+                    good={s.whatsappCalls.metaCallErrors1h === 0}
+                    label={String(s.whatsappCalls.metaCallErrors1h)}
+                  />
+                </Fact>
                 <Fact label="TURN relay">
                   <State
                     good={s.whatsappCalls.turnSet}
