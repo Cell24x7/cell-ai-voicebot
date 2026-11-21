@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 
 import { useAuthStore } from '@/features/auth/store';
 import type {
+  MetaCallingInput,
   WhatsAppChannel,
   WhatsAppChannelDetail,
   WhatsAppChannelList,
@@ -123,6 +124,19 @@ export const useSwitchToMeta = () =>
       whatsappApi.switchToMeta(id, body),
     true,
   );
+/** PMC: silent — the dialog shows the steps and every error itself. */
+export const useEnableMetaCalling = () =>
+  useChannelMutation(
+    ({ id, body }: { id: string; body: MetaCallingInput }) =>
+      whatsappApi.enableMetaCalling(id, body),
+    true,
+  );
+export const useDisableMetaCalling = () =>
+  useChannelMutation(({ id, turnOffAtWhatsApp }: { id: string; turnOffAtWhatsApp: boolean }) =>
+    whatsappApi.disableMetaCalling(id, { turnOffAtWhatsApp }),
+  );
+export const useCheckMetaCalling = () =>
+  useChannelMutation((id: string) => whatsappApi.checkMetaCalling(id), true);
 export const useRetrySetup = () => useChannelMutation((id: string) => whatsappApi.retrySetup(id));
 export const useRegisterPin = () =>
   useChannelMutation(({ id, pin }: { id: string; pin?: string }) => whatsappApi.register(id, pin));

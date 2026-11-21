@@ -97,6 +97,8 @@ describe('Admin → System', () => {
         webhookMissing: 0,
         turnSet: false,
         aiFirstAudioP95Ms: null,
+        metaCallingOn: 1,
+        metaCallingBroken: 1,
       },
     });
     open();

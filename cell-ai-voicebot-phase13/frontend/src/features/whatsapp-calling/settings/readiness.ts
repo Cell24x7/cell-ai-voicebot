@@ -14,6 +14,8 @@ export const READINESS_LABELS: Record<ReadinessItem['key'], string> = {
   last_calls_webhook: 'Last call event',
   media: 'Call audio on our server',
   prices: 'Calling prices',
+  // PMC: managed numbers only
+  meta_direct: 'Calls via Meta direct',
 };
 
 /** Items that keep calling off while they fail (backend `BLOCKING_KEYS`). */
@@ -22,6 +24,7 @@ export const BLOCKING: readonly ReadinessItem['key'][] = [
   'messaging_limit',
   'calls_webhook',
   'media',
+  'meta_direct',
 ];
 
 /** The first failing must-have item, or null. */

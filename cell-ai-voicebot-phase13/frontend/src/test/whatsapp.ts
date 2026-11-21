@@ -43,6 +43,23 @@ export const fakeChannel = (overrides: Partial<WhatsAppChannel> = {}): WhatsAppC
     fixedAt: null,
     error: null,
   },
+  metaCalling: {
+    status: 'off',
+    method: null,
+    tokenLast4: null,
+    tokenExpiresAt: null,
+    webhookCheck: {
+      status: 'unknown',
+      appSubscribed: null,
+      missingFields: [],
+      checkedAt: null,
+      fixedAt: null,
+      error: null,
+    },
+    enabledAt: null,
+    checkedAt: null,
+    error: null,
+  },
   connectedBy: 'u1',
   connectedAt: '2026-10-22T08:00:00.000Z',
   syncedAt: '2026-10-22T08:00:00.000Z',
@@ -87,6 +104,7 @@ export const fakeWhatsAppConfig = (overrides: Partial<WhatsAppConfig> = {}): Wha
   graphVersion: 'v26.0',
   metaPayer: 'platform',
   solutionId: null,
+  metaCallingEnabled: true,
   ...overrides,
 });
 

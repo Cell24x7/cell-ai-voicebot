@@ -26,6 +26,7 @@ import { CHANNEL_STATUS_LABELS, whatsappErrorMessage } from '../labels';
 import { useChannel, useSimulateEvent } from '../queries';
 
 import { BusinessProfileSection } from './BusinessProfileSection';
+import { MetaCallingSection } from './MetaCallingSection';
 import { KIND_LABELS, showSimulator } from './texts';
 
 function Row({ label, value, copy }: { label: string; value: ReactNode; copy?: string | null }) {
@@ -126,6 +127,12 @@ export function ChannelDrawer({
               <>
                 <Divider />
                 <BusinessProfileSection channelId={c.id} />
+              </>
+            )}
+            {c.managed && c.status !== 'disconnected' && config?.metaCallingEnabled && (
+              <>
+                <Divider />
+                <MetaCallingSection channel={c} config={config} />
               </>
             )}
             {c.status !== 'disconnected' && (

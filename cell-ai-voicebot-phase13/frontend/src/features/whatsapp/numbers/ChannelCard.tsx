@@ -37,6 +37,7 @@ import {
   useSyncChannel,
 } from '../queries';
 
+import { META_CALLING_STATUS_LABELS } from './meta-calling-texts';
 import { DISCONNECT_TEXT, WHATSAPP_MANAGER_URL } from './texts';
 import { WebhookChip, WebhookFixButton } from './WebhookCheck';
 
@@ -232,7 +233,20 @@ export function ChannelCard({
           />
           <Chip size="small" variant="outlined" label={MODE_LABELS[channel.mode]} />
           {channel.managed && <Chip size="small" color="info" variant="outlined" label="Managed" />}
-          {channel.managed && <Chip size="small" variant="outlined" label="Calls via partner" />}
+          {channel.managed && (
+            <Chip
+              size="small"
+              variant="outlined"
+              color={
+                channel.metaCalling.status === 'on'
+                  ? 'success'
+                  : channel.metaCalling.status === 'error'
+                    ? 'error'
+                    : 'default'
+              }
+              label={META_CALLING_STATUS_LABELS[channel.metaCalling.status]}
+            />
+          )}
           {!channel.managed && status !== 'disconnected' && (
             <WebhookChip check={channel.webhookCheck} />
           )}

@@ -1,5 +1,8 @@
 import { apiClient, unwrap } from './client';
 import type {
+  MetaCallingInput,
+  MetaCallingOffResult,
+  MetaCallingResult,
   MetaWebhookReceipt,
   SuccessEnvelope,
   WebhookFixResult,
@@ -164,6 +167,19 @@ export const whatsappApi = {
         }>
       >(channel(id, '/switch-to-meta'), body),
     ),
+  /** PMC: Calling on (Meta direct) — calls over Meta Graph, messages stay on the partner. */
+  enableMetaCalling: (id: string, body: MetaCallingInput) =>
+    unwrap(apiClient.post<SuccessEnvelope<MetaCallingResult>>(channel(id, '/meta-calling'), body)),
+  /** PMC: Calling off — calls back to the partner (token removed). */
+  disableMetaCalling: (id: string, body: { turnOffAtWhatsApp?: boolean }) =>
+    unwrap(
+      apiClient.delete<SuccessEnvelope<MetaCallingOffResult>>(channel(id, '/meta-calling'), {
+        data: body,
+      }),
+    ),
+  /** PMC: Check / Fix of the Meta calling (token, number, `calls` webhook, settings). */
+  checkMetaCalling: (id: string) =>
+    unwrap(apiClient.post<SuccessEnvelope<MetaCallingResult>>(channel(id, '/meta-calling/check'))),
   /** SAC-T4: Webhook check / Fix — subscribe our app, add missing fields, check again. */
   fixWebhook: (id: string) =>
     unwrap(apiClient.post<SuccessEnvelope<WebhookFixResult>>(channel(id, '/webhook/fix'))),

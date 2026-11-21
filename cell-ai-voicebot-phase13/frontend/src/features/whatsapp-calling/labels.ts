@@ -70,7 +70,11 @@ export const UNAVAILABLE_TEXT: Record<
   not_cloud_api: 'Calling works on Cloud API numbers only.',
   country: "WhatsApp doesn't offer calling for this number's country yet.",
   // PN: a managed number whose partner can't do calling
-  provider_unsupported: "WhatsApp calling isn't available on this number yet.",
+  provider_unsupported:
+    'The partner can’t carry calls — turn on "Calling on karo (Meta direct)" in Number details.',
+  // PMC: the Meta access for a managed number's calls stopped working
+  meta_calling_broken:
+    'The Meta access for calls stopped working — Number details → Calling → Check / Fix.',
 };
 
 export const unavailableText = (reason: string | null | undefined): string =>

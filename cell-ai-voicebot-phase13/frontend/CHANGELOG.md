@@ -6,6 +6,12 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- **Calls via Meta direct for managed (Pinnacle) numbers (PMC)** — 2026-11-21
+  - Number details → **Calls via Meta direct**: **Calling on karo (Meta direct)** opens Continue with Facebook for the same number. A superadmin in Full access also has an **Advanced** System User token field.
+  - Progress steps ✅ / ❌; **Check / Fix**, **Retry check**, **Calling off** (optionally at WhatsApp too).
+  - Number card chip: **Calls via Meta** / **Calls off (partner)** / stopped. Readiness item **Calls via Meta direct**; new unavailable text for broken Meta calling.
+  - Admin → System: managed numbers on / stopped.
+
 - **Superadmin full access + WhatsApp calling (SAC)** — 2026-11-21
   - Admin → account → **Full access**: red banner with time left, Extend, Ring me too, Exit; owner actions open up (top-up stays off); a step-up dialog asks for the superadmin's own password on danger actions (`STEP_UP_REQUIRED` → retry once); audit rows say "by the platform team".
   - Numbers: **Webhook ✓ / ✗** chip and **Webhook check / Fix** (also on the superadmin account page); Admin → System shows numbers with webhook problems, TURN and AI first-word p95.

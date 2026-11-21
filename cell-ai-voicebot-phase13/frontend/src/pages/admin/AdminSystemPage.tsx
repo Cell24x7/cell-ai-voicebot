@@ -256,6 +256,12 @@ export function AdminSystemPage() {
                     label={String(s.whatsappCalls.webhookMissing)}
                   />
                 </Fact>
+                <Fact label="Managed numbers: calls via Meta">
+                  <State
+                    good={s.whatsappCalls.metaCallingBroken === 0}
+                    label={`${String(s.whatsappCalls.metaCallingOn)} on · ${String(s.whatsappCalls.metaCallingBroken)} stopped`}
+                  />
+                </Fact>
               </Section>
             </Grid>
           )}

@@ -34066,6 +34066,409 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/whatsapp/channels/{id}/meta-calling': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** PMC: a managed number's calls over Meta Graph — the last state, never the token (whatsapp.read) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: components['schemas']['WhatsAppMetaCalling'];
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** PMC: Calling on (Meta direct) — Embedded Signup code for the same WABA / number (a System User token only from a superadmin in full access); subscribes our app + `calls`, turns calling on at WhatsApp. Messages stay on the partner (whatsapp.manage; 6 / 10 min / number) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['WhatsAppMetaCallingInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                channel: components['schemas']['WhatsAppChannel'];
+                steps: {
+                  /** @enum {string} */
+                  key: 'token' | 'verify' | 'app_subscribed' | 'fields' | 'calling_on';
+                  ok: boolean;
+                  detail: string | null;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Meta returned an error (META_API_ERROR) */
+        502: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    /** PMC: Calling off (Meta direct) — token removed, our app leaves the WABA when unused, calls back to the partner (whatsapp.manage) */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['WhatsAppMetaCallingOffInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                channel: components['schemas']['WhatsAppChannel'];
+                turnedOffAtWhatsApp: boolean;
+                /** @description Our app left the WABA (no other number of ours uses it) */
+                unsubscribed: boolean;
+              };
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Meta returned an error (META_API_ERROR) */
+        502: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/whatsapp/channels/{id}/meta-calling/check': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** PMC: Check / Fix — token, WABA / number access, our app + `calls` webhook (repaired), call settings (whatsapp.manage; 6 / 10 min / number) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                channel: components['schemas']['WhatsAppChannel'];
+                steps: {
+                  /** @enum {string} */
+                  key: 'token' | 'verify' | 'app_subscribed' | 'fields' | 'calling_on';
+                  ok: boolean;
+                  detail: string | null;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Meta returned an error (META_API_ERROR) */
+        502: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/whatsapp/channels/{id}/sync': {
     parameters: {
       query?: never;
@@ -35964,6 +36367,328 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/whatsapp/channels/{id}/meta-calling': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** PMC: Calling on (Meta direct) for any account's managed number — code or System User token (superadmin, audited) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['WhatsAppMetaCallingInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                channel: components['schemas']['WhatsAppChannel'];
+                steps: {
+                  /** @enum {string} */
+                  key: 'token' | 'verify' | 'app_subscribed' | 'fields' | 'calling_on';
+                  ok: boolean;
+                  detail: string | null;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    /** PMC: Calling off (Meta direct) for any account's managed number (superadmin, audited) */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['WhatsAppMetaCallingOffInput'];
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                channel: components['schemas']['WhatsAppChannel'];
+                turnedOffAtWhatsApp: boolean;
+                /** @description Our app left the WABA (no other number of ours uses it) */
+                unsubscribed: boolean;
+              };
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/whatsapp/channels/{id}/meta-calling/check': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** PMC: Check / Fix of any account's Meta calling (superadmin, audited) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {boolean} */
+              success: true;
+              data: {
+                channel: components['schemas']['WhatsAppChannel'];
+                steps: {
+                  /** @enum {string} */
+                  key: 'token' | 'verify' | 'app_subscribed' | 'fields' | 'calling_on';
+                  ok: boolean;
+                  detail: string | null;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Missing / invalid / expired token (AUTH_UNAUTHENTICATED, AUTH_TOKEN_EXPIRED) */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Missing permission, disabled user, suspended account or impersonation block */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Not found in this account (RESOURCE_NOT_FOUND) */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Conflict (CONFLICT_DUPLICATE / CONFLICT_INVALID_STATE) */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Validation failed / invalid code (VALIDATION_FAILED, AUTH_CODE_INVALID) */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description Rate limited / too many attempts (RATE_LIMITED, AUTH_TOO_MANY_ATTEMPTS) — see Retry-After */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ErrorEnvelope'];
+          };
+        };
+        /** @description WhatsApp isn't set up on this server (WHATSAPP_NOT_CONFIGURED) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/whatsapp/channels/{id}/managed/webhook': {
     parameters: {
       query?: never;
@@ -37428,7 +38153,11 @@ export interface components {
         | 'whatsapp.webhook_fix_failed'
         | 'whatsapp.incoming_default_updated'
         | 'whatsapp.ai_calls_stopped'
-        | 'whatsapp.channel_switched_to_meta';
+        | 'whatsapp.channel_switched_to_meta'
+        | 'whatsapp.meta_calling_enabled'
+        | 'whatsapp.meta_calling_disabled'
+        | 'whatsapp.meta_calling_failed'
+        | 'whatsapp.meta_calling_checked';
       actor: {
         /** @enum {string} */
         type: 'user' | 'api_key' | 'system';
@@ -37719,6 +38448,10 @@ export interface components {
         webhookMissing: number;
         turnSet: boolean;
         aiFirstAudioP95Ms: number | null;
+        /** @description PMC: managed numbers with calls over Meta Graph */
+        metaCallingOn: number;
+        /** @description PMC: managed numbers whose Meta calling broke (wa-meta-calling-broken) */
+        metaCallingBroken: number;
       } | null;
     };
     AgentFunction: {
@@ -40807,7 +41540,8 @@ export interface components {
         | 'voice_api.provider_error'
         | 'whatsapp.provider_balance_low'
         | 'whatsapp.webhook_missing'
-        | 'whatsapp.scheduled_call_failed';
+        | 'whatsapp.scheduled_call_failed'
+        | 'whatsapp.meta_calling_broken';
       title: string;
       body: string;
       link: string | null;
@@ -41560,7 +42294,8 @@ export interface components {
           | 'restrictions'
           | 'last_calls_webhook'
           | 'media'
-          | 'prices';
+          | 'prices'
+          | 'meta_direct';
         /** @description null = could not tell */
         ok: boolean | null;
         detail: string;
@@ -41628,6 +42363,33 @@ export interface components {
       createdAt: string;
       updatedAt: string;
     };
+    WhatsAppMetaCalling: {
+      /**
+       * @description `on` = calls go over Meta Graph; messages stay on the partner
+       * @enum {string}
+       */
+      status: 'off' | 'on' | 'error';
+      /** @enum {string|null} */
+      method: 'embedded_signup' | 'system_user_token' | null;
+      tokenLast4: string | null;
+      tokenExpiresAt: string | null;
+      webhookCheck: {
+        /** @enum {string} */
+        status: 'ok' | 'failed' | 'unknown';
+        appSubscribed: boolean | null;
+        missingFields: string[];
+        checkedAt: string | null;
+        fixedAt: string | null;
+        error: string | null;
+      };
+      enabledAt: string | null;
+      checkedAt: string | null;
+      error: {
+        code: string;
+        step: string | null;
+        message: string;
+      } | null;
+    };
     WhatsAppChannel: {
       id: string;
       label: string;
@@ -41688,6 +42450,7 @@ export interface components {
           | 'messaging_limit'
           | 'not_cloud_api'
           | 'provider_unsupported'
+          | 'meta_calling_broken'
           | null;
         /** @description Meta paused calling on the number now */
         restricted: boolean;
@@ -41735,6 +42498,7 @@ export interface components {
         fixedAt: string | null;
         error: string | null;
       };
+      metaCalling: components['schemas']['WhatsAppMetaCalling'];
       connectedBy: string | null;
       connectedAt: string | null;
       syncedAt: string | null;
@@ -41799,6 +42563,8 @@ export interface components {
       metaPayer: 'platform' | 'customer';
       /** @description Partner Solution id for this platform-payer account; null otherwise */
       solutionId: string | null;
+      /** @description PMC: "Calling on karo (Meta direct)" is offered on managed numbers */
+      metaCallingEnabled: boolean;
     };
     WhatsAppChannelList: {
       items: components['schemas']['WhatsAppChannel'][];
@@ -42452,6 +43218,23 @@ export interface components {
       phoneNumberId: string;
       /** @enum {string} */
       mode?: 'cloud_api' | 'coexistence';
+    };
+    WhatsAppMetaCallingInput:
+      | {
+          /** @description Code from FB.login (single use, ~30 s) */
+          code: string;
+          /** @example 106540352242922 */
+          wabaId?: string;
+          /** @example 106540352242922 */
+          phoneNumberId?: string;
+        }
+      | {
+          /** @description A System User access token with this WABA (platform team only: admin route or superadmin full access) */
+          accessToken: string;
+        };
+    WhatsAppMetaCallingOffInput: {
+      /** @description Also turn calling off at WhatsApp (default false) */
+      turnOffAtWhatsApp?: boolean;
     };
     WhatsAppRegisterPinInput: {
       pin?: string;

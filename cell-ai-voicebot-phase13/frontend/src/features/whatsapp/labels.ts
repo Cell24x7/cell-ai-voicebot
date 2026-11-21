@@ -120,6 +120,21 @@ export const whatsappErrorMessage = (err: ApiError): string => {
       return 'Please wait a minute before trying again.';
     case 'AUTH_IMPERSONATION_BLOCKED':
       return "You can't change WhatsApp numbers while viewing as a user.";
+    // PMC: calls of a managed number over Meta Graph
+    case 'WHATSAPP_META_CALLING_MISMATCH':
+      return 'Meta ki window mein dusra WhatsApp account / number chuna gaya — yahi number chunein.';
+    case 'WHATSAPP_META_CALLING_SCOPES':
+      return 'WhatsApp permissions nahi mili — Meta window mein saari permissions allow karein.';
+    case 'WHATSAPP_META_CALLING_TOKEN_FORBIDDEN':
+      return 'Token sirf platform team paste kar sakti hai — Continue with Facebook use karein.';
+    case 'WHATSAPP_META_CALLING_NOT_MANAGED':
+      return 'Ye option sirf managed (partner) numbers ke liye hai.';
+    case 'WA_META_CALLING_DISABLED':
+      return 'Calls via Meta direct is server par band hai.';
+    case 'WA_META_CALLING_BROKEN':
+      return 'Is number par calls ka Meta access band ho gaya — Check / Fix karein.';
+    case 'WHATSAPP_SIGNUP_FAILED':
+      return err.message || 'Meta signup failed — try again.';
     // PN: managed numbers (Pinnacle partner API)
     case 'PINNACLE_KEY_INVALID':
       return 'The API key was rejected by the partner.';

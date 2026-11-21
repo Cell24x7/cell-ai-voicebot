@@ -203,6 +203,20 @@ export interface WebhookFixResult {
     detail: string | null;
   }[];
 }
+/** PMC: a managed number's calls over Meta Graph (messages stay on the partner). */
+export type MetaCalling = WhatsAppChannel['metaCalling'];
+export type MetaCallingStepKey = 'token' | 'verify' | 'app_subscribed' | 'fields' | 'calling_on';
+export interface MetaCallingResult {
+  channel: WhatsAppChannel;
+  steps: { key: MetaCallingStepKey; ok: boolean; detail: string | null }[];
+}
+export interface MetaCallingOffResult {
+  channel: WhatsAppChannel;
+  turnedOffAtWhatsApp: boolean;
+  unsubscribed: boolean;
+}
+export type MetaCallingInput =
+  { code: string; wabaId?: string; phoneNumberId?: string } | { accessToken: string };
 export type WhatsAppChannelDetail = Schemas['WhatsAppChannelDetail'];
 export type WhatsAppChannelList = Schemas['WhatsAppChannelList'];
 export type WhatsAppConnectResult = Schemas['WhatsAppConnectResult'];
